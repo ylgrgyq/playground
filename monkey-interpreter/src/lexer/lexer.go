@@ -23,7 +23,31 @@ func (l *Lexer) NextToken() token.Token {
 	var tok token.Token
 	switch l.ch {
 	case '=':
-		tok = newToken(token.ASSIGN, '=')
+		if l.peekChar() == '=' {
+			tok.Literal = "=="
+			tok.Type = token.EQ
+			l.readChar()
+		} else {
+			tok = newToken(token.ASSIGN, '=')
+		}
+	case '!':
+		if l.peekChar() == '=' {
+			tok.Literal = "!="
+			tok.Type = token.NOTEQ
+			l.readChar()
+		} else {
+			tok = newToken(token.BANG, '!')
+		}
+	case '<':
+		tok = newToken(token.LT, '<')
+	case '>':
+		tok = newToken(token.GT, '>')
+	case '*':
+		tok = newToken(token.ASTERISK, '*')
+	case '-':
+		tok = newToken(token.MINUS, '-')
+	case '/':
+		tok = newToken(token.DIVIDE, '/')
 	case ';':
 		tok = newToken(token.SEMICOLON, ';')
 	case '(':
@@ -44,14 +68,7 @@ func (l *Lexer) NextToken() token.Token {
 	default:
 		if isLetter(l.ch) {
 			tok.Literal = l.readIdentifier()
-			switch tok.Literal {
-			case "let":
-				tok.Type = token.LET
-			case "fn":
-				tok.Type = token.FUNCTION
-			default:
-				tok.Type = token.IDENT
-			}
+			tok.Type = token.LookupIdent(tok.Literal)
 		} else if isNumber(l.ch) {
 			tok.Literal = l.readInt()
 			tok.Type = token.INT
