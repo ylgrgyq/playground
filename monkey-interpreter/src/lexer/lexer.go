@@ -73,6 +73,14 @@ func (l *Lexer) readChar() {
 	l.readPosition++
 }
 
+func (l *Lexer) peekChar() byte {
+	if l.readPosition >= len(l.input) {
+		return 0
+	}
+
+	return l.input[l.readPosition]
+}
+
 func (l *Lexer) skipWhiteSpaces() {
 	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
 		l.readChar()
@@ -88,12 +96,11 @@ func isLetter(ch byte) bool {
 }
 
 func (l *Lexer) readIdentifier() string {
-	for isLetter(l.input[l.readPosition]) {
-		l.readPosition++
+	pos := l.position
+	for isLetter(l.peekChar()) {
+		l.readChar()
 	}
-	ident := l.input[l.position:l.readPosition]
-	l.position = l.readPosition - 1
-	return ident
+	return l.input[pos:l.readPosition]
 }
 
 func isNumber(ch byte) bool {
@@ -101,11 +108,10 @@ func isNumber(ch byte) bool {
 }
 
 func (l *Lexer) readInt() string {
-	for isNumber(l.input[l.readPosition]) {
-		l.readPosition++
+	pos := l.position
+	for isNumber(l.peekChar()) {
+		l.readChar()
 	}
 
-	n := l.input[l.position:l.readPosition]
-	l.position = l.readPosition - 1
-	return n
+	return l.input[pos:l.readPosition]
 }
