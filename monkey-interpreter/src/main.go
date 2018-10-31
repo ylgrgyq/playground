@@ -7,10 +7,6 @@ import (
 	"repl"
 )
 
-type Niu struct {
-	Name string
-}
-
 func main() {
 	user, err := user.Current()
 	if err != nil {
