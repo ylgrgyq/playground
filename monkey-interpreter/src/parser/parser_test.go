@@ -12,19 +12,7 @@ func TestLetParseStatement(t *testing.T) {
 	let niuniu = 100;
 	let huahua = 1122334;
 	`
-
-	lex := lexer.New(input)
-	par := New(lex)
-
-	program := par.ParseProgram()
-	if program == nil {
-		t.Fatalf("ParseProgram() returns nil")
-	}
-	checkParserErrors(t, par)
-
-	if len(program.Statements) != 3 {
-		t.Fatalf("program.Statements does not contain 3 statements. got=%d", len(program.Statements))
-	}
+	program := parseTestingProgram(t, input, 3)
 
 	tests := []struct {
 		expectedIdentifier string
@@ -63,18 +51,7 @@ func TestParseReturnStatement(t *testing.T) {
 		return 1234567;
 		return x;
 	`
-	lex := lexer.New(input)
-	par := New(lex)
-
-	program := par.ParseProgram()
-	if program == nil {
-		t.Fatalf("ParseProgram() returns nil")
-	}
-	checkParserErrors(t, par)
-
-	if len(program.Statements) != 3 {
-		t.Fatalf("program.Statements does not contain 3 statements. got=%d", len(program.Statements))
-	}
+	program := parseTestingProgram(t, input, 3)
 
 	tests := []struct {
 		expect string
@@ -101,6 +78,38 @@ func TestParseReturnStatement(t *testing.T) {
 			t.Errorf("parsed not expected statement '%q'. got '%q'", test.expect, actual.String())
 		}
 	}
+}
+
+func TestParseIdentifierExpression(t *testing.T) {
+	input := "hello;"
+
+	program := parseTestingProgram(t, input, 1)
+
+	express, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+	}
+
+	if express.String() != "hello;" {
+		t.Errorf("parsed not expected statement 'hello;'. got '%q'", express.String())
+	}
+}
+
+func parseTestingProgram(t *testing.T, input string, expectedStatementCount int) *ast.Program {
+	lex := lexer.New(input)
+	par := New(lex)
+
+	program := par.ParseProgram()
+	if program == nil {
+		t.Fatalf("ParseProgram() returns nil")
+	}
+	checkParserErrors(t, par)
+
+	if len(program.Statements) != expectedStatementCount {
+		t.Fatalf("program.Statements does not contain %d statements. got=%d", expectedStatementCount, len(program.Statements))
+	}
+
+	return program
 }
 
 func checkParserErrors(t *testing.T, par *Parser) {

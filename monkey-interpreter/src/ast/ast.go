@@ -72,7 +72,7 @@ type Identifier struct {
 	Value string
 }
 
-func (i *Identifier) statementNode() {}
+func (i *Identifier) expressionNode() {}
 
 func (i *Identifier) TokenLieteral() string {
 	return i.Token.Literal
@@ -119,5 +119,8 @@ func (es *ExpressionStatement) TokenLieteral() string {
 }
 
 func (ex *ExpressionStatement) String() string {
-	return ""
+	var buffer bytes.Buffer
+	buffer.WriteString(ex.Value.String())
+	buffer.WriteString(";")
+	return buffer.String()
 }
