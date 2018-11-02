@@ -69,6 +69,8 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerInfixParseFn(token.NOTEQ, p.parseInfix)
 	p.registerInfixParseFn(token.LT, p.parseInfix)
 	p.registerInfixParseFn(token.GT, p.parseInfix)
+	p.registerInfixParseFn(token.PLUSPLUS, p.parsePostfix)
+	p.registerInfixParseFn(token.MINUSMINUS, p.parsePostfix)
 
 	return &p
 }
@@ -259,9 +261,14 @@ func (p *Parser) parseInfix(left ast.Expression) ast.Expression {
 	p.nextToken()
 
 	// TODOs shall we seperate return a nil expression or parseExpression failed
+
 	infix.Right = p.parseExpression(precedence)
 
 	return infix
+}
+
+func (p *Parser) parsePostfix(left ast.Expression) ast.Expression {
+	return &ast.PostfixExpression{Token: p.currentToken, Left: left, Operator: p.currentToken.Literal}
 }
 
 func (p *Parser) peekTokenPrecedence() int {

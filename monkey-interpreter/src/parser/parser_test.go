@@ -149,6 +149,7 @@ func TestParseInfixExpression(t *testing.T) {
 		{" less < greater;", "<", "less", "greater"},
 		{" a == 5;", "==", "a", 5},
 		{" b != 1;", "!=", "b", 1},
+		{" a++", "++", "a", 1},
 	}
 
 	for _, test := range tests {
@@ -161,7 +162,7 @@ func TestParseInfixExpression(t *testing.T) {
 
 		infix := express.Value.(*ast.InfixExpression)
 		if infix.Operator != test.expectOperator {
-			t.Errorf("expect prefix operator %q. got %q", test.expectOperator, infix.Operator)
+			t.Errorf("expect infix operator %q. got %q", test.expectOperator, infix.Operator)
 		}
 
 		if !testLiteralExpression(t, infix.Left, test.expectLeft) {
@@ -169,6 +170,35 @@ func TestParseInfixExpression(t *testing.T) {
 		}
 
 		if !testLiteralExpression(t, infix.Right, test.expectRight) {
+			t.FailNow()
+		}
+	}
+}
+
+func TestParsePostfixExpression(t *testing.T) {
+	tests := []struct {
+		input          string
+		expectOperator string
+		expectLeft     interface{}
+	}{
+		{" a++", "++", "a"},
+		{" a--", "--", "a"},
+	}
+
+	for _, test := range tests {
+		program := parseTestingProgram(t, test.input, 1)
+
+		express, ok := program.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+		}
+
+		postfix := express.Value.(*ast.PostfixExpression)
+		if postfix.Operator != test.expectOperator {
+			t.Errorf("expect postfix operator %q. got %q", test.expectOperator, postfix.Operator)
+		}
+
+		if !testLiteralExpression(t, postfix.Left, test.expectLeft) {
 			t.FailNow()
 		}
 	}
@@ -191,6 +221,7 @@ func TestExpressionPrecedence(t *testing.T) {
 		{"!-a", "(!(-a))"},
 		{"a > b == c < d", "((a > b) == (c < d))"},
 		{"a * b != c - d", "((a * b) != (c - d))"},
+		{"a-- * b++ != c----- d++", "(((a--) * (b++)) != (((c--)--) - (d++)))"},
 	}
 
 	for _, test := range tests {

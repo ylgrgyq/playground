@@ -185,3 +185,24 @@ func (i *InfixExpression) String() string {
 	buffer.WriteString(")")
 	return buffer.String()
 }
+
+type PostfixExpression struct {
+	Token    token.Token
+	Left     Expression
+	Operator string
+}
+
+func (p *PostfixExpression) expressionNode() {}
+
+func (p *PostfixExpression) TokenLieteral() string {
+	return p.Token.Literal
+}
+
+func (p *PostfixExpression) String() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("(")
+	buffer.WriteString(p.Left.String())
+	buffer.WriteString(p.Operator)
+	buffer.WriteString(")")
+	return buffer.String()
+}
