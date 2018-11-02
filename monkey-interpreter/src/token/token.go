@@ -18,12 +18,14 @@ const (
 	FALSE = "FALSE"
 
 	// Operators
-	ASSIGN   = "="
-	PLUS     = "+"
-	MINUS    = "-"
-	ASTERISK = "*"
-	DIVIDE   = "/"
-	BANG     = "!"
+	ASSIGN     = "="
+	PLUS       = "+"
+	MINUS      = "-"
+	ASTERISK   = "*"
+	DIVIDE     = "/"
+	BANG       = "!"
+	PLUSPLUS   = "++"
+	MINUSMINUS = "--"
 
 	LT = "<"
 	GT = ">"
