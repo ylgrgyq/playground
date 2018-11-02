@@ -19,6 +19,17 @@ const (
 	CALL
 )
 
+var precedenceMap = map[token.TokenType]int{
+	token.EQ:       EQUALS,
+	token.NOTEQ:    EQUALS,
+	token.LT:       LESSGREATER,
+	token.GT:       LESSGREATER,
+	token.PLUS:     SUM,
+	token.MINUS:    SUM,
+	token.DIVIDE:   PRODUCT,
+	token.ASTERISK: PRODUCT,
+}
+
 type (
 	prefixParseFn func() ast.Expression
 	infixParseFn  func(ast.Expression) ast.Expression
@@ -43,7 +54,10 @@ func New(l *lexer.Lexer) *Parser {
 	p.nextToken()
 
 	p.registerPrefixParseFn(token.IDENT, p.parseIdentifier)
-	p.registerPrefixParseFn(token.INT, p.parseInt)
+	p.registerPrefixParseFn(token.INT, p.parseInteger)
+
+	p.registerPrefixParseFn(token.BANG, p.parsePrefix)
+	p.registerPrefixParseFn(token.MINUS, p.parsePrefix)
 
 	return &p
 }
@@ -171,11 +185,15 @@ func (p *Parser) expectNextTokenType(expect token.TokenType) *token.Token {
 	return &peekToken
 }
 
+func (p *Parser) peekTokenTypeIs(expectType token.TokenType) bool {
+	return p.peekToken.Type == expectType
+}
+
 func (p *Parser) parseIdentifier() ast.Expression {
 	return &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal}
 }
 
-func (p *Parser) parseInt() ast.Expression {
+func (p *Parser) parseInteger() ast.Expression {
 	value, err := strconv.ParseInt(p.currentToken.Literal, 0, 64)
 	if err != nil {
 		msg := fmt.Sprintf("could not parse %q as intger", p.currentToken.Literal)
@@ -184,4 +202,35 @@ func (p *Parser) parseInt() ast.Expression {
 	}
 
 	return &ast.Integer{Token: p.currentToken, Value: value}
+}
+
+func (p *Parser) parsePrefix() ast.Expression {
+	prefix := &ast.PrefixExpression{Token: p.currentToken, Operator: p.currentToken.Literal}
+
+	p.nextToken()
+
+	precedence := p.currentTokenPrecedence()
+
+	prefix.Value = p.parseExpression(precedence)
+	if prefix.Value == nil {
+		return nil
+	}
+
+	return prefix
+}
+
+func (p *Parser) peekTokenPrecedence() int {
+	if precedence, ok := precedenceMap[p.peekToken.Type]; ok {
+		return precedence
+	}
+
+	return LOWEST
+}
+
+func (p *Parser) currentTokenPrecedence() int {
+	if precedence, ok := precedenceMap[p.currentToken.Type]; ok {
+		return precedence
+	}
+
+	return LOWEST
 }

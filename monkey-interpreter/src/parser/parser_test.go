@@ -104,6 +104,36 @@ func TestParseLiteralExpression(t *testing.T) {
 	}
 }
 
+func TestParsePrefixExpression(t *testing.T) {
+	tests := []struct {
+		input          string
+		expectOperator string
+		expectValue    interface{}
+	}{
+		{"!123123;  ", "!", 123123},
+		{"  -56;  ", "-", 56},
+		{"! haha;", "!", "haha"},
+	}
+
+	for _, test := range tests {
+		program := parseTestingProgram(t, test.input, 1)
+
+		express, ok := program.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+		}
+
+		prefix := express.Value.(*ast.PrefixExpression)
+		if prefix.Operator != test.expectOperator {
+			t.Errorf("expect prefix operator %q. got %q", test.expectOperator, prefix.Operator)
+		}
+
+		if !testLiteralExpression(t, prefix.Value, test.expectValue) {
+			t.FailNow()
+		}
+	}
+}
+
 func testLiteralExpression(t *testing.T, expression ast.Expression, expectValue interface{}) bool {
 	switch v := expectValue.(type) {
 	case int:
