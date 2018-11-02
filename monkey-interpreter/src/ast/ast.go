@@ -160,3 +160,28 @@ func (p *PrefixExpression) String() string {
 	buffer.WriteString(")")
 	return buffer.String()
 }
+
+type InfixExpression struct {
+	Token    token.Token
+	Left     Expression
+	Operator string
+	Right    Expression
+}
+
+func (i *InfixExpression) expressionNode() {}
+
+func (i *InfixExpression) TokenLieteral() string {
+	return i.Token.Literal
+}
+
+func (i *InfixExpression) String() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("(")
+	buffer.WriteString(i.Left.String())
+	buffer.WriteString(" ")
+	buffer.WriteString(i.Operator)
+	buffer.WriteString(" ")
+	buffer.WriteString(i.Right.String())
+	buffer.WriteString(")")
+	return buffer.String()
+}

@@ -20,14 +20,16 @@ const (
 )
 
 var precedenceMap = map[token.TokenType]int{
-	token.EQ:       EQUALS,
-	token.NOTEQ:    EQUALS,
-	token.LT:       LESSGREATER,
-	token.GT:       LESSGREATER,
-	token.PLUS:     SUM,
-	token.MINUS:    SUM,
-	token.DIVIDE:   PRODUCT,
-	token.ASTERISK: PRODUCT,
+	token.EQ:         EQUALS,
+	token.NOTEQ:      EQUALS,
+	token.LT:         LESSGREATER,
+	token.GT:         LESSGREATER,
+	token.PLUS:       SUM,
+	token.MINUS:      SUM,
+	token.DIVIDE:     PRODUCT,
+	token.ASTERISK:   PRODUCT,
+	token.PLUSPLUS:   CALL,
+	token.MINUSMINUS: CALL,
 }
 
 type (
@@ -58,6 +60,15 @@ func New(l *lexer.Lexer) *Parser {
 
 	p.registerPrefixParseFn(token.BANG, p.parsePrefix)
 	p.registerPrefixParseFn(token.MINUS, p.parsePrefix)
+
+	p.registerInfixParseFn(token.MINUS, p.parseInfix)
+	p.registerInfixParseFn(token.PLUS, p.parseInfix)
+	p.registerInfixParseFn(token.DIVIDE, p.parseInfix)
+	p.registerInfixParseFn(token.ASTERISK, p.parseInfix)
+	p.registerInfixParseFn(token.EQ, p.parseInfix)
+	p.registerInfixParseFn(token.NOTEQ, p.parseInfix)
+	p.registerInfixParseFn(token.LT, p.parseInfix)
+	p.registerInfixParseFn(token.GT, p.parseInfix)
 
 	return &p
 }
@@ -169,6 +180,21 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	}
 
 	left := prefixFn()
+	// 最难的是这个 for 循环。当执行到这里时候 p.currentToken 指向一个 expression，peekToken 指向空或者下一个 operator
+	// precedence 和 p.peekTokenPrecedence 比较实际比较的是 p.currentToken 指向的这个 expression 左右两边的 operator 优先级
+	// 拿 A + B + C 来举例，当 p.currentToken 指向 B 时候，比较的就是 B 两侧 + 的优先级，当左边更高时就返回 left，并保持 p.peekToken 依然
+	// 指向 B 右边的 + ，从而能在 B 作为 A + B 的 Right 结合为 Expression 整体时候，在上一层的 for 中继续从 p.peekToken 指向 B 右侧的 + 开始解析。
+	// 拿 A + B * C 来举例，当 B 右侧优先级更高时，保持 B 去作为 left 和 B 后面的 Expression 结合
+	for p.peekToken.Type != token.SEMICOLON && precedence < p.peekTokenPrecedence() {
+		infixFn := p.infixFns[p.peekToken.Type]
+		if infixFn == nil {
+			break
+		}
+
+		p.nextToken()
+
+		left = infixFn(left)
+	}
 
 	return left
 }
@@ -205,11 +231,17 @@ func (p *Parser) parseInteger() ast.Expression {
 }
 
 func (p *Parser) parsePrefix() ast.Expression {
+	if p.peekToken.Type == token.SEMICOLON {
+		msg := fmt.Sprintf("got ';' after prefix operator %q", p.currentToken.Literal)
+		p.errors = append(p.errors, msg)
+		return nil
+	}
+
 	prefix := &ast.PrefixExpression{Token: p.currentToken, Operator: p.currentToken.Literal}
 
-	p.nextToken()
-
 	precedence := p.currentTokenPrecedence()
+
+	p.nextToken()
 
 	prefix.Value = p.parseExpression(precedence)
 	if prefix.Value == nil {
@@ -217,6 +249,19 @@ func (p *Parser) parsePrefix() ast.Expression {
 	}
 
 	return prefix
+}
+
+// when called p.currentToken must point to a infix operator
+func (p *Parser) parseInfix(left ast.Expression) ast.Expression {
+	infix := &ast.InfixExpression{Token: p.currentToken, Left: left, Operator: p.currentToken.Literal}
+
+	precedence := p.currentTokenPrecedence()
+	p.nextToken()
+
+	// TODOs shall we seperate return a nil expression or parseExpression failed
+	infix.Right = p.parseExpression(precedence)
+
+	return infix
 }
 
 func (p *Parser) peekTokenPrecedence() int {

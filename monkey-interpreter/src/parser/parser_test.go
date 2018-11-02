@@ -134,6 +134,80 @@ func TestParsePrefixExpression(t *testing.T) {
 	}
 }
 
+func TestParseInfixExpression(t *testing.T) {
+	tests := []struct {
+		input          string
+		expectOperator string
+		expectLeft     interface{}
+		expectRight    interface{}
+	}{
+		{"123123 + 111;  ", "+", 123123, 111},
+		{" 12 - 56;  ", "-", 12, 56},
+		{" 11 * haha;", "*", 11, "haha"},
+		{" 11 / haha;", "/", 11, "haha"},
+		{" greater > less;", ">", "greater", "less"},
+		{" less < greater;", "<", "less", "greater"},
+		{" a == 5;", "==", "a", 5},
+		{" b != 1;", "!=", "b", 1},
+	}
+
+	for _, test := range tests {
+		program := parseTestingProgram(t, test.input, 1)
+
+		express, ok := program.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+		}
+
+		infix := express.Value.(*ast.InfixExpression)
+		if infix.Operator != test.expectOperator {
+			t.Errorf("expect prefix operator %q. got %q", test.expectOperator, infix.Operator)
+		}
+
+		if !testLiteralExpression(t, infix.Left, test.expectLeft) {
+			t.FailNow()
+		}
+
+		if !testLiteralExpression(t, infix.Right, test.expectRight) {
+			t.FailNow()
+		}
+	}
+}
+
+func TestExpressionPrecedence(t *testing.T) {
+	tests := []struct {
+		input        string
+		expectString string
+	}{
+		{"123123 + 111 + 222;  ", "((123123 + 111) + 222)"},
+		{" 12 - 56 - haha;  ", "((12 - 56) - haha)"},
+		{" niuniu + 11 * haha;", "(niuniu + (11 * haha))"},
+		{" niuniu + 11 * !haha;", "(niuniu + (11 * (!haha)))"},
+		{" a * b + c", "((a * b) + c)"},
+		{" a * b * c", "((a * b) * c)"},
+		{" a * b / c", "((a * b) / c)"},
+		{" a + b / c + d", "((a + (b / c)) + d)"},
+		{" a + b / c * d * e + f", "((a + (((b / c) * d) * e)) + f)"},
+		{"!-a", "(!(-a))"},
+		{"a > b == c < d", "((a > b) == (c < d))"},
+		{"a * b != c - d", "((a * b) != (c - d))"},
+	}
+
+	for _, test := range tests {
+		program := parseTestingProgram(t, test.input, 1)
+
+		express, ok := program.Statements[0].(*ast.ExpressionStatement)
+		if !ok {
+			t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+		}
+
+		infix := express.Value.(ast.Expression)
+		if infix.String() != test.expectString {
+			t.Errorf("expect infix String() %q. got %q", test.expectString, infix.String())
+		}
+	}
+}
+
 func testLiteralExpression(t *testing.T, expression ast.Expression, expectValue interface{}) bool {
 	switch v := expectValue.(type) {
 	case int:
@@ -171,17 +245,17 @@ func testIntegerExpression(t *testing.T, expression ast.Expression, v int64) boo
 func testIdentifierExpression(t *testing.T, expression ast.Expression, v string) bool {
 	ident, ok := expression.(*ast.Identifier)
 	if !ok {
-		t.Errorf("expression is not *ast.Integer. got '%T'", expression)
+		t.Errorf("expression is not *ast.Identifier. got '%T'", expression)
 		return false
 	}
 
 	if ident.Value != v {
-		t.Errorf("value for integer expression is not %s. got '%s'", v, ident.Value)
+		t.Errorf("value for identifier expression is not %s. got '%s'", v, ident.Value)
 		return false
 	}
 
 	if ident.TokenLieteral() != v {
-		t.Errorf("token literal for integer expression is not %s. got '%s'", v, ident.TokenLieteral())
+		t.Errorf("token literal for identifier expression is not %s. got '%s'", v, ident.TokenLieteral())
 		return false
 	}
 
