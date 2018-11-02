@@ -4,6 +4,7 @@ import (
 	"ast"
 	"fmt"
 	"lexer"
+	"strconv"
 	"token"
 )
 
@@ -42,6 +43,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.nextToken()
 
 	p.registerPrefixParseFn(token.IDENT, p.parseIdentifier)
+	p.registerPrefixParseFn(token.INT, p.parseInt)
 
 	return &p
 }
@@ -171,4 +173,15 @@ func (p *Parser) expectNextTokenType(expect token.TokenType) *token.Token {
 
 func (p *Parser) parseIdentifier() ast.Expression {
 	return &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal}
+}
+
+func (p *Parser) parseInt() ast.Expression {
+	value, err := strconv.ParseInt(p.currentToken.Literal, 0, 64)
+	if err != nil {
+		msg := fmt.Sprintf("could not parse %q as intger", p.currentToken.Literal)
+		p.errors = append(p.errors, msg)
+		return nil
+	}
+
+	return &ast.Integer{Token: p.currentToken, Value: value}
 }
