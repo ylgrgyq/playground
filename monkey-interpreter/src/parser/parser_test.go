@@ -149,7 +149,6 @@ func TestParseInfixExpression(t *testing.T) {
 		{" less < greater;", "<", "less", "greater"},
 		{" a == 5;", "==", "a", 5},
 		{" b != 1;", "!=", "b", 1},
-		{" a++", "++", "a", 1},
 	}
 
 	for _, test := range tests {
