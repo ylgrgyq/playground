@@ -153,6 +153,7 @@ func (p *Parser) parseLetStatement() *ast.LetStatement {
 		return nil
 	}
 
+	p.nextToken()
 	letStatement.Value = p.parseExpression(LOWEST)
 
 	if p.expectNextTokenType(token.SEMICOLON) == nil {

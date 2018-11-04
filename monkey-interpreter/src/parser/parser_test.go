@@ -8,31 +8,24 @@ import (
 )
 
 func TestLetParseStatement(t *testing.T) {
-	input := `
-	let x = 5;
-	let niuniu = 100;
-	let huahua = 1122334;
-	`
-	program := parseTestingProgram(t, input, 3)
-
 	tests := []struct {
-		expectedIdentifier string
+		input                    string
+		expectedIdentifier       string
+		expectedExpressionString string
 	}{
-		{"x"},
-		{"niuniu"},
-		{"huahua"},
+		{"let x = 5;", "x", "5"},
+		{"let niuniu = 100;", "niuniu", "100"},
+		{"let huahua = 1122334;", "huahua", "1122334"},
+		{"let hello = new + world;", "hello", "(new + world)"},
+		{"let y = false;", "y", "false"},
 	}
 
-	for i, test := range tests {
-		actual := program.Statements[i]
+	for _, test := range tests {
+		program := parseTestingProgram(t, test.input, 1)
 
-		if actual.TokenLieteral() != "let" {
-			t.Errorf("token literal is not let. got '%q'", actual.TokenLieteral())
-		}
-
-		letStateMent, ok := actual.(*ast.LetStatement)
+		letStateMent, ok := program.Statements[0].(*ast.LetStatement)
 		if !ok {
-			t.Errorf("statement not *ast.LetStatement. got '%T'", actual)
+			t.Errorf("statement not *ast.LetStatement. got '%T'", program.Statements[0])
 		}
 
 		if letStateMent.Name.Value != test.expectedIdentifier {
@@ -43,40 +36,32 @@ func TestLetParseStatement(t *testing.T) {
 			t.Errorf("actual.Name not '%s'. got '%s'", test.expectedIdentifier, letStateMent.Name.TokenLieteral())
 		}
 
+		if letStateMent.Value.String() != test.expectedExpressionString {
+			t.Errorf("actual.Name not '%s'. got '%s'", test.expectedIdentifier, letStateMent.Value.String())
+		}
 	}
 }
 
 func TestParseReturnStatement(t *testing.T) {
-	input := `
-		return  ;
-		return 1234567;
-		return x;
-	`
-	program := parseTestingProgram(t, input, 3)
-
 	tests := []struct {
-		expect string
+		input                    string
+		expectedExpressionString string
 	}{
-		{"return;"},
-		{"return;"},
-		{"return;"},
+		{"return;", "return;"},
+		{"return x + y;", "return (x + y);"},
+		{"return 111;", "return 111;"},
 	}
 
-	for i, test := range tests {
-		actual := program.Statements[i]
-
-		if actual.TokenLieteral() != "return" {
-			t.Errorf("token literal is not return. got '%q'", actual.TokenLieteral())
-		}
-
-		retStateMent, ok := actual.(*ast.ReturnStatement)
+	for _, test := range tests {
+		program := parseTestingProgram(t, test.input, 1)
+		retStateMent, ok := program.Statements[0].(*ast.ReturnStatement)
 
 		if !ok {
-			t.Errorf("statement not *ast.ReturnStatement. got '%T'", actual)
+			t.Errorf("statement not *ast.ReturnStatement. got '%T'", program.Statements[0])
 		}
 
-		if retStateMent.String() != test.expect {
-			t.Errorf("parsed not expected statement '%q'. got '%q'", test.expect, actual.String())
+		if retStateMent.String() != test.expectedExpressionString {
+			t.Errorf("parsed not expected statement '%q'. got '%q'", test.expectedExpressionString, retStateMent.String())
 		}
 	}
 }
