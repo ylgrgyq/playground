@@ -153,6 +153,8 @@ func TestParseInfixExpression(t *testing.T) {
 		{" less < greater;", "<", "less", "greater"},
 		{" a == 5;", "==", "a", 5},
 		{" b != 1;", "!=", "b", 1},
+		{" true == true;", "==", true, true},
+		{" false != false;", "!=", false, false},
 	}
 
 	for _, test := range tests {
@@ -223,8 +225,13 @@ func TestExpressionPrecedence(t *testing.T) {
 		{" a + b / c * d * e + f", "((a + (((b / c) * d) * e)) + f)"},
 		{"!-a", "(!(-a))"},
 		{"a > b == c < d", "((a > b) == (c < d))"},
+		{"a > b == ! false", "((a > b) == (!false))"},
+		{"a < b < c  != ! true", "(((a < b) < c) != (!true))"},
 		{"a * b != c - d", "((a * b) != (c - d))"},
 		{"a-- * b++ != c----- d++", "(((a--) * (b++)) != (((c--)--) - (d++)))"},
+		{"(123123 + 111) * 222;  ", "((123123 + 111) * 222)"},
+		{"a + (b + c) + d;", "((a + (b + c)) + d)"},
+		{"-(a +b);", "(-(a + b))"},
 	}
 
 	for _, test := range tests {
