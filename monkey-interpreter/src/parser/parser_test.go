@@ -88,6 +88,8 @@ func TestParseLiteralExpression(t *testing.T) {
 	}{
 		{"123123;", 123123},
 		{"hello;", "hello"},
+		{"true;", true},
+		{"false;", false},
 	}
 
 	for _, test := range tests {
@@ -113,6 +115,8 @@ func TestParsePrefixExpression(t *testing.T) {
 		{"!123123;  ", "!", 123123},
 		{"  -56;  ", "-", 56},
 		{"! haha;", "!", "haha"},
+		{"! true;", "!", true},
+		{"! false;", "!", false},
 	}
 
 	for _, test := range tests {
@@ -246,6 +250,8 @@ func testLiteralExpression(t *testing.T, expression ast.Expression, expectValue 
 		return testIntegerExpression(t, expression, v)
 	case string:
 		return testIdentifierExpression(t, expression, v)
+	case bool:
+		return testBooleanExpression(t, expression, v)
 	}
 
 	t.Errorf("unknown expected literal type %T", expectValue)
@@ -286,6 +292,27 @@ func testIdentifierExpression(t *testing.T, expression ast.Expression, v string)
 
 	if ident.TokenLieteral() != v {
 		t.Errorf("token literal for identifier expression is not %s. got '%s'", v, ident.TokenLieteral())
+		return false
+	}
+
+	return true
+}
+
+func testBooleanExpression(t *testing.T, expression ast.Expression, v bool) bool {
+	ident, ok := expression.(*ast.Boolean)
+	if !ok {
+		t.Errorf("expression is not *ast.Boolean. got '%T'", expression)
+		return false
+	}
+
+	if ident.Value != v {
+		t.Errorf("value for boolean expression is not %t. got '%t'", v, ident.Value)
+		return false
+	}
+
+	vInStr := strconv.FormatBool(v)
+	if ident.TokenLieteral() != vInStr {
+		t.Errorf("token literal for boolean expression is not %s. got '%s'", vInStr, ident.TokenLieteral())
 		return false
 	}
 
