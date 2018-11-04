@@ -2,6 +2,7 @@ package ast
 
 import (
 	"bytes"
+	"strings"
 	"token"
 )
 
@@ -267,5 +268,38 @@ func (i *IfExpression) String() string {
 		buffer.WriteString(" else ")
 		buffer.WriteString(i.ElseBody.String())
 	}
+	return buffer.String()
+}
+
+type Function struct {
+	Token      token.Token
+	Name       *Identifier
+	Parameters []*Identifier
+	Body       *BlockExpression
+}
+
+func (f *Function) expressionNode() {}
+
+func (f *Function) TokenLieteral() string {
+	return f.Token.Literal
+}
+
+func (f *Function) String() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("fn ")
+	if f.Name != nil {
+		buffer.WriteString(f.Name.String())
+		buffer.WriteString(" ")
+	}
+
+	params := []string{}
+	for _, param := range f.Parameters {
+		params = append(params, param.String())
+	}
+
+	buffer.WriteString("(")
+	buffer.WriteString(strings.Join(params, ", "))
+	buffer.WriteString(") ")
+	buffer.WriteString(f.Body.String())
 	return buffer.String()
 }

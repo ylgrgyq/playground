@@ -259,9 +259,27 @@ func TestIfExpression(t *testing.T) {
 		t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
 	}
 
+	expectStr := "if (x < y) {return (x + 1);} else {return (y + 1);}"
 	ifExpress, ok := express.Value.(*ast.IfExpression)
-	if ifExpress.String() != "if (x < y) {return (x + 1);} else {return (y + 1);}" {
-		t.Errorf("expect if expression String() %q. got %q", "", ifExpress.String())
+	if ifExpress.String() != expectStr {
+		t.Errorf("expect if expression String() %q. got %q", expectStr, ifExpress.String())
+	}
+}
+
+func TestFunctionExpression(t *testing.T) {
+	input := `fn hello(x, y) { return x + y; }`
+
+	program := parseTestingProgram(t, input, 1)
+
+	express, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+	}
+
+	expectStr := "fn hello (x, y) {return (x + y);}"
+	funExpress, ok := express.Value.(*ast.Function)
+	if funExpress.String() != expectStr {
+		t.Errorf("expect function expression String() %q. got %q", expectStr, funExpress.String())
 	}
 }
 

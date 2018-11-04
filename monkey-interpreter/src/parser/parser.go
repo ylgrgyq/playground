@@ -60,6 +60,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefixParseFn(token.TRUE, p.parseBoolean)
 	p.registerPrefixParseFn(token.FALSE, p.parseBoolean)
 	p.registerPrefixParseFn(token.IF, p.parseIfExpression)
+	p.registerPrefixParseFn(token.FUNCTION, p.parseFunction)
 
 	p.registerPrefixParseFn(token.BANG, p.parsePrefix)
 	p.registerPrefixParseFn(token.MINUS, p.parsePrefix)
@@ -371,6 +372,45 @@ func (p *Parser) parseBlockExpression() ast.Expression {
 	}
 
 	return block
+}
+
+func (p *Parser) parseFunction() ast.Expression {
+	function := &ast.Function{Token: p.currentToken}
+
+	if p.peekToken.Type == token.IDENT {
+		p.nextToken()
+		ident := p.parseIdentifier()
+		function.Name = ident.(*ast.Identifier)
+	}
+
+	if p.expectNextTokenType(token.LPAREN) == nil {
+		return nil
+	}
+
+	function.Parameters = p.parseParameters()
+
+	if p.expectNextTokenType(token.LBRACE) == nil {
+		return nil
+	}
+
+	body := p.parseBlockExpression()
+	function.Body = body.(*ast.BlockExpression)
+	return function
+}
+
+func (p *Parser) parseParameters() []*ast.Identifier {
+	p.nextToken()
+	params := []*ast.Identifier{}
+
+	for p.currentToken.Type != token.RPAREN {
+		params = append(params, &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal})
+		p.nextToken()
+		if p.currentToken.Type == token.COMMA {
+			p.nextToken()
+		}
+	}
+
+	return params
 }
 
 func (p *Parser) peekTokenPrecedence() int {
