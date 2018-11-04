@@ -271,20 +271,20 @@ func (i *IfExpression) String() string {
 	return buffer.String()
 }
 
-type Function struct {
+type FunctionExpression struct {
 	Token      token.Token
 	Name       *Identifier
 	Parameters []*Identifier
 	Body       *BlockExpression
 }
 
-func (f *Function) expressionNode() {}
+func (f *FunctionExpression) expressionNode() {}
 
-func (f *Function) TokenLieteral() string {
+func (f *FunctionExpression) TokenLieteral() string {
 	return f.Token.Literal
 }
 
-func (f *Function) String() string {
+func (f *FunctionExpression) String() string {
 	var buffer bytes.Buffer
 	buffer.WriteString("fn ")
 	if f.Name != nil {
@@ -301,5 +301,33 @@ func (f *Function) String() string {
 	buffer.WriteString(strings.Join(params, ", "))
 	buffer.WriteString(") ")
 	buffer.WriteString(f.Body.String())
+	return buffer.String()
+}
+
+type CallExpression struct {
+	Token     token.Token
+	Function  Expression
+	Arguments []Expression
+}
+
+func (c *CallExpression) expressionNode() {}
+
+func (c *CallExpression) TokenLieteral() string {
+	return c.Token.Literal
+}
+
+func (c *CallExpression) String() string {
+	var buffer bytes.Buffer
+	buffer.WriteString(c.Function.String())
+
+	args := []string{}
+	for _, arg := range c.Arguments {
+		args = append(args, arg.String())
+	}
+
+	buffer.WriteString("(")
+	buffer.WriteString(strings.Join(args, ", "))
+	buffer.WriteString(")")
+
 	return buffer.String()
 }

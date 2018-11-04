@@ -277,9 +277,26 @@ func TestFunctionExpression(t *testing.T) {
 	}
 
 	expectStr := "fn hello (x, y) {return (x + y);}"
-	funExpress, ok := express.Value.(*ast.Function)
+	funExpress, ok := express.Value.(*ast.FunctionExpression)
 	if funExpress.String() != expectStr {
 		t.Errorf("expect function expression String() %q. got %q", expectStr, funExpress.String())
+	}
+}
+
+func TestCallExpression(t *testing.T) {
+	input := `hello(x, y) + a`
+
+	program := parseTestingProgram(t, input, 1)
+
+	express, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+	}
+
+	expectStr := "(hello(x, y) + a)"
+	funExpress, ok := express.Value.(ast.Expression)
+	if funExpress.String() != expectStr {
+		t.Errorf("expect call expression String() %q. got %q", expectStr, funExpress.String())
 	}
 }
 
