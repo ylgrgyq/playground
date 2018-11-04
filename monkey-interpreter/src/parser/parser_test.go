@@ -249,6 +249,22 @@ func TestExpressionPrecedence(t *testing.T) {
 	}
 }
 
+func TestIfExpression(t *testing.T) {
+	input := `if (x < y) { return x + 1;} else {return y + 1;}`
+
+	program := parseTestingProgram(t, input, 1)
+
+	express, ok := program.Statements[0].(*ast.ExpressionStatement)
+	if !ok {
+		t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+	}
+
+	ifExpress, ok := express.Value.(*ast.IfExpression)
+	if ifExpress.String() != "if (x < y) {return (x + 1);} else {return (y + 1);}" {
+		t.Errorf("expect if expression String() %q. got %q", "", ifExpress.String())
+	}
+}
+
 func testLiteralExpression(t *testing.T, expression ast.Expression, expectValue interface{}) bool {
 	switch v := expectValue.(type) {
 	case int:

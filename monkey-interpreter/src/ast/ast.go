@@ -221,3 +221,51 @@ func (p *PostfixExpression) String() string {
 	buffer.WriteString(")")
 	return buffer.String()
 }
+
+type BlockExpression struct {
+	Token      token.Token
+	Statements []Statement
+}
+
+func (b *BlockExpression) expressionNode() {}
+
+func (b *BlockExpression) TokenLieteral() string {
+	return b.Token.Literal
+}
+
+func (b *BlockExpression) String() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("{")
+	for _, statement := range b.Statements {
+		buffer.WriteString(statement.String())
+	}
+
+	buffer.WriteString("}")
+	return buffer.String()
+}
+
+type IfExpression struct {
+	Token     token.Token
+	Condition Expression
+	ThenBody  *BlockExpression
+	ElseBody  *BlockExpression
+}
+
+func (i *IfExpression) expressionNode() {}
+
+func (i *IfExpression) TokenLieteral() string {
+	return i.Token.Literal
+}
+
+func (i *IfExpression) String() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("if ")
+	buffer.WriteString(i.Condition.String())
+	buffer.WriteString(" ")
+	buffer.WriteString(i.ThenBody.String())
+	if i.ElseBody != nil {
+		buffer.WriteString(" else ")
+		buffer.WriteString(i.ElseBody.String())
+	}
+	return buffer.String()
+}
