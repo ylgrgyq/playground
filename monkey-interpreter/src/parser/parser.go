@@ -66,7 +66,6 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefixParseFn(token.BANG, p.parsePrefix)
 	p.registerPrefixParseFn(token.MINUS, p.parsePrefix)
 	p.registerPrefixParseFn(token.LPAREN, p.parseGroupedExpression)
-	p.registerPrefixParseFn(token.LBRACE, p.parseBlockExpression)
 
 	p.registerInfixParseFn(token.MINUS, p.parseInfix)
 	p.registerInfixParseFn(token.PLUS, p.parseInfix)
@@ -362,12 +361,12 @@ func (p *Parser) parseIfExpression() (ast.Expression, error) {
 		return nil, err
 	}
 
-	body, err := p.parseExpression(LOWEST)
+	body, err := p.parseBlockExpression()
 	if err != nil {
 		return nil, err
 	}
 
-	ifExpress.ThenBody = body.(*ast.BlockExpression)
+	ifExpress.ThenBody = body
 	if p.peekTokenTypeIs(token.ELSE) {
 		p.nextToken()
 
@@ -375,20 +374,23 @@ func (p *Parser) parseIfExpression() (ast.Expression, error) {
 			return nil, err
 		}
 
-		body, err := p.parseExpression(LOWEST)
+		body, err := p.parseBlockExpression()
 		if err != nil {
 			return nil, err
 		}
-		ifExpress.ElseBody = body.(*ast.BlockExpression)
+		ifExpress.ElseBody = body
 	}
 
 	return ifExpress, nil
 }
 
-func (p *Parser) parseBlockExpression() (ast.Expression, error) {
+func (p *Parser) parseBlockExpression() (*ast.BlockExpression, error) {
 	block := &ast.BlockExpression{Token: p.currentToken}
 
-	p.nextToken()
+	if err := p.assertCurrentTokenType(token.LBRACE); err != nil {
+		return nil, err
+	}
+
 	for !p.currentTokenTypeIs(token.RBRACE) {
 		statement, err := p.parseStatement()
 		if err != nil {
@@ -427,8 +429,12 @@ func (p *Parser) parseFunction() (ast.Expression, error) {
 		return nil, err
 	}
 
-	body, _ := p.parseBlockExpression()
-	function.Body = body.(*ast.BlockExpression)
+	body, err := p.parseBlockExpression()
+	if err != nil {
+		return nil, err
+	}
+
+	function.Body = body
 	return function, nil
 }
 
