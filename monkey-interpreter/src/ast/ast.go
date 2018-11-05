@@ -274,8 +274,6 @@ type IfExpression struct {
 	ElseBody  *BlockExpression
 }
 
-func (i *IfExpression) statementNode() {}
-
 func (i *IfExpression) expressionNode() {}
 
 func (i *IfExpression) TokenLieteral() string {
