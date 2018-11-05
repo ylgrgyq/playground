@@ -120,8 +120,14 @@ func (p *Parser) parseStatement() (ast.Statement, error) {
 		statement, err = p.parseLetStatement()
 	case token.RETURN:
 		statement, err = p.parseReturnStatement()
+	case token.IF:
+		statement, err = p.parseIfStatement()
 	default:
-		statement, err = p.parseExpressionStatement()
+		if p.peekTokenTypeIs(token.ASSIGN) {
+			statement, err = p.parseAssignStatement()
+		} else {
+			statement, err = p.parseExpressionStatement()
+		}
 	}
 
 	return statement, err
@@ -186,11 +192,35 @@ func (p *Parser) parseExpressionStatement() (*ast.ExpressionStatement, error) {
 	}
 	express.Value = value
 
-	if p.peekTokenTypeIs(token.SEMICOLON) {
-		p.nextToken()
+	if err := p.assertNextTokenType(token.SEMICOLON); err != nil {
+		return nil, err
 	}
 
 	return express, nil
+}
+
+func (p *Parser) parseAssignStatement() (*ast.AssignStatement, error) {
+	assign := &ast.AssignStatement{Token: p.currentToken}
+
+	ident := &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal}
+
+	if err := p.assertNextTokenType(token.ASSIGN); err != nil {
+		return nil, err
+	}
+
+	p.nextToken()
+	value, err := p.parseExpression(LOWEST)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := p.assertNextTokenType(token.SEMICOLON); err != nil {
+		return nil, err
+	}
+
+	assign.Variable = ident
+	assign.Value = value
+	return assign, nil
 }
 
 /*
@@ -341,6 +371,18 @@ func (p *Parser) parseGroupedExpression() (ast.Expression, error) {
 }
 
 func (p *Parser) parseIfExpression() (ast.Expression, error) {
+	ifExpress, err := p.doParseIfExpression()
+
+	return ifExpress, err
+}
+
+func (p *Parser) parseIfStatement() (ast.Statement, error) {
+	ifExpress, err := p.doParseIfExpression()
+
+	return ifExpress, err
+}
+
+func (p *Parser) doParseIfExpression() (*ast.IfExpression, error) {
 	ifExpress := &ast.IfExpression{Token: p.currentToken}
 
 	if !p.currentTokenTypeIs(token.IF) {

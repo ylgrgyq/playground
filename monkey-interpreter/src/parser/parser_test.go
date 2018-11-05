@@ -171,8 +171,8 @@ func TestParsePostfixExpression(t *testing.T) {
 		expectOperator string
 		expectLeft     interface{}
 	}{
-		{" a++", "++", "a"},
-		{" a--", "--", "a"},
+		{" a++;", "++", "a"},
+		{" a--;", "--", "a"},
 	}
 
 	for _, test := range tests {
@@ -235,24 +235,40 @@ func TestExpressionPrecedence(t *testing.T) {
 }
 
 func TestIfExpression(t *testing.T) {
-	input := `if (x < y) { return x + 1;} else {return y + 1;}`
+	input := `x = if (x < y) { return x + 1;} else {return y + 1;};`
 
 	program := parseTestingProgram(t, input, 1)
 
-	express, ok := program.Statements[0].(*ast.ExpressionStatement)
+	express, ok := program.Statements[0].(*ast.AssignStatement)
 	if !ok {
-		t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+		t.Errorf("statement not *ast.AssignStatement. got '%T'", program.Statements[0])
 	}
 
-	expectStr := "if (x < y) {return (x + 1);} else {return (y + 1);}"
-	ifExpress, ok := express.Value.(*ast.IfExpression)
+	expectStr := "if (x < y) {return (x + 1); } else {return (y + 1); }"
+	ifExpress, _ := express.Value.(*ast.IfExpression)
 	if ifExpress.String() != expectStr {
 		t.Errorf("expect if expression String() %q. got %q", expectStr, ifExpress.String())
 	}
 }
 
+func TestIfStatement(t *testing.T) {
+	input := `if (x < y) { return x + 1;} else {return y + 1;}`
+
+	program := parseTestingProgram(t, input, 1)
+
+	express, ok := program.Statements[0].(*ast.IfExpression)
+	if !ok {
+		t.Errorf("statement not *ast.AssignStatement. got '%T'", program.Statements[0])
+	}
+
+	expectStr := "if (x < y) {return (x + 1); } else {return (y + 1); }"
+	if express.String() != expectStr {
+		t.Errorf("expect if expression String() %q. got %q", expectStr, express.String())
+	}
+}
+
 func TestFunctionExpression(t *testing.T) {
-	input := `fn hello(x, y) { return x + y; }`
+	input := `fn hello(x, y) { x = 1; return x + y; };`
 
 	program := parseTestingProgram(t, input, 1)
 
@@ -261,7 +277,7 @@ func TestFunctionExpression(t *testing.T) {
 		t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
 	}
 
-	expectStr := "fn hello (x, y) {return (x + y);}"
+	expectStr := "fn hello (x, y) {x = 1; return (x + y); }"
 	funExpress, ok := express.Value.(*ast.FunctionExpression)
 	if funExpress.String() != expectStr {
 		t.Errorf("expect function expression String() %q. got %q", expectStr, funExpress.String())
@@ -269,7 +285,7 @@ func TestFunctionExpression(t *testing.T) {
 }
 
 func TestCallExpression(t *testing.T) {
-	input := `hello(x, y) + a`
+	input := `hello(x, y) + a;`
 
 	program := parseTestingProgram(t, input, 1)
 

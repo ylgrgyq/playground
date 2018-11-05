@@ -111,6 +111,27 @@ func (ex *ExpressionStatement) String() string {
 	return buffer.String()
 }
 
+type AssignStatement struct {
+	Token    token.Token
+	Variable *Identifier
+	Value    Expression
+}
+
+func (a *AssignStatement) statementNode() {}
+
+func (a *AssignStatement) TokenLieteral() string {
+	return a.Token.Literal
+}
+
+func (a *AssignStatement) String() string {
+	var buffer bytes.Buffer
+	buffer.WriteString(a.Variable.String())
+	buffer.WriteString(" = ")
+	buffer.WriteString(a.Value.String())
+	buffer.WriteString(";")
+	return buffer.String()
+}
+
 type Identifier struct {
 	Token token.Token
 	Value string
@@ -239,6 +260,7 @@ func (b *BlockExpression) String() string {
 	buffer.WriteString("{")
 	for _, statement := range b.Statements {
 		buffer.WriteString(statement.String())
+		buffer.WriteString(" ")
 	}
 
 	buffer.WriteString("}")
@@ -251,6 +273,8 @@ type IfExpression struct {
 	ThenBody  *BlockExpression
 	ElseBody  *BlockExpression
 }
+
+func (i *IfExpression) statementNode() {}
 
 func (i *IfExpression) expressionNode() {}
 
