@@ -203,17 +203,17 @@ func TestExpressionPrecedence(t *testing.T) {
 		{" 12 - 56 - haha;  ", "((12 - 56) - haha)"},
 		{" niuniu + 11 * haha;", "(niuniu + (11 * haha))"},
 		{" niuniu + 11 * !haha;", "(niuniu + (11 * (!haha)))"},
-		{" a * b + c", "((a * b) + c)"},
-		{" a * b * c", "((a * b) * c)"},
-		{" a * b / c", "((a * b) / c)"},
-		{" a + b / c + d", "((a + (b / c)) + d)"},
-		{" a + b / c * d * e + f", "((a + (((b / c) * d) * e)) + f)"},
-		{"!-a", "(!(-a))"},
-		{"a > b == c < d", "((a > b) == (c < d))"},
-		{"a > b == ! false", "((a > b) == (!false))"},
-		{"a < b < c  != ! true", "(((a < b) < c) != (!true))"},
-		{"a * b != c - d", "((a * b) != (c - d))"},
-		{"a-- * b++ != c----- d++", "(((a--) * (b++)) != (((c--)--) - (d++)))"},
+		{" a * b + c;", "((a * b) + c)"},
+		{" a * b * c;", "((a * b) * c)"},
+		{" a * b / c;", "((a * b) / c)"},
+		{" a + b / c + d;", "((a + (b / c)) + d)"},
+		{" a + b / c * d * e + f;", "((a + (((b / c) * d) * e)) + f)"},
+		{"!-a;", "(!(-a))"},
+		{"a > b == c < d;", "((a > b) == (c < d))"},
+		{"a > b == ! false;", "((a > b) == (!false))"},
+		{"a < b < c  != ! true;", "(((a < b) < c) != (!true))"},
+		{"a * b != c - d;", "((a * b) != (c - d))"},
+		{"a-- * b++ != c----- d++;", "(((a--) * (b++)) != (((c--)--) - (d++)))"},
 		{"(123123 + 111) * 222;  ", "((123123 + 111) * 222)"},
 		{"a + (b + c) + d;", "((a + (b + c)) + d)"},
 		{"-(a +b);", "(-(a + b))"},
@@ -377,17 +377,4 @@ func parseTestingProgram(t *testing.T, input string, expectedStatementCount int)
 	}
 
 	return program
-}
-
-func checkParserErrors(t *testing.T, par *Parser) {
-	errors := par.Errors()
-	if len(errors) == 0 {
-		return
-	}
-
-	for _, msg := range errors {
-		t.Errorf("parser error: %q", msg)
-	}
-
-	t.FailNow()
 }
