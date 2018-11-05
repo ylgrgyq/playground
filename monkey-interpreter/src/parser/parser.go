@@ -95,99 +95,92 @@ func (p *Parser) Errors() []string {
 	return p.errors
 }
 
-func (p *Parser) expectTokenTypeError(expect token.TokenType, actual token.TokenType) {
-	err := fmt.Sprintf("expectd token type is %s, got %s", expect, actual)
-	p.errors = append(p.errors, err)
-}
-
 func (p *Parser) nextToken() token.Token {
 	p.currentToken = p.peekToken
 	p.peekToken = p.lex.NextToken()
 	return p.currentToken
 }
 
-func (p *Parser) ParseProgram() *ast.Program {
+func (p *Parser) ParseProgram() (*ast.Program, error) {
 	program := &ast.Program{}
 
-	for p.currentToken.Type != token.EOF {
-		statement := p.parseStatement()
-
-		if statement != nil {
+	for !p.currentTokenTypeIs(token.EOF) {
+		if statement, err := p.parseStatement(); err != nil {
+			return nil, err
+		} else if statement != nil {
 			program.Statements = append(program.Statements, statement)
 		}
 
 		p.nextToken()
 	}
 
-	return program
+	return program, nil
 }
 
-func (p *Parser) parseStatement() ast.Statement {
+func (p *Parser) parseStatement() (ast.Statement, error) {
 	var statement ast.Statement
+	var err error
 	switch p.currentToken.Type {
 	case token.LET:
-		statement = p.parseLetStatement()
+		statement, err = p.parseLetStatement()
 	case token.RETURN:
-		statement = p.parseReturnStatement()
+		statement, err = p.parseReturnStatement()
 	default:
-		statement = p.parseExpressionStatement()
+		statement, err = p.parseExpressionStatement()
 	}
 
-	return statement
+	return statement, err
 }
 
-func (p *Parser) parseLetStatement() *ast.LetStatement {
+func (p *Parser) parseLetStatement() (*ast.LetStatement, error) {
 	letStatement := &ast.LetStatement{Token: p.currentToken}
 
-	var expect *token.Token
-
-	expect = p.expectNextTokenType(token.IDENT)
-	if expect == nil {
-		return nil
+	if err := p.assertNextTokenType(token.IDENT); err != nil {
+		return nil, err
 	}
 
-	letStatement.Name = &ast.Identifier{Token: *expect, Value: expect.Literal}
+	letStatement.Name = &ast.Identifier{Token: p.currentToken, Value: p.currentToken.Literal}
 
-	expect = p.expectNextTokenType(token.ASSIGN)
-	if expect == nil {
-		return nil
+	if err := p.assertNextTokenType(token.ASSIGN); err != nil {
+		return nil, err
 	}
 
+	// skip ASSIGN token and point currentToken to the start of the next expression
 	p.nextToken()
 	letStatement.Value = p.parseExpression(LOWEST)
 
-	if p.expectNextTokenType(token.SEMICOLON) == nil {
-		return nil
+	if err := p.assertNextTokenType(token.SEMICOLON); err != nil {
+		return nil, err
 	}
 
-	return letStatement
+	return letStatement, nil
 }
 
-func (p *Parser) parseReturnStatement() *ast.ReturnStatement {
+func (p *Parser) parseReturnStatement() (*ast.ReturnStatement, error) {
 	retStatement := &ast.ReturnStatement{Token: p.currentToken}
 
-	if p.peekToken.Type != token.SEMICOLON {
+	if !p.nextTokenTypeIs(token.SEMICOLON) {
 		p.nextToken()
 		retStatement.Value = p.parseExpression(LOWEST)
 	}
 
-	if p.expectNextTokenType(token.SEMICOLON) == nil {
-		return nil
+	if err := p.assertNextTokenType(token.SEMICOLON); err != nil {
+		return nil, err
 	}
 
-	return retStatement
+	return retStatement, nil
 }
 
-func (p *Parser) parseExpressionStatement() *ast.ExpressionStatement {
+func (p *Parser) parseExpressionStatement() (*ast.ExpressionStatement, error) {
 	express := &ast.ExpressionStatement{Token: p.currentToken}
 
 	express.Value = p.parseExpression(LOWEST)
 
-	if p.peekToken.Type == token.SEMICOLON {
-		p.nextToken()
+	if err := p.assertNextTokenType(token.SEMICOLON); err != nil {
+		return nil, err
 	}
 
-	return express
+	return express, nil
 }
 
 /*
@@ -222,28 +215,31 @@ func (p *Parser) parseExpression(precedence int) ast.Expression {
 	return left
 }
 
-func (p *Parser) expectNextTokenType(expect token.TokenType) *token.Token {
-	var peekToken token.Token
-	if p.peekToken.Type == expect {
-		peekToken = p.peekToken
-	} else {
-		p.expectTokenTypeError(expect, p.peekToken.Type)
-	}
-
-	p.nextToken()
-	return &peekToken
+func (p *Parser) nextTokenTypeIs(expect token.TokenType) bool {
+	return p.peekToken.Type == expect
 }
 
-func (p *Parser) expectCurrentTokenType(expect token.TokenType) *token.Token {
-	var t token.Token
-	if p.currentToken.Type == expect {
-		t = p.currentToken
+func (p *Parser) currentTokenTypeIs(expect token.TokenType) bool {
+	return p.currentToken.Type == expect
+}
+
+func (p *Parser) assertNextTokenType(expect token.TokenType) error {
+	return p.assertTokenType(expect, p.peekToken.Type)
+}
+
+func (p *Parser) assertCurrentTokenType(expect token.TokenType) error {
+	return p.assertTokenType(expect, p.currentToken.Type)
+}
+
+func (p *Parser) assertTokenType(expect token.TokenType, actual token.TokenType) error {
+	var err error
+	if actual != expect {
+		err = fmt.Errorf("expectd token type is %q, got %q", expect, actual)
 	} else {
-		p.expectTokenTypeError(expect, p.currentToken.Type)
+		p.nextToken()
 	}
 
-	p.nextToken()
-	return &t
+	return err
 }
 
 func (p *Parser) peekTokenTypeIs(expectType token.TokenType) bool {
@@ -318,7 +314,7 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 
 	expression := p.parseExpression(LOWEST)
 
-	if p.expectNextTokenType(token.RPAREN) == nil {
+	if p.assertNextTokenType(token.RPAREN) == nil {
 		return nil
 	}
 
@@ -328,13 +324,13 @@ func (p *Parser) parseGroupedExpression() ast.Expression {
 func (p *Parser) parseIfExpression() ast.Expression {
 	ifExpress := &ast.IfExpression{Token: p.currentToken}
 
-	if p.expectNextTokenType(token.LPAREN) == nil {
+	if p.assertNextTokenType(token.LPAREN) == nil {
 		return nil
 	}
 
 	ifExpress.Condition = p.parseExpression(LOWEST)
 
-	if p.expectCurrentTokenType(token.RPAREN) == nil {
+	if p.assertCurrentTokenType(token.RPAREN) == nil {
 		return nil
 	}
 
@@ -347,7 +343,7 @@ func (p *Parser) parseIfExpression() ast.Expression {
 	if p.peekToken.Type == token.ELSE {
 		p.nextToken()
 
-		if p.expectNextTokenType(token.LBRACE) == nil {
+		if p.assertNextTokenType(token.LBRACE) == nil {
 			return nil
 		}
 
@@ -366,7 +362,7 @@ func (p *Parser) parseBlockExpression() ast.Expression {
 
 	p.nextToken()
 	for p.currentToken.Type != token.RBRACE {
-		statement := p.parseStatement()
+		statement, _ := p.parseStatement()
 		if statement != nil {
 			block.Statements = append(block.Statements, statement)
 		}
@@ -386,13 +382,13 @@ func (p *Parser) parseFunction() ast.Expression {
 		function.Name = ident.(*ast.Identifier)
 	}
 
-	if p.expectNextTokenType(token.LPAREN) == nil {
+	if p.assertNextTokenType(token.LPAREN) == nil {
 		return nil
 	}
 
 	function.Parameters = p.parseParameters()
 
-	if p.expectNextTokenType(token.LBRACE) == nil {
+	if p.assertNextTokenType(token.LBRACE) == nil {
 		return nil
 	}
 
@@ -419,7 +415,7 @@ func (p *Parser) parseParameters() []*ast.Identifier {
 func (p *Parser) parseCallExpression(fun ast.Expression) ast.Expression {
 	call := &ast.CallExpression{Token: p.currentToken, Function: fun}
 
-	if p.expectCurrentTokenType(token.LPAREN) == nil {
+	if p.assertCurrentTokenType(token.LPAREN) == nil {
 		return nil
 	}
 

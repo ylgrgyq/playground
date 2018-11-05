@@ -366,11 +366,11 @@ func parseTestingProgram(t *testing.T, input string, expectedStatementCount int)
 	lex := lexer.New(input)
 	par := New(lex)
 
-	program := par.ParseProgram()
-	if program == nil {
-		t.Fatalf("ParseProgram() returns nil")
+	program, err := par.ParseProgram()
+	if err != nil {
+		t.Fatalf("parse program for input: %q failed. error is: %q", input, err.Error())
+		return nil
 	}
-	checkParserErrors(t, par)
 
 	if len(program.Statements) != expectedStatementCount {
 		t.Fatalf("program.Statements does not contain %d statements. got=%d", expectedStatementCount, len(program.Statements))
