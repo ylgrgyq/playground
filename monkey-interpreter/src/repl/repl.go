@@ -2,10 +2,11 @@ package repl
 
 import (
 	"bufio"
+	"evaluator"
 	"fmt"
 	"io"
 	"lexer"
-	"token"
+	"parser"
 )
 
 const PROMPT = ">>"
@@ -21,9 +22,17 @@ func Start(in io.Reader, out io.Writer) {
 
 		line := scanner.Text()
 		lexer := lexer.New(line)
-
-		for tok := lexer.NextToken(); tok.Type != token.EOF; tok = lexer.NextToken() {
-			fmt.Printf("%+v\n", tok)
+		parser := parser.New(lexer)
+		program, err := parser.ParseProgram()
+		if err != nil {
+			fmt.Printf("parse program failed: %s", err)
 		}
+
+		obj, err := evaluator.Eval(program)
+		if err != nil {
+			fmt.Printf("evaluate program failed: %s", err)
+		}
+
+		fmt.Printf("%+v\n", obj.Inspect())
 	}
 }

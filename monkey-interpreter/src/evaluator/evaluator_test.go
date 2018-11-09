@@ -16,6 +16,12 @@ func TestEvalIntegerValue(t *testing.T) {
 		{"5;", 5},
 		{"-5;", -5},
 		{"-100;", -100},
+		{"5 + 5;", 10},
+		{"10 * 10 + 5", 105},
+		{"10 + 5 * 10 + 1", 61},
+		{"10 * (10 + 5)", 150},
+		{"100 / (10 + 10);", 5},
+		{"100 / 10 * -10 + 10;", -90},
 	}
 
 	for _, test := range tests {
@@ -37,6 +43,16 @@ func TestEvalBooleanValue(t *testing.T) {
 		{"!true", false},
 		{"!555", false},
 		{"!!555", true},
+		{"!!!555", false},
+		{"10 < 5", false},
+		{"10 > 5", true},
+		{"10 != 5", true},
+		{"10 == 5", false},
+		{"true == true", true},
+		{"true != true", false},
+		{"true == false", false},
+		{"1 + 5 == 7 - 1", true},
+		{"1 + 5 == 8 - 1", false},
 	}
 
 	for _, test := range tests {
