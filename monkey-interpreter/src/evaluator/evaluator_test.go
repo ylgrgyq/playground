@@ -118,7 +118,7 @@ func TestEvalError(t *testing.T) {
 			t.Fatalf("parse program for input: %q failed. error is: %q", test.input, err.Error())
 		}
 
-		actual := Eval(program)
+		actual := Eval(program, object.NewEnvironment())
 		if !isError(actual) {
 			t.Errorf("need an error for input: %s. but got %T", test.input, actual)
 		}
@@ -127,6 +127,20 @@ func TestEvalError(t *testing.T) {
 		if error.Msg != test.expect {
 			t.Errorf("expect error msg: %s for input %s. but got %s", test.expect, test.input, error.Msg)
 		}
+	}
+}
+
+func TestLetStatement(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect interface{}
+	}{
+		{"let x = 1; return x + x + 3", 5},
+		{"let x = 1; let y = 100; if (x < y) {return x + y}", 101},
+	}
+
+	for _, test := range tests {
+		assertEvalResultEqual(t, test.input, test.expect)
 	}
 }
 
@@ -166,7 +180,7 @@ func evalTestingInput(t *testing.T, input string) object.Object {
 		t.Fatalf("parse program for input: %q failed. error is: %q", input, err.Error())
 	}
 
-	actual := Eval(program)
+	actual := Eval(program, object.NewEnvironment())
 	if isError(actual) {
 		t.Fatalf("evaluate program failed for input: %q. error is: %q", input, actual.(*object.Error).Msg)
 	}

@@ -77,3 +77,21 @@ func (e *Error) Type() ObjectType {
 func (e *Error) Inspect() string {
 	return fmt.Sprintf("error: %s", e.Msg)
 }
+
+func NewEnvironment() *Environment {
+	return &Environment{storage: make(map[string]Object)}
+}
+
+type Environment struct {
+	storage map[string]Object
+}
+
+func (e *Environment) Set(key string, val Object) Object {
+	e.storage[key] = val
+	return val
+}
+
+func (e *Environment) Get(key string) (Object, bool) {
+	val, ok := e.storage[key]
+	return val, ok
+}
