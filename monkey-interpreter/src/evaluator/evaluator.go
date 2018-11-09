@@ -16,12 +16,16 @@ func Eval(node ast.Node) (object.Object, error) {
 	switch node := node.(type) {
 	case *ast.Program:
 		return evalStatements(node.Statements)
+	case *ast.BlockExpression:
+		return evalStatements(node.Statements)
 	case *ast.ExpressionStatement:
 		return Eval(node.Value)
 	case *ast.PrefixExpression:
 		return evalPrefixExpression(node)
 	case *ast.InfixExpression:
 		return evalInfixExpression(node)
+	case *ast.IfExpression:
+		return evalIfExpression(node)
 	case *ast.Integer:
 		return &object.Integer{Value: node.Value}, nil
 	case *ast.Boolean:
@@ -74,6 +78,28 @@ func evalPrefixExpression(node *ast.PrefixExpression) (object.Object, error) {
 	return NULL, nil
 }
 
+func evalBangOperator(obj object.Object) (object.Object, error) {
+	switch obj {
+	case TRUE:
+		return FALSE, nil
+	case FALSE:
+		return TRUE, nil
+	case NULL:
+		return TRUE, nil
+	default:
+		return FALSE, nil
+	}
+}
+
+func evalPrefixMinusOperator(obj object.Object) (object.Object, error) {
+	integer, ok := obj.(*object.Integer)
+	if !ok {
+		return nil, fmt.Errorf("minus operator can not be used as prefix operator for %T", obj)
+	}
+
+	return &object.Integer{Value: -integer.Value}, nil
+}
+
 func evalInfixExpression(node *ast.InfixExpression) (object.Object, error) {
 	left, err := Eval(node.Left)
 	if err != nil {
@@ -114,32 +140,26 @@ func evalIntegerInfixExpression(operator string, left object.Object, right objec
 	case ">":
 		return &object.Boolean{Value: leftInt.Value > rightInt.Value}, nil
 	case "==":
-		return &object.Boolean{Value: leftInt.Value == rightInt.Value}, nil
+		return nativeBoolToBooleanObj(leftInt.Value == rightInt.Value), nil
 	case "!=":
-		return &object.Boolean{Value: leftInt.Value != rightInt.Value}, nil
+		return nativeBoolToBooleanObj(leftInt.Value != rightInt.Value), nil
 	default:
 		return NULL, nil
 	}
 }
 
-func evalBangOperator(obj object.Object) (object.Object, error) {
-	switch obj {
-	case TRUE:
-		return FALSE, nil
-	case FALSE:
-		return TRUE, nil
-	case NULL:
-		return TRUE, nil
-	default:
-		return FALSE, nil
-	}
-}
-
-func evalPrefixMinusOperator(obj object.Object) (object.Object, error) {
-	integer, ok := obj.(*object.Integer)
-	if !ok {
-		return nil, fmt.Errorf("minus operator can not be used as prefix operator for %T", obj)
+func evalIfExpression(node *ast.IfExpression) (object.Object, error) {
+	con, err := Eval(node.Condition)
+	if err != nil {
+		return nil, err
 	}
 
-	return &object.Integer{Value: -integer.Value}, nil
+	var ret object.Object
+	ret = NULL
+	if con != FALSE && con != NULL {
+		ret, err = Eval(node.ThenBody)
+	} else if node.ElseBody != nil {
+		ret, err = Eval(node.ElseBody)
+	}
+	return ret, err
 }

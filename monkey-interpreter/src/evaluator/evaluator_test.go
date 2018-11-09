@@ -63,6 +63,44 @@ func TestEvalBooleanValue(t *testing.T) {
 	}
 }
 
+func TestIfElseExpression(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect interface{}
+	}{
+		{"if (true) {1} else {2}", 1},
+		{"if (false) {1} else {2}", 2},
+		{"if (1 + 1 != 6) {1 + 2} else {3 + 4}", 3},
+		{"if (2 + 3 == 5) {5}", 5},
+		{"if (2 + 3 != 5) {5}", NULL},
+	}
+
+	for _, test := range tests {
+		var err error
+		actual := evalTestingInput(t, test.input)
+		switch v := test.expect.(type) {
+		case int:
+			err = testCompareInteger(t, actual, int64(v))
+		case bool:
+			err = testCompareBoolean(t, actual, v)
+		default:
+			err = testCompareNull(t, actual)
+		}
+
+		if err != nil {
+			t.Errorf("evaluate for input: %q failed. error is: %s", test.input, err)
+		}
+	}
+}
+
+func testCompareNull(t *testing.T, obj object.Object) error {
+	if obj == NULL {
+		return nil
+	}
+
+	return fmt.Errorf("evaluated object is not Null. got %T", obj)
+}
+
 func evalTestingInput(t *testing.T, input string) object.Object {
 	lexer := lexer.New(input)
 	parser := parser.New(lexer)
