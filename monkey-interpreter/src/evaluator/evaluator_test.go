@@ -22,13 +22,11 @@ func TestEvalIntegerValue(t *testing.T) {
 		{"10 * (10 + 5)", 150},
 		{"100 / (10 + 10);", 5},
 		{"100 / 10 * -10 + 10;", -90},
+		{"return 100 / 10 * -10 + 10;", -90},
 	}
 
 	for _, test := range tests {
-		actual := evalTestingInput(t, test.input)
-		if err := testCompareInteger(t, actual, test.expect); err != nil {
-			t.Errorf("evaluate for input: %q failed. error is: %s", test.input, err)
-		}
+		assertEvalResultEqual(t, test.input, test.expect)
 	}
 }
 
@@ -56,10 +54,7 @@ func TestEvalBooleanValue(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual := evalTestingInput(t, test.input)
-		if err := testCompareBoolean(t, actual, test.expect); err != nil {
-			t.Errorf("evaluate for input: %q failed. error is: %s", test.input, err)
-		}
+		assertEvalResultEqual(t, test.input, test.expect)
 	}
 }
 
@@ -76,20 +71,49 @@ func TestIfElseExpression(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var err error
-		actual := evalTestingInput(t, test.input)
-		switch v := test.expect.(type) {
-		case int:
-			err = testCompareInteger(t, actual, int64(v))
-		case bool:
-			err = testCompareBoolean(t, actual, v)
-		default:
-			err = testCompareNull(t, actual)
-		}
+		assertEvalResultEqual(t, test.input, test.expect)
+	}
+}
 
-		if err != nil {
-			t.Errorf("evaluate for input: %q failed. error is: %s", test.input, err)
-		}
+func TestReturnStatement(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect interface{}
+	}{
+		{"return 1 + 2 + 3", 6},
+		{"if (true){ 1 + 1; return 3;}", 3},
+		{`if (true)
+			{ if (false)
+				{return 1 + 1;}
+			  else { return 3;}}`, 3},
+		{`if (true)
+			  { if (true)
+				  {return 1 + 1;}
+				return 6;}`, 2},
+	}
+
+	for _, test := range tests {
+		assertEvalResultEqual(t, test.input, test.expect)
+	}
+
+}
+
+func assertEvalResultEqual(t *testing.T, input string, expect interface{}) {
+	var err error
+	actual := evalTestingInput(t, input)
+	switch v := expect.(type) {
+	case int:
+		err = testCompareInteger(t, actual, int64(v))
+	case int64:
+		err = testCompareInteger(t, actual, v)
+	case bool:
+		err = testCompareBoolean(t, actual, v)
+	default:
+		err = testCompareNull(t, actual)
+	}
+
+	if err != nil {
+		t.Errorf("evaluate for input: %q failed. error is: %s", input, err)
 	}
 }
 
