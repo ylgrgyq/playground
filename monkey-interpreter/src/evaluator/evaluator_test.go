@@ -81,6 +81,7 @@ func TestReturnStatement(t *testing.T) {
 		expect interface{}
 	}{
 		{"return 1 + 2 + 3", 6},
+		{"return;", NULL},
 		{"if (true){ 1 + 1; return 3;}", 3},
 		{`if (true)
 			{ if (false)
@@ -90,12 +91,43 @@ func TestReturnStatement(t *testing.T) {
 			  { if (true)
 				  {return 1 + 1;}
 				return 6;}`, 2},
+		{`if (true) { if (true) {return;} return 6;}`, NULL},
 	}
 
 	for _, test := range tests {
 		assertEvalResultEqual(t, test.input, test.expect)
 	}
+}
 
+func TestEvalError(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"true + 5", "unknown operator: true + 5"},
+		{"true - true", "unknown operator: true - true"},
+		{"return true - true", "unknown operator: true - true"},
+	}
+
+	for _, test := range tests {
+		lexer := lexer.New(test.input)
+		parser := parser.New(lexer)
+
+		program, err := parser.ParseProgram()
+		if err != nil {
+			t.Fatalf("parse program for input: %q failed. error is: %q", test.input, err.Error())
+		}
+
+		actual := Eval(program)
+		if !isError(actual) {
+			t.Errorf("need an error for input: %s. but got %T", test.input, actual)
+		}
+
+		error := actual.(*object.Error)
+		if error.Msg != test.expect {
+			t.Errorf("expect error msg: %s for input %s. but got %s", test.expect, test.input, error.Msg)
+		}
+	}
 }
 
 func assertEvalResultEqual(t *testing.T, input string, expect interface{}) {
@@ -134,9 +166,9 @@ func evalTestingInput(t *testing.T, input string) object.Object {
 		t.Fatalf("parse program for input: %q failed. error is: %q", input, err.Error())
 	}
 
-	actual, err := Eval(program)
-	if err != nil {
-		t.Fatalf("evaluate program failed for input: %q. error is: %q", input, err.Error())
+	actual := Eval(program)
+	if isError(actual) {
+		t.Fatalf("evaluate program failed for input: %q. error is: %q", input, actual.(*object.Error).Msg)
 	}
 
 	return actual

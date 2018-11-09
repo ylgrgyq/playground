@@ -11,6 +11,7 @@ const (
 	BOOLEAN_OBJ = "BOOLEAN"
 	NULL_OBJ    = "NULL"
 	RETURN_OBJ  = "RETURN_VALUE"
+	ERROR_OBJ   = "ERROR"
 )
 
 type Object interface {
@@ -63,4 +64,16 @@ func (r *ReturnValue) Type() ObjectType {
 
 func (r *ReturnValue) Inspect() string {
 	return fmt.Sprintf("return %s", r.Value.Inspect())
+}
+
+type Error struct {
+	Msg string
+}
+
+func (e *Error) Type() ObjectType {
+	return ERROR_OBJ
+}
+
+func (e *Error) Inspect() string {
+	return fmt.Sprintf("error: %s", e.Msg)
 }

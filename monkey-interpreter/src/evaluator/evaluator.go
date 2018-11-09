@@ -12,7 +12,7 @@ var (
 	NULL  = &object.Null{}
 )
 
-func Eval(node ast.Node) (object.Object, error) {
+func Eval(node ast.Node) object.Object {
 	switch node := node.(type) {
 	case *ast.Program:
 		return evalProgram(node.Statements)
@@ -29,13 +29,20 @@ func Eval(node ast.Node) (object.Object, error) {
 	case *ast.ReturnStatement:
 		return evalReturnStatement(node)
 	case *ast.Integer:
-		return &object.Integer{Value: node.Value}, nil
+		return &object.Integer{Value: node.Value}
 	case *ast.Boolean:
-		v := nativeBoolToBooleanObj(node.Value)
-		return v, nil
+		return nativeBoolToBooleanObj(node.Value)
 	default:
-		return nil, fmt.Errorf("unknown node type %T", node)
+		return newError(fmt.Sprintf("unknown node type %T", node))
 	}
+}
+
+func newError(msg string) *object.Error {
+	return &object.Error{Msg: msg}
+}
+
+func isError(obj object.Object) bool {
+	return obj != nil && obj.Type() == object.ERROR_OBJ
 }
 
 func nativeBoolToBooleanObj(v bool) *object.Boolean {
@@ -46,152 +53,152 @@ func nativeBoolToBooleanObj(v bool) *object.Boolean {
 	return FALSE
 }
 
-func evalProgram(statements []ast.Statement) (object.Object, error) {
+func evalProgram(statements []ast.Statement) object.Object {
 	var result object.Object
-	var err error
 	for _, statement := range statements {
-		result, err = Eval(statement)
-		if err != nil {
-			return nil, err
+		result = Eval(statement)
+
+		if isError(result) {
+			return result
 		}
+
 		if val, ok := result.(*object.ReturnValue); ok {
-			return val.Value, nil
+			return val.Value
 		}
 	}
-	return result, nil
+	return result
 }
 
-func evalBlockStatements(statements []ast.Statement) (object.Object, error) {
+func evalBlockStatements(statements []ast.Statement) object.Object {
 	var result object.Object
-	var err error
 	for _, statement := range statements {
-		result, err = Eval(statement)
-		if err != nil {
-			return nil, err
+		result = Eval(statement)
+		if isError(result) {
+			return result
 		}
 		if result.Type() == object.RETURN_OBJ {
-			return result, nil
+			return result
 		}
 	}
-	return result, nil
+	return result
 }
 
-func evalPrefixExpression(node *ast.PrefixExpression) (object.Object, error) {
+func evalPrefixExpression(node *ast.PrefixExpression) object.Object {
 	var obj object.Object
-	var err error
 	switch node.Operator {
 	case "!":
-		obj, err = Eval(node.Value)
-		if err != nil {
-			return nil, err
+		obj = Eval(node.Value)
+		if isError(obj) {
+			return obj
 		}
 		return evalBangOperator(obj)
 	case "-":
-		obj, err = Eval(node.Value)
-		if err != nil {
-			return nil, err
+		obj = Eval(node.Value)
+		if isError(obj) {
+			return obj
 		}
 
 		return evalPrefixMinusOperator(obj)
 	}
 
-	return NULL, nil
+	return newError(fmt.Sprintf("unknown operator: %s%s", node.Operator, node.Value.String()))
 }
 
-func evalBangOperator(obj object.Object) (object.Object, error) {
+func evalBangOperator(obj object.Object) object.Object {
 	switch obj {
 	case TRUE:
-		return FALSE, nil
+		return FALSE
 	case FALSE:
-		return TRUE, nil
+		return TRUE
 	case NULL:
-		return TRUE, nil
+		return TRUE
 	default:
-		return FALSE, nil
+		return FALSE
 	}
 }
 
-func evalPrefixMinusOperator(obj object.Object) (object.Object, error) {
+func evalPrefixMinusOperator(obj object.Object) object.Object {
 	integer, ok := obj.(*object.Integer)
 	if !ok {
-		return nil, fmt.Errorf("minus operator can not be used as prefix operator for %T", obj)
+		return newError(fmt.Sprintf("minus operator can not be used as prefix operator for %T", obj))
 	}
 
-	return &object.Integer{Value: -integer.Value}, nil
+	return &object.Integer{Value: -integer.Value}
 }
 
-func evalInfixExpression(node *ast.InfixExpression) (object.Object, error) {
-	left, err := Eval(node.Left)
-	if err != nil {
-		return nil, err
+func evalInfixExpression(node *ast.InfixExpression) object.Object {
+	left := Eval(node.Left)
+	if isError(left) {
+		return left
 	}
 
-	right, err := Eval(node.Right)
-	if err != nil {
-		return nil, err
+	right := Eval(node.Right)
+	if isError(right) {
+		return right
 	}
 
 	switch {
 	case left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ:
 		return evalIntegerInfixExpression(node.Operator, left, right)
 	case node.Operator == "==":
-		return nativeBoolToBooleanObj(left == right), nil
+		return nativeBoolToBooleanObj(left == right)
 	case node.Operator == "!=":
-		return nativeBoolToBooleanObj(left != right), nil
+		return nativeBoolToBooleanObj(left != right)
 	}
 
-	return NULL, nil
+	return newError(fmt.Sprintf("unknown operator: %s %s %s", node.Left.String(), node.Operator, node.Right.String()))
 }
 
-func evalIntegerInfixExpression(operator string, left object.Object, right object.Object) (object.Object, error) {
+func evalIntegerInfixExpression(operator string, left object.Object, right object.Object) object.Object {
 	leftInt := left.(*object.Integer)
 	rightInt := right.(*object.Integer)
 	switch operator {
 	case "+":
-		return &object.Integer{Value: leftInt.Value + rightInt.Value}, nil
+		return &object.Integer{Value: leftInt.Value + rightInt.Value}
 	case "-":
-		return &object.Integer{Value: leftInt.Value - rightInt.Value}, nil
+		return &object.Integer{Value: leftInt.Value - rightInt.Value}
 	case "*":
-		return &object.Integer{Value: leftInt.Value * rightInt.Value}, nil
+		return &object.Integer{Value: leftInt.Value * rightInt.Value}
 	case "/":
-		return &object.Integer{Value: leftInt.Value / rightInt.Value}, nil
+		return &object.Integer{Value: leftInt.Value / rightInt.Value}
 	case "<":
-		return &object.Boolean{Value: leftInt.Value < rightInt.Value}, nil
+		return &object.Boolean{Value: leftInt.Value < rightInt.Value}
 	case ">":
-		return &object.Boolean{Value: leftInt.Value > rightInt.Value}, nil
+		return &object.Boolean{Value: leftInt.Value > rightInt.Value}
 	case "==":
-		return nativeBoolToBooleanObj(leftInt.Value == rightInt.Value), nil
+		return nativeBoolToBooleanObj(leftInt.Value == rightInt.Value)
 	case "!=":
-		return nativeBoolToBooleanObj(leftInt.Value != rightInt.Value), nil
+		return nativeBoolToBooleanObj(leftInt.Value != rightInt.Value)
 	default:
-		return NULL, nil
+		return newError(fmt.Sprintf("unknown operator: %d %s %d", leftInt, operator, rightInt))
 	}
 }
 
-func evalIfExpression(node *ast.IfExpression) (object.Object, error) {
-	con, err := Eval(node.Condition)
-	if err != nil {
-		return nil, err
+func evalIfExpression(node *ast.IfExpression) object.Object {
+	con := Eval(node.Condition)
+	if isError(con) {
+		return con
 	}
 
 	var ret object.Object
 	ret = NULL
 	if con != FALSE && con != NULL {
-		ret, err = Eval(node.ThenBody)
+		ret = Eval(node.ThenBody)
 	} else if node.ElseBody != nil {
-		ret, err = Eval(node.ElseBody)
+		ret = Eval(node.ElseBody)
 	}
-	return ret, err
+	return ret
 }
 
-func evalReturnStatement(node *ast.ReturnStatement) (object.Object, error) {
+func evalReturnStatement(node *ast.ReturnStatement) object.Object {
 	if node.Value != nil {
-		ret, err := Eval(node.Value)
-		if err != nil {
-			return nil, err
+		ret := Eval(node.Value)
+		if isError(ret) {
+			return ret
 		}
-		return &object.ReturnValue{Value: ret}, nil
+
+		return &object.ReturnValue{Value: ret}
 	}
 
-	return NULL, nil
+	return &object.ReturnValue{Value: NULL}
 }
