@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"lexer"
+	"object"
 	"parser"
 )
 
@@ -13,6 +14,7 @@ const PROMPT = ">>"
 
 func Start(in io.Reader, out io.Writer) {
 	scanner := bufio.NewScanner(in)
+	env := object.NewEnvironment()
 	for {
 		fmt.Printf(PROMPT)
 		scanned := scanner.Scan()
@@ -28,8 +30,8 @@ func Start(in io.Reader, out io.Writer) {
 			fmt.Printf("parse program failed: %s", err)
 		}
 
-		obj, err := evaluator.Eval(program)
-		if err != nil {
+		obj := evaluator.Eval(program, env)
+		if evaluator.IsError(obj) {
 			fmt.Printf("evaluate program failed: %s", err)
 		}
 

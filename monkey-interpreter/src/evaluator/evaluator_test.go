@@ -119,7 +119,7 @@ func TestEvalError(t *testing.T) {
 		}
 
 		actual := Eval(program, object.NewEnvironment())
-		if !isError(actual) {
+		if !IsError(actual) {
 			t.Errorf("need an error for input: %s. but got %T", test.input, actual)
 		}
 
@@ -136,6 +136,7 @@ func TestLetStatement(t *testing.T) {
 		expect interface{}
 	}{
 		{"let x = 1; return x + x + 3", 5},
+		{"let x = 1; x", 1},
 		{"let x = 1; let y = 100; if (x < y) {return x + y}", 101},
 		{"let x = 1; let y = 100; if (x < y) {x = y; y = 2; return x + y}", 102},
 		{"let identity = fn(x) {x}; identity(100);", 100},
@@ -189,7 +190,7 @@ func evalTestingInput(t *testing.T, input string) object.Object {
 	}
 
 	actual := Eval(program, object.NewEnvironment())
-	if isError(actual) {
+	if IsError(actual) {
 		t.Fatalf("evaluate program failed for input: %q. error is: %q", input, actual.(*object.Error).Msg)
 	}
 

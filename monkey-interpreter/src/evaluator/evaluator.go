@@ -56,7 +56,7 @@ func newError(msg string) *object.Error {
 	return &object.Error{Msg: msg}
 }
 
-func isError(obj object.Object) bool {
+func IsError(obj object.Object) bool {
 	return obj != nil && obj.Type() == object.ERROR_OBJ
 }
 
@@ -73,7 +73,7 @@ func evalProgram(statements []ast.Statement, env *object.Environment) object.Obj
 	for _, statement := range statements {
 		result = Eval(statement, env)
 
-		if isError(result) {
+		if IsError(result) {
 			return result
 		}
 
@@ -88,7 +88,7 @@ func evalBlockStatements(statements []ast.Statement, env *object.Environment) ob
 	var result object.Object
 	for _, statement := range statements {
 		result = Eval(statement, env)
-		if isError(result) {
+		if IsError(result) {
 			return result
 		}
 		if result.Type() == object.RETURN_OBJ {
@@ -100,7 +100,7 @@ func evalBlockStatements(statements []ast.Statement, env *object.Environment) ob
 
 func evalLetStatement(node *ast.LetStatement, env *object.Environment) object.Object {
 	val := Eval(node.Value, env)
-	if isError(val) {
+	if IsError(val) {
 		return val
 	}
 
@@ -110,7 +110,7 @@ func evalLetStatement(node *ast.LetStatement, env *object.Environment) object.Ob
 
 func evalAssignStatement(node *ast.AssignStatement, env *object.Environment) object.Object {
 	val := Eval(node.Value, env)
-	if isError(val) {
+	if IsError(val) {
 		return val
 	}
 
@@ -124,7 +124,7 @@ func evalFunctionExpression(node *ast.FunctionExpression, env *object.Environmen
 
 func evalCallExpression(node *ast.CallExpression, env *object.Environment) object.Object {
 	function := Eval(node.Function, env)
-	if isError(function) {
+	if IsError(function) {
 		return function
 	}
 
@@ -138,7 +138,7 @@ func evalCallExpression(node *ast.CallExpression, env *object.Environment) objec
 	for i, param := range fn.Parameters {
 		arg := node.Arguments[i]
 		p := Eval(arg, env)
-		if isError(p) {
+		if IsError(p) {
 			return p
 		}
 
@@ -158,13 +158,13 @@ func evalPrefixExpression(node *ast.PrefixExpression, env *object.Environment) o
 	switch node.Operator {
 	case "!":
 		obj = Eval(node.Value, env)
-		if isError(obj) {
+		if IsError(obj) {
 			return obj
 		}
 		return evalBangOperator(obj)
 	case "-":
 		obj = Eval(node.Value, env)
-		if isError(obj) {
+		if IsError(obj) {
 			return obj
 		}
 
@@ -198,12 +198,12 @@ func evalPrefixMinusOperator(obj object.Object) object.Object {
 
 func evalInfixExpression(node *ast.InfixExpression, env *object.Environment) object.Object {
 	left := Eval(node.Left, env)
-	if isError(left) {
+	if IsError(left) {
 		return left
 	}
 
 	right := Eval(node.Right, env)
-	if isError(right) {
+	if IsError(right) {
 		return right
 	}
 
@@ -246,7 +246,7 @@ func evalIntegerInfixExpression(operator string, left object.Object, right objec
 
 func evalIfExpression(node *ast.IfExpression, env *object.Environment) object.Object {
 	con := Eval(node.Condition, env)
-	if isError(con) {
+	if IsError(con) {
 		return con
 	}
 
@@ -263,7 +263,7 @@ func evalIfExpression(node *ast.IfExpression, env *object.Environment) object.Ob
 func evalReturnStatement(node *ast.ReturnStatement, env *object.Environment) object.Object {
 	if node.Value != nil {
 		ret := Eval(node.Value, env)
-		if isError(ret) {
+		if IsError(ret) {
 			return ret
 		}
 
