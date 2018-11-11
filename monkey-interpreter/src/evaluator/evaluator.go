@@ -22,18 +22,24 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		return Eval(node.Value, env)
 	case *ast.LetStatement:
 		return evalLetStatement(node, env)
+	case *ast.AssignStatement:
+		return evalAssignStatement(node, env)
+	case *ast.ReturnStatement:
+		return evalReturnStatement(node, env)
 	case *ast.PrefixExpression:
 		return evalPrefixExpression(node, env)
 	case *ast.InfixExpression:
 		return evalInfixExpression(node, env)
 	case *ast.IfExpression:
 		return evalIfExpression(node, env)
-	case *ast.ReturnStatement:
-		return evalReturnStatement(node, env)
+	case *ast.CallExpression:
+		return evalCallExpression(node, env)
 	case *ast.Integer:
 		return &object.Integer{Value: node.Value}
 	case *ast.Boolean:
 		return nativeBoolToBooleanObj(node.Value)
+	case *ast.FunctionExpression:
+		return evalFunctionExpression(node, env)
 	case *ast.Identifier:
 		val, ok := env.Get(node.Value)
 		if ok {
@@ -100,6 +106,51 @@ func evalLetStatement(node *ast.LetStatement, env *object.Environment) object.Ob
 
 	env.Set(node.Name.Value, val)
 	return val
+}
+
+func evalAssignStatement(node *ast.AssignStatement, env *object.Environment) object.Object {
+	val := Eval(node.Value, env)
+	if isError(val) {
+		return val
+	}
+
+	env.Set(node.Variable.Value, val)
+	return val
+}
+
+func evalFunctionExpression(node *ast.FunctionExpression, env *object.Environment) object.Object {
+	return &object.Function{Body: node.Body, Parameters: node.Parameters, Env: env}
+}
+
+func evalCallExpression(node *ast.CallExpression, env *object.Environment) object.Object {
+	function := Eval(node.Function, env)
+	if isError(function) {
+		return function
+	}
+
+	fn, ok := function.(*object.Function)
+	if !ok {
+		return newError(fmt.Sprintf("unknown function: %s", function.Inspect()))
+	}
+
+	newEnv := object.NewNestedEnvironment(fn.Env)
+
+	for i, param := range fn.Parameters {
+		arg := node.Arguments[i]
+		p := Eval(arg, env)
+		if isError(p) {
+			return p
+		}
+
+		newEnv.Set(param.Value, p)
+	}
+
+	ret := Eval(fn.Body, newEnv)
+
+	if val, ok := ret.(*object.ReturnValue); ok {
+		return val.Value
+	}
+	return ret
 }
 
 func evalPrefixExpression(node *ast.PrefixExpression, env *object.Environment) object.Object {

@@ -137,6 +137,14 @@ func TestLetStatement(t *testing.T) {
 	}{
 		{"let x = 1; return x + x + 3", 5},
 		{"let x = 1; let y = 100; if (x < y) {return x + y}", 101},
+		{"let x = 1; let y = 100; if (x < y) {x = y; y = 2; return x + y}", 102},
+		{"let identity = fn(x) {x}; identity(100);", 100},
+		{"let add = fn(x, y) {x + y}; add(5, 10);", 15},
+		{"let add = fn(x, y) {x + y}; add(5, add(5,5));", 15},
+		{`let adder = fn (x) {return fn(y) {return x + y;}}; 
+		  let add_one = adder(1); 
+		  add_one(10);`,
+			11},
 	}
 
 	for _, test := range tests {

@@ -1,17 +1,21 @@
 package object
 
 import (
+	"ast"
+	"bytes"
 	"fmt"
+	"strings"
 )
 
 type ObjectType string
 
 const (
-	INTEGER_OBJ = "INTEGER"
-	BOOLEAN_OBJ = "BOOLEAN"
-	NULL_OBJ    = "NULL"
-	RETURN_OBJ  = "RETURN_VALUE"
-	ERROR_OBJ   = "ERROR"
+	INTEGER_OBJ  = "INTEGER"
+	BOOLEAN_OBJ  = "BOOLEAN"
+	NULL_OBJ     = "NULL"
+	RETURN_OBJ   = "RETURN_VALUE"
+	ERROR_OBJ    = "ERROR"
+	FUNCTION_OBJ = "FUNCTION"
 )
 
 type Object interface {
@@ -78,12 +82,45 @@ func (e *Error) Inspect() string {
 	return fmt.Sprintf("error: %s", e.Msg)
 }
 
+type Function struct {
+	Parameters []*ast.Identifier
+	Body       *ast.BlockExpression
+	Env        *Environment
+}
+
+func (f *Function) Type() ObjectType {
+	return FUNCTION_OBJ
+}
+
+func (f *Function) Inspect() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("fn (")
+
+	params := []string{}
+	for _, param := range f.Parameters {
+		params = append(params, param.Value)
+	}
+
+	buffer.WriteString(strings.Join(params, ", "))
+	buffer.WriteString(") ")
+	buffer.WriteString(f.Body.String())
+
+	return buffer.String()
+}
+
 func NewEnvironment() *Environment {
 	return &Environment{storage: make(map[string]Object)}
 }
 
+func NewNestedEnvironment(outer *Environment) *Environment {
+	env := NewEnvironment()
+	env.outer = outer
+	return env
+}
+
 type Environment struct {
 	storage map[string]Object
+	outer   *Environment
 }
 
 func (e *Environment) Set(key string, val Object) Object {
@@ -93,5 +130,9 @@ func (e *Environment) Set(key string, val Object) Object {
 
 func (e *Environment) Get(key string) (Object, bool) {
 	val, ok := e.storage[key]
-	return val, ok
+	if ok {
+		return val, ok
+	}
+
+	return e.outer.Get(key)
 }
