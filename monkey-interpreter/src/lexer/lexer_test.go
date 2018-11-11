@@ -16,22 +16,9 @@ func TestNextToken(t *testing.T) {
 
 	let result = add(five, ten);
 
-	! -/*5;
-	5 < 10 > 5;
-
-	if (5 < 10) {
-		return true;
-	} else {
-		return false;
-	}
-
-	10 == 9
-	10 != 9
-	
-	plusplus++;
-	minusminus--
-	--minus
-	++plus`
+	"hello"
+	"world"
+	"wor\t\n\r\"ld"`
 
 	tests := []struct {
 		expectedType    token.TokenType
@@ -76,6 +63,57 @@ func TestNextToken(t *testing.T) {
 		{token.IDENT, "ten"},
 		{token.RPAREN, ")"},
 		{token.SEMICOLON, ";"},
+
+		/*
+			"hello"
+			"world"
+			"wor\t\n\r\"ld"
+		*/
+		{token.STRING, "hello"},
+		{token.STRING, "world"},
+		{token.STRING, "wor\t\n\r\"ld"},
+
+		{token.EOF, ""},
+	}
+
+	l := New(input)
+	for i, test := range tests {
+		tk := l.NextToken()
+		fmt.Println(l.ch)
+		if tk.Type != test.expectedType {
+			t.Fatalf("tests[%d] - token type wrong. expected=%q, got=%q",
+				i, test.expectedType, tk.Type)
+		}
+
+		if tk.Literal != test.expectedLiteral {
+			t.Fatalf("tests[%d] - token literal wrong. expected=%q, got=%q",
+				i, test.expectedLiteral, tk.Literal)
+		}
+	}
+}
+
+func TestOperatorToken(t *testing.T) {
+	input := `! -/*5;
+	5 < 10 > 5;
+
+	if (5 < 10) {
+		return true;
+	} else {
+		return false;
+	}
+
+	10 == 9
+	10 != 9
+	
+	plusplus++;
+	minusminus--
+	--minus
+	++plus;
+	`
+	tests := []struct {
+		expectedType    token.TokenType
+		expectedLiteral string
+	}{
 
 		// ! -/*5;
 		{token.BANG, "!"},
@@ -143,8 +181,6 @@ func TestNextToken(t *testing.T) {
 		{token.IDENT, "minus"},
 		{token.PLUSPLUS, "++"},
 		{token.IDENT, "plus"},
-
-		{token.EOF, ""},
 	}
 
 	l := New(input)

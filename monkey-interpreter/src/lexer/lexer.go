@@ -1,6 +1,7 @@
 package lexer
 
 import (
+	"fmt"
 	"token"
 )
 
@@ -28,7 +29,7 @@ func (l *Lexer) NextToken() token.Token {
 			tok.Type = token.EQ
 			l.readChar()
 		} else {
-			tok = newToken(token.ASSIGN, '=')
+			tok = newToken(token.ASSIGN, "=")
 		}
 	case '!':
 		if l.peekChar() == '=' {
@@ -36,21 +37,21 @@ func (l *Lexer) NextToken() token.Token {
 			tok.Type = token.NOTEQ
 			l.readChar()
 		} else {
-			tok = newToken(token.BANG, '!')
+			tok = newToken(token.BANG, "!")
 		}
 	case '<':
-		tok = newToken(token.LT, '<')
+		tok = newToken(token.LT, "<")
 	case '>':
-		tok = newToken(token.GT, '>')
+		tok = newToken(token.GT, ">")
 	case '*':
-		tok = newToken(token.ASTERISK, '*')
+		tok = newToken(token.ASTERISK, "*")
 	case '-':
 		if l.peekChar() == '-' {
 			tok.Literal = "--"
 			tok.Type = token.MINUSMINUS
 			l.readChar()
 		} else {
-			tok = newToken(token.MINUS, '-')
+			tok = newToken(token.MINUS, "-")
 		}
 	case '+':
 		if l.peekChar() == '+' {
@@ -58,22 +59,28 @@ func (l *Lexer) NextToken() token.Token {
 			tok.Type = token.PLUSPLUS
 			l.readChar()
 		} else {
-			tok = newToken(token.PLUS, '+')
+			tok = newToken(token.PLUS, "+")
 		}
 	case '/':
-		tok = newToken(token.DIVIDE, '/')
+		tok = newToken(token.DIVIDE, "/")
 	case ';':
-		tok = newToken(token.SEMICOLON, ';')
+		tok = newToken(token.SEMICOLON, ";")
 	case '(':
-		tok = newToken(token.LPAREN, '(')
+		tok = newToken(token.LPAREN, "(")
 	case ')':
-		tok = newToken(token.RPAREN, ')')
+		tok = newToken(token.RPAREN, ")")
 	case '{':
-		tok = newToken(token.LBRACE, '{')
+		tok = newToken(token.LBRACE, "{")
 	case '}':
-		tok = newToken(token.RBRACE, '}')
+		tok = newToken(token.RBRACE, "}")
 	case ',':
-		tok = newToken(token.COMMA, ',')
+		tok = newToken(token.COMMA, ",")
+	case '"':
+		literal, err := l.readString()
+		if err != nil {
+			panic(err)
+		}
+		tok = newToken(token.STRING, literal)
 	case 0:
 		tok.Literal = ""
 		tok.Type = token.EOF
@@ -85,11 +92,51 @@ func (l *Lexer) NextToken() token.Token {
 			tok.Literal = l.readInt()
 			tok.Type = token.INT
 		} else {
-			tok = newToken(token.ILLEGAL, l.ch)
+			tok = newToken(token.ILLEGAL, string(l.ch))
 		}
 	}
 
 	return tok
+}
+
+func (l *Lexer) readString() (string, error) {
+	var ret string
+Loop:
+	for {
+		l.readChar()
+		switch l.ch {
+		case 0:
+			return "", fmt.Errorf("EOF while reading string")
+		case '\\':
+			l.readChar()
+			var nextCh int
+			switch l.ch {
+			case 0:
+				return "", fmt.Errorf("EOF while reading string")
+			case 't':
+				nextCh = '\t'
+			case 'n':
+				nextCh = '\n'
+			case 'r':
+				nextCh = '\r'
+			case '\'':
+				nextCh = '\''
+			case '"':
+				nextCh = '"'
+			case '\\':
+				nextCh = '\\'
+			default:
+				return "", fmt.Errorf("Unsupported escape character: \\%c", nextCh)
+			}
+
+			ret = ret + string(nextCh)
+		case '"':
+			break Loop
+		default:
+			ret = ret + string(l.ch)
+		}
+	}
+	return ret, nil
 }
 
 func (l *Lexer) readChar() {
@@ -116,8 +163,8 @@ func (l *Lexer) skipWhiteSpaces() {
 	}
 }
 
-func newToken(tokenType token.TokenType, ch byte) token.Token {
-	return token.Token{Type: tokenType, Literal: string(ch)}
+func newToken(tokenType token.TokenType, literal string) token.Token {
+	return token.Token{Type: tokenType, Literal: literal}
 }
 
 func isLetter(ch byte) bool {

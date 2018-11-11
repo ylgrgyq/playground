@@ -5,6 +5,8 @@ type TokenType string
 type Token struct {
 	Type    TokenType
 	Literal string
+	Line    int
+	Column  int
 }
 
 const (
@@ -12,10 +14,11 @@ const (
 	EOF     = "EOF"
 
 	// Identifiers
-	IDENT = "IDENT"
-	INT   = "INT"
-	TRUE  = "TRUE"
-	FALSE = "FALSE"
+	IDENT  = "IDENT"
+	INT    = "INT"
+	STRING = "STRING"
+	TRUE   = "TRUE"
+	FALSE  = "FALSE"
 
 	// Operators
 	ASSIGN     = "="
