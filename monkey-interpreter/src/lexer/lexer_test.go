@@ -14,81 +14,75 @@ func TestNextToken(t *testing.T) {
 		x + y;
 	};
 
-	let result = add(five, ten);
+	  let result = add(five, ten);
 
-	"hello"
+	    		"hello"
 	"world"
-	"wor\t\n\r\"ld"`
+	"wor\t\n\r\"ld"
+	
+	`
 
 	tests := []struct {
 		expectedType    token.TokenType
 		expectedLiteral string
+		expectedLine    int
+		expectedColumn  int
 	}{
-		{token.LET, "let"},
-		{token.IDENT, "five"},
-		{token.ASSIGN, "="},
-		{token.INT, "50"},
-		{token.SEMICOLON, ";"},
+		{token.LET, "let", 1, 1},
+		{token.IDENT, "five", 1, 5},
+		{token.ASSIGN, "=", 1, 10},
+		{token.INT, "50", 1, 12},
+		{token.SEMICOLON, ";", 1, 14},
 
-		{token.LET, "let"},
-		{token.IDENT, "ten"},
-		{token.ASSIGN, "="},
-		{token.INT, "10"},
-		{token.SEMICOLON, ";"},
+		{token.LET, "let", 2, 2},
+		{token.IDENT, "ten", 2, 6},
+		{token.ASSIGN, "=", 2, 10},
+		{token.INT, "10", 2, 12},
+		{token.SEMICOLON, ";", 2, 14},
 
-		{token.LET, "let"},
-		{token.IDENT, "add"},
-		{token.ASSIGN, "="},
-		{token.FUNCTION, "fn"},
-		{token.LPAREN, "("},
-		{token.IDENT, "x"},
-		{token.COMMA, ","},
-		{token.IDENT, "y"},
-		{token.RPAREN, ")"},
-		{token.LBRACE, "{"},
-		{token.IDENT, "x"},
-		{token.PLUS, "+"},
-		{token.IDENT, "y"},
-		{token.SEMICOLON, ";"},
-		{token.RBRACE, "}"},
-		{token.SEMICOLON, ";"},
+		{token.LET, "let", 4, 2},
+		{token.IDENT, "add", 4, 6},
+		{token.ASSIGN, "=", 4, 10},
+		{token.FUNCTION, "fn", 4, 12},
+		{token.LPAREN, "(", 4, 14},
+		{token.IDENT, "x", 4, 15},
+		{token.COMMA, ",", 4, 16},
+		{token.IDENT, "y", 4, 18},
+		{token.RPAREN, ")", 4, 19},
+		{token.LBRACE, "{", 4, 21},
+		{token.IDENT, "x", 5, 3},
+		{token.PLUS, "+", 5, 5},
+		{token.IDENT, "y", 5, 7},
+		{token.SEMICOLON, ";", 5, 8},
+		{token.RBRACE, "}", 6, 2},
+		{token.SEMICOLON, ";", 6, 3},
 
-		{token.LET, "let"},
-		{token.IDENT, "result"},
-		{token.ASSIGN, "="},
-		{token.IDENT, "add"},
-		{token.LPAREN, "("},
-		{token.IDENT, "five"},
-		{token.COMMA, ","},
-		{token.IDENT, "ten"},
-		{token.RPAREN, ")"},
-		{token.SEMICOLON, ";"},
+		{token.LET, "let", 8, 4},
+		{token.IDENT, "result", 8, 8},
+		{token.ASSIGN, "=", 8, 15},
+		{token.IDENT, "add", 8, 17},
+		{token.LPAREN, "(", 8, 20},
+		{token.IDENT, "five", 8, 21},
+		{token.COMMA, ",", 8, 25},
+		{token.IDENT, "ten", 8, 27},
+		{token.RPAREN, ")", 8, 30},
+		{token.SEMICOLON, ";", 8, 31},
 
 		/*
 			"hello"
 			"world"
 			"wor\t\n\r\"ld"
 		*/
-		{token.STRING, "hello"},
-		{token.STRING, "world"},
-		{token.STRING, "wor\t\n\r\"ld"},
+		{token.STRING, "hello", 10, 8},
+		{token.STRING, "world", 11, 2},
+		{token.STRING, "wor\t\n\r\"ld", 12, 2},
 
-		{token.EOF, ""},
+		{token.EOF, "", 14, 2},
 	}
 
 	l := New(input)
-	for i, test := range tests {
-		tk := l.NextToken()
-		fmt.Println(l.ch)
-		if tk.Type != test.expectedType {
-			t.Fatalf("tests[%d] - token type wrong. expected=%q, got=%q",
-				i, test.expectedType, tk.Type)
-		}
-
-		if tk.Literal != test.expectedLiteral {
-			t.Fatalf("tests[%d] - token literal wrong. expected=%q, got=%q",
-				i, test.expectedLiteral, tk.Literal)
-		}
+	for _, test := range tests {
+		testLexer(t, l, test.expectedType, test.expectedLiteral, test.expectedLine, test.expectedColumn)
 	}
 }
 
@@ -113,23 +107,25 @@ func TestOperatorToken(t *testing.T) {
 	tests := []struct {
 		expectedType    token.TokenType
 		expectedLiteral string
+		expectedLine    int
+		expectedColumn  int
 	}{
 
 		// ! -/*5;
-		{token.BANG, "!"},
-		{token.MINUS, "-"},
-		{token.DIVIDE, "/"},
-		{token.ASTERISK, "*"},
-		{token.INT, "5"},
-		{token.SEMICOLON, ";"},
+		{token.BANG, "!", 1, 1},
+		{token.MINUS, "-", 1, 3},
+		{token.DIVIDE, "/", 1, 4},
+		{token.ASTERISK, "*", 1, 5},
+		{token.INT, "5", 1, 6},
+		{token.SEMICOLON, ";", 1, 7},
 
 		// 5 < 10 > 5;
-		{token.INT, "5"},
-		{token.LT, "<"},
-		{token.INT, "10"},
-		{token.GT, ">"},
-		{token.INT, "5"},
-		{token.SEMICOLON, ";"},
+		{token.INT, "5", 2, 2},
+		{token.LT, "<", 2, 4},
+		{token.INT, "10", 2, 6},
+		{token.GT, ">", 2, 9},
+		{token.INT, "5", 2, 11},
+		{token.SEMICOLON, ";", 2, 12},
 
 		/*
 			if (5 < 10) {
@@ -138,63 +134,94 @@ func TestOperatorToken(t *testing.T) {
 				return false;
 			}
 		*/
-		{token.IF, "if"},
-		{token.LPAREN, "("},
-		{token.INT, "5"},
-		{token.LT, "<"},
-		{token.INT, "10"},
-		{token.RPAREN, ")"},
-		{token.LBRACE, "{"},
-		{token.RETURN, "return"},
-		{token.TRUE, "true"},
-		{token.SEMICOLON, ";"},
-		{token.RBRACE, "}"},
-		{token.ELSE, "else"},
-		{token.LBRACE, "{"},
-		{token.RETURN, "return"},
-		{token.FALSE, "false"},
-		{token.SEMICOLON, ";"},
-		{token.RBRACE, "}"},
+		{token.IF, "if", 4, 2},
+		{token.LPAREN, "(", 4, 5},
+		{token.INT, "5", 4, 6},
+		{token.LT, "<", 4, 8},
+		{token.INT, "10", 4, 10},
+		{token.RPAREN, ")", 4, 12},
+		{token.LBRACE, "{", 4, 14},
+		{token.RETURN, "return", 5, 3},
+		{token.TRUE, "true", 5, 10},
+		{token.SEMICOLON, ";", 5, 14},
+		{token.RBRACE, "}", 6, 2},
+		{token.ELSE, "else", 6, 4},
+		{token.LBRACE, "{", 6, 9},
+		{token.RETURN, "return", 7, 3},
+		{token.FALSE, "false", 7, 10},
+		{token.SEMICOLON, ";", 7, 15},
+		{token.RBRACE, "}", 8, 2},
 
 		/*
 			10 == 9
 			10 != 9
 		*/
-		{token.INT, "10"},
-		{token.EQ, "=="},
-		{token.INT, "9"},
-		{token.INT, "10"},
-		{token.NOTEQ, "!="},
-		{token.INT, "9"},
+		{token.INT, "10", 10, 2},
+		{token.EQ, "==", 10, 5},
+		{token.INT, "9", 10, 8},
+		{token.INT, "10", 11, 2},
+		{token.NOTEQ, "!=", 11, 5},
+		{token.INT, "9", 11, 8},
 		/*
 			plusplus++;
 			minusminus--
 			--minus
 			++plus
 		*/
-		{token.IDENT, "plusplus"},
-		{token.PLUSPLUS, "++"},
-		{token.SEMICOLON, ";"},
-		{token.IDENT, "minusminus"},
-		{token.MINUSMINUS, "--"},
-		{token.MINUSMINUS, "--"},
-		{token.IDENT, "minus"},
-		{token.PLUSPLUS, "++"},
-		{token.IDENT, "plus"},
+		{token.IDENT, "plusplus", 13, 2},
+		{token.PLUSPLUS, "++", 13, 10},
+		{token.SEMICOLON, ";", 13, 12},
+		{token.IDENT, "minusminus", 14, 2},
+		{token.MINUSMINUS, "--", 14, 12},
+		{token.MINUSMINUS, "--", 15, 2},
+		{token.IDENT, "minus", 15, 4},
+		{token.PLUSPLUS, "++", 16, 2},
+		{token.IDENT, "plus", 16, 4},
 	}
 
 	l := New(input)
-	for i, test := range tests {
-		tk := l.NextToken()
-		fmt.Println(l.ch)
-		if tk.Type != test.expectedType {
-			t.Fatalf("tests[%d] - token type wrong. expected=%q, got=%q",
-				i, test.expectedType, tk.Type)
-		}
-
-		if tk.Literal != test.expectedLiteral {
-			t.Fatalf("tests[%d] - token literal wrong. expected=%q, got=%q",
-				i, test.expectedLiteral, tk.Literal)
-		}
+	for _, test := range tests {
+		testLexer(t, l, test.expectedType, test.expectedLiteral, test.expectedLine, test.expectedColumn)
 	}
+}
+
+func testLexer(t *testing.T, l *Lexer, expectedType token.TokenType, expectedLiteral string, expectedLine, expectedColumn int) {
+	tk := l.NextToken()
+	fmt.Println(l.ch)
+	if tk.Type != expectedType {
+		t.Fatalf("%q - token type wrong. expected=%q, got=%q",
+			l.lineAtPosition(), expectedType, tk.Type)
+	}
+
+	if tk.Literal != expectedLiteral {
+		t.Fatalf("%q - token literal wrong. expected=%q, got=%q",
+			l.lineAtPosition(), expectedLiteral, tk.Literal)
+	}
+
+	if tk.Line != expectedLine {
+		t.Fatalf("%q - token line wrong. expected=%d, got=%d",
+			l.lineAtPosition(), expectedLine, tk.Line)
+	}
+
+	if tk.Column != expectedColumn {
+		t.Fatalf("%q - token column wrong. expect token %q with literal %q at %d, got=%d",
+			l.lineAtPosition(), expectedType, expectedLiteral, expectedColumn, tk.Column)
+	}
+}
+
+func (l *Lexer) lineAtPosition() string {
+	start := l.position
+	if start == len(l.input) {
+		start--
+	}
+
+	for start >= 0 && l.input[start] != '\n' && l.input[start] != '\r' {
+		start--
+	}
+
+	end := l.position
+	for end < len(l.input) && l.input[end] != '\n' && l.input[end] != '\r' {
+		end++
+	}
+	return l.input[start:end]
 }

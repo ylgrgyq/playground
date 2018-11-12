@@ -10,10 +10,12 @@ type Lexer struct {
 	position     int
 	readPosition int
 	ch           byte
+	line         int
+	column       int
 }
 
 func New(input string) *Lexer {
-	l := &Lexer{input: input}
+	l := &Lexer{input: input, line: 1, column: 0}
 	return l
 }
 
@@ -21,20 +23,20 @@ func (l *Lexer) NextToken() token.Token {
 	l.readChar()
 	l.skipWhiteSpaces()
 
+	line := l.line
+	column := l.column
 	var tok token.Token
 	switch l.ch {
 	case '=':
 		if l.peekChar() == '=' {
-			tok.Literal = "=="
-			tok.Type = token.EQ
+			tok = newToken(token.EQ, "==")
 			l.readChar()
 		} else {
 			tok = newToken(token.ASSIGN, "=")
 		}
 	case '!':
 		if l.peekChar() == '=' {
-			tok.Literal = "!="
-			tok.Type = token.NOTEQ
+			tok = newToken(token.NOTEQ, "!=")
 			l.readChar()
 		} else {
 			tok = newToken(token.BANG, "!")
@@ -47,16 +49,14 @@ func (l *Lexer) NextToken() token.Token {
 		tok = newToken(token.ASTERISK, "*")
 	case '-':
 		if l.peekChar() == '-' {
-			tok.Literal = "--"
-			tok.Type = token.MINUSMINUS
+			tok = newToken(token.MINUSMINUS, "--")
 			l.readChar()
 		} else {
 			tok = newToken(token.MINUS, "-")
 		}
 	case '+':
 		if l.peekChar() == '+' {
-			tok.Literal = "++"
-			tok.Type = token.PLUSPLUS
+			tok = newToken(token.PLUSPLUS, "++")
 			l.readChar()
 		} else {
 			tok = newToken(token.PLUS, "+")
@@ -78,24 +78,25 @@ func (l *Lexer) NextToken() token.Token {
 	case '"':
 		literal, err := l.readString()
 		if err != nil {
-			panic(err)
+			tok = newToken(token.ILLEGAL, err.Error())
+		} else {
+			tok = newToken(token.STRING, literal)
 		}
-		tok = newToken(token.STRING, literal)
 	case 0:
-		tok.Literal = ""
-		tok.Type = token.EOF
+		tok = newToken(token.EOF, "")
 	default:
 		if isLetter(l.ch) {
-			tok.Literal = l.readIdentifier()
-			tok.Type = token.LookupIdent(tok.Literal)
+			literal := l.readIdentifier()
+			tok = newToken(token.LookupIdent(literal), literal)
 		} else if isNumber(l.ch) {
-			tok.Literal = l.readInt()
-			tok.Type = token.INT
+			tok = newToken(token.INT, l.readInt())
 		} else {
 			tok = newToken(token.ILLEGAL, string(l.ch))
 		}
 	}
 
+	tok.Column = column
+	tok.Line = line
 	return tok
 }
 
@@ -147,6 +148,7 @@ func (l *Lexer) readChar() {
 	}
 	l.position = l.readPosition
 	l.readPosition++
+	l.column++
 }
 
 func (l *Lexer) peekChar() byte {
@@ -159,8 +161,14 @@ func (l *Lexer) peekChar() byte {
 
 func (l *Lexer) skipWhiteSpaces() {
 	for l.ch == ' ' || l.ch == '\t' || l.ch == '\n' || l.ch == '\r' {
+		lastC := l.ch
 		l.readChar()
+		if lastC == '\n' || lastC == '\r' {
+			l.column = 1
+			l.line++
+		}
 	}
+
 }
 
 func newToken(tokenType token.TokenType, literal string) token.Token {
