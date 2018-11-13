@@ -202,24 +202,29 @@ func TestLexerError(t *testing.T) {
 
 	for _, test := range tests {
 		l := New(test.input)
-
-	Loop:
-		for {
-			tk := l.NextToken()
-			switch tk.Type {
-			case token.EOF:
-				t.Fatalf("%q - token type wrong. missing ILLEGAL", l.lineAtPosition())
-			case token.ILLEGAL:
-				if tk.Literal != test.errorMsg {
-					t.Fatalf("%q - token Literal wrong. expected %q, got %q", l.lineAtPosition(), test.errorMsg, tk.Literal)
-				}
-				break Loop
-			}
-		}
-
+		testError(t, l, test.errorMsg)
 	}
 }
 
+func testError(t *testing.T, l *Lexer, expectErrorMsg string) {
+	defer func() {
+		if r := recover(); r != nil {
+			err, ok := r.(LexerParseError)
+			if !ok {
+				t.Errorf("%q - panic without LexerParseError, got %q", l.lineAtPosition(), r)
+			}
+			if err.Error() != expectErrorMsg {
+				t.Errorf("%q - token Literal wrong. expected %q, got %q", l.lineAtPosition(), expectErrorMsg, err.Error())
+			}
+		}
+	}()
+	for {
+		tk := l.NextToken()
+		if tk.Type == token.EOF {
+			t.Fatalf("%q - token type wrong. missing ILLEGAL", l.lineAtPosition())
+		}
+	}
+}
 func testLexer(t *testing.T, l *Lexer, expectedType token.TokenType, expectedLiteral string, expectedLine, expectedColumn int) {
 	tk := l.NextToken()
 

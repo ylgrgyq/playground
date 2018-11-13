@@ -5,6 +5,16 @@ import (
 	"token"
 )
 
+type LexerParseError struct {
+	Line   int
+	Column int
+	Msg    string
+}
+
+func (l *LexerParseError) Error() string {
+	return fmt.Sprintf("%s at line: %d, column: %d", l.Msg, l.Line, l.Column)
+}
+
 type Lexer struct {
 	input        string
 	position     int
@@ -86,15 +96,12 @@ func (l *Lexer) NextToken() token.Token {
 		} else if isNumber(l.ch) {
 			tok = newToken(token.INT, l.readInt())
 		} else {
-			tok = newIllegalToken("Unrecognized character", l.line, l.column)
+			panic(LexerParseError{Msg: "Unrecognized character", Line: l.line, Column: l.column})
 		}
 	}
 
-	if tok.Type != token.ILLEGAL {
-		tok.Column = column
-		tok.Line = line
-	}
-
+	tok.Column = column
+	tok.Line = line
 	return tok
 }
 
@@ -107,13 +114,13 @@ Loop:
 		l.readChar()
 		switch l.ch {
 		case 0:
-			return newIllegalToken("EOF while reading string", startLine, startColumn)
+			panic(LexerParseError{Msg: "EOF while reading string", Line: startLine, Column: startColumn})
 		case '\\':
 			l.readChar()
 			var nextCh byte
 			switch l.ch {
 			case 0:
-				return newIllegalToken("EOF while reading string", startLine, startColumn)
+				panic(LexerParseError{Msg: "EOF while reading string", Line: startLine, Column: startColumn})
 			case 't':
 				nextCh = '\t'
 			case 'n':
@@ -127,7 +134,7 @@ Loop:
 			case '\\':
 				nextCh = '\\'
 			default:
-				return newIllegalToken("Unsupported escape character", l.line, l.column)
+				panic(LexerParseError{Msg: "Unsupported escape character", Line: l.line, Column: l.column})
 			}
 
 			ret = append(ret, nextCh)
@@ -172,10 +179,6 @@ func (l *Lexer) skipWhiteSpaces() {
 
 func newToken(tokenType token.TokenType, literal string) token.Token {
 	return token.Token{Type: tokenType, Literal: literal}
-}
-
-func newIllegalToken(errorMsg string, line int, column int) token.Token {
-	return token.Token{Type: token.ILLEGAL, Literal: fmt.Sprintf("%s at line: %d, column: %d", errorMsg, line, column), Line: line, Column: column}
 }
 
 func isLetter(ch byte) bool {
