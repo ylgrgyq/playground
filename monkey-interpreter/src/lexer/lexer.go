@@ -76,12 +76,7 @@ func (l *Lexer) NextToken() token.Token {
 	case ',':
 		tok = newToken(token.COMMA, ",")
 	case '"':
-		literal, err := l.readString()
-		if err != nil {
-			tok = newToken(token.ILLEGAL, err.Error())
-		} else {
-			tok = newToken(token.STRING, literal)
-		}
+		tok = l.readString()
 	case 0:
 		tok = newToken(token.EOF, "")
 	default:
@@ -91,29 +86,34 @@ func (l *Lexer) NextToken() token.Token {
 		} else if isNumber(l.ch) {
 			tok = newToken(token.INT, l.readInt())
 		} else {
-			tok = newToken(token.ILLEGAL, string(l.ch))
+			tok = newIllegalToken("Unrecognized character", l.line, l.column)
 		}
 	}
 
-	tok.Column = column
-	tok.Line = line
+	if tok.Type != token.ILLEGAL {
+		tok.Column = column
+		tok.Line = line
+	}
+
 	return tok
 }
 
-func (l *Lexer) readString() (string, error) {
+func (l *Lexer) readString() token.Token {
+	startLine := l.line
+	startColumn := l.column
 	var ret string
 Loop:
 	for {
 		l.readChar()
 		switch l.ch {
 		case 0:
-			return "", fmt.Errorf("EOF while reading string")
+			return newIllegalToken("EOF while reading string", startLine, startColumn)
 		case '\\':
 			l.readChar()
 			var nextCh int
 			switch l.ch {
 			case 0:
-				return "", fmt.Errorf("EOF while reading string")
+				return newIllegalToken("EOF while reading string", startLine, startColumn)
 			case 't':
 				nextCh = '\t'
 			case 'n':
@@ -127,7 +127,7 @@ Loop:
 			case '\\':
 				nextCh = '\\'
 			default:
-				return "", fmt.Errorf("Unsupported escape character: \\%c", nextCh)
+				return newIllegalToken("Unsupported escape character", l.line, l.column)
 			}
 
 			ret = ret + string(nextCh)
@@ -137,7 +137,7 @@ Loop:
 			ret = ret + string(l.ch)
 		}
 	}
-	return ret, nil
+	return newToken(token.STRING, ret)
 }
 
 func (l *Lexer) readChar() {
@@ -168,11 +168,14 @@ func (l *Lexer) skipWhiteSpaces() {
 			l.line++
 		}
 	}
-
 }
 
 func newToken(tokenType token.TokenType, literal string) token.Token {
 	return token.Token{Type: tokenType, Literal: literal}
+}
+
+func newIllegalToken(errorMsg string, line int, column int) token.Token {
+	return token.Token{Type: token.ILLEGAL, Literal: fmt.Sprintf("%s at line: %d, column: %d", errorMsg, line, column), Line: line, Column: column}
 }
 
 func isLetter(ch byte) bool {

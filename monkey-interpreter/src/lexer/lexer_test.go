@@ -1,7 +1,6 @@
 package lexer
 
 import (
-	"fmt"
 	"testing"
 	"token"
 )
@@ -185,9 +184,43 @@ func TestOperatorToken(t *testing.T) {
 	}
 }
 
+func TestLexerError(t *testing.T) {
+	tests := []struct {
+		input    string
+		errorMsg string
+	}{
+		{"hello你好", "Unrecognized character at line: 1, column: 6"},
+		{`hello * 1;
+		"哈哈哈哈`, "EOF while reading string at line: 2, column: 3"},
+		{`a + b; 
+		c + d;
+		 "哈哈哈哈\"`, "EOF while reading string at line: 3, column: 4"},
+		{`"哈哈哈\x哈\"`, "Unsupported escape character at line: 1, column: 12"},
+	}
+
+	for _, test := range tests {
+		l := New(test.input)
+
+	Loop:
+		for {
+			tk := l.NextToken()
+			switch tk.Type {
+			case token.EOF:
+				t.Fatalf("%q - token type wrong. missing ILLEGAL", l.lineAtPosition())
+			case token.ILLEGAL:
+				if tk.Literal != test.errorMsg {
+					t.Fatalf("%q - token Literal wrong. expected %q, got %q", l.lineAtPosition(), test.errorMsg, tk.Literal)
+				}
+				break Loop
+			}
+		}
+
+	}
+}
+
 func testLexer(t *testing.T, l *Lexer, expectedType token.TokenType, expectedLiteral string, expectedLine, expectedColumn int) {
 	tk := l.NextToken()
-	fmt.Println(l.ch)
+
 	if tk.Type != expectedType {
 		t.Fatalf("%q - token type wrong. expected=%q, got=%q",
 			l.lineAtPosition(), expectedType, tk.Type)
@@ -215,7 +248,7 @@ func (l *Lexer) lineAtPosition() string {
 		start--
 	}
 
-	for start >= 0 && l.input[start] != '\n' && l.input[start] != '\r' {
+	for start > 0 && l.input[start] != '\n' && l.input[start] != '\r' {
 		start--
 	}
 
