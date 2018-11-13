@@ -32,8 +32,8 @@ func TestLetParseStatement(t *testing.T) {
 			t.Errorf("actual.Name.Value not '%s'. got '%s'", test.expectedIdentifier, letStateMent.Name.Value)
 		}
 
-		if letStateMent.Name.TokenLieteral() != test.expectedIdentifier {
-			t.Errorf("actual.Name not '%s'. got '%s'", test.expectedIdentifier, letStateMent.Name.TokenLieteral())
+		if letStateMent.Name.String() != test.expectedIdentifier {
+			t.Errorf("actual.Name not '%s'. got '%s'", test.expectedIdentifier, letStateMent.Name.String())
 		}
 
 		if letStateMent.Value.String() != test.expectedExpressionString {
@@ -75,6 +75,7 @@ func TestParseLiteralExpression(t *testing.T) {
 		{"hello;", "hello"},
 		{"true;", true},
 		{"false;", false},
+		{"\"哈哈哈\";", "哈哈哈"},
 	}
 
 	for _, test := range tests {
@@ -292,7 +293,12 @@ func testLiteralExpression(t *testing.T, expression ast.Expression, expectValue 
 	case int64:
 		return testIntegerExpression(t, expression, v)
 	case string:
-		return testIdentifierExpression(t, expression, v)
+		switch expression.(type) {
+		case *ast.String:
+			return testStringExpression(t, expression, v)
+		case *ast.Identifier:
+			return testIdentifierExpression(t, expression, v)
+		}
 	case bool:
 		return testBooleanExpression(t, expression, v)
 	}
@@ -315,6 +321,26 @@ func testIntegerExpression(t *testing.T, expression ast.Expression, v int64) boo
 
 	if integerExpress.TokenLieteral() != strconv.FormatInt(v, 10) {
 		t.Errorf("token literal for integer expression is not %d. got '%s'", v, integerExpress.TokenLieteral())
+		return false
+	}
+
+	return true
+}
+
+func testStringExpression(t *testing.T, expression ast.Expression, v string) bool {
+	s, ok := expression.(*ast.String)
+	if !ok {
+		t.Errorf("expression is not *ast.String. got '%T'", expression)
+		return false
+	}
+
+	if s.Value != v {
+		t.Errorf("value for string expression is not %s. got '%s'", v, s.Value)
+		return false
+	}
+
+	if s.TokenLieteral() != v {
+		t.Errorf("token literal for string expression is not %s. got '%s'", v, s.TokenLieteral())
 		return false
 	}
 

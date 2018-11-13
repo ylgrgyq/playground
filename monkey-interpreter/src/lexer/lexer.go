@@ -101,7 +101,7 @@ func (l *Lexer) NextToken() token.Token {
 func (l *Lexer) readString() token.Token {
 	startLine := l.line
 	startColumn := l.column
-	var ret string
+	var ret []byte
 Loop:
 	for {
 		l.readChar()
@@ -110,7 +110,7 @@ Loop:
 			return newIllegalToken("EOF while reading string", startLine, startColumn)
 		case '\\':
 			l.readChar()
-			var nextCh int
+			var nextCh byte
 			switch l.ch {
 			case 0:
 				return newIllegalToken("EOF while reading string", startLine, startColumn)
@@ -130,14 +130,14 @@ Loop:
 				return newIllegalToken("Unsupported escape character", l.line, l.column)
 			}
 
-			ret = ret + string(nextCh)
+			ret = append(ret, nextCh)
 		case '"':
 			break Loop
 		default:
-			ret = ret + string(l.ch)
+			ret = append(ret, l.ch)
 		}
 	}
-	return newToken(token.STRING, ret)
+	return newToken(token.STRING, string(ret))
 }
 
 func (l *Lexer) readChar() {

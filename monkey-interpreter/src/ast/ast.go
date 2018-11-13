@@ -144,7 +144,7 @@ func (i *Identifier) TokenLieteral() string {
 }
 
 func (i *Identifier) String() string {
-	return i.Token.Literal
+	return i.Value
 }
 
 type Integer struct {
@@ -175,6 +175,21 @@ func (b *Boolean) TokenLieteral() string {
 
 func (b *Boolean) String() string {
 	return b.Token.Literal
+}
+
+type String struct {
+	Token token.Token
+	Value string
+}
+
+func (s *String) expressionNode() {}
+
+func (s *String) TokenLieteral() string {
+	return s.Token.Literal
+}
+
+func (s *String) String() string {
+	return s.Value
 }
 
 type PrefixExpression struct {

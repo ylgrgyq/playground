@@ -17,8 +17,8 @@ func TestNextToken(t *testing.T) {
 
 	    		"hello"
 	"world"
-	"wor\t\n\r\"ld"
-	
+	"wor\t\n\r\"l\\d"
+	"哈哈哈"
 	`
 
 	tests := []struct {
@@ -71,10 +71,12 @@ func TestNextToken(t *testing.T) {
 			"hello"
 			"world"
 			"wor\t\n\r\"ld"
+			"哈哈哈"
 		*/
 		{token.STRING, "hello", 10, 8},
 		{token.STRING, "world", 11, 2},
-		{token.STRING, "wor\t\n\r\"ld", 12, 2},
+		{token.STRING, "wor\t\n\r\"l\\d", 12, 2},
+		{token.STRING, "哈哈哈", 13, 2},
 
 		{token.EOF, "", 14, 2},
 	}
@@ -194,7 +196,7 @@ func TestLexerError(t *testing.T) {
 		"哈哈哈哈`, "EOF while reading string at line: 2, column: 3"},
 		{`a + b; 
 		c + d;
-		 "哈哈哈哈\"`, "EOF while reading string at line: 3, column: 4"},
+		 "哈哈哈哈\`, "EOF while reading string at line: 3, column: 4"},
 		{`"哈哈哈\x哈\"`, "Unsupported escape character at line: 1, column: 12"},
 	}
 
