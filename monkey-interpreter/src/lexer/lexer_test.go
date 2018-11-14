@@ -104,6 +104,8 @@ func TestOperatorToken(t *testing.T) {
 	minusminus--
 	--minus
 	++plus;
+
+	array[15]
 	`
 	tests := []struct {
 		expectedType    token.TokenType
@@ -167,7 +169,7 @@ func TestOperatorToken(t *testing.T) {
 			plusplus++;
 			minusminus--
 			--minus
-			++plus
+			++plus;
 		*/
 		{token.IDENT, "plusplus", 13, 2},
 		{token.PLUSPLUS, "++", 13, 10},
@@ -178,6 +180,17 @@ func TestOperatorToken(t *testing.T) {
 		{token.IDENT, "minus", 15, 4},
 		{token.PLUSPLUS, "++", 16, 2},
 		{token.IDENT, "plus", 16, 4},
+		{token.SEMICOLON, ";", 16, 8},
+
+		/*
+			array[15]
+		*/
+		{token.IDENT, "array", 18, 2},
+		{token.LBRACKET, "[", 18, 7},
+		{token.INT, "15", 18, 8},
+		{token.RBRACKET, "]", 18, 10},
+
+		{token.EOF, "", 19, 2},
 	}
 
 	l := New(input)

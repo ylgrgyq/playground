@@ -43,7 +43,7 @@ type ParserError struct {
 	msg        string
 }
 
-func (p *ParserError) Error() string {
+func (p ParserError) Error() string {
 	return fmt.Sprintf("%s at line: %d, column: %d", p.msg, p.errorToken.Line, p.errorToken.Column)
 }
 
@@ -70,6 +70,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefixParseFn(token.STRING, p.parseString)
 	p.registerPrefixParseFn(token.IF, p.parseIfExpression)
 	p.registerPrefixParseFn(token.FUNCTION, p.parseFunction)
+	p.registerPrefixParseFn(token.LBRACKET, p.parseArrayLiteral)
 
 	p.registerPrefixParseFn(token.BANG, p.parsePrefix)
 	p.registerPrefixParseFn(token.MINUS, p.parsePrefix)
@@ -419,6 +420,30 @@ func (p *Parser) parseFunction() ast.Expression {
 	return function
 }
 
+func (p *Parser) parseArrayLiteral() ast.Expression {
+	array := &ast.ArrayLiteral{Token: p.currentToken}
+
+	p.assertCurrentTokenType(token.LBRACKET)
+	if p.peekTokenTypeIs(token.RBRACKET) {
+		p.nextToken()
+		return array
+	}
+
+	for p.currentToken.Type != token.RBRACKET && p.currentToken.Type != token.EOF {
+		array.Elements = append(array.Elements, p.parseExpression(LOWEST))
+		p.nextToken()
+		if p.currentTokenTypeIs(token.COMMA) {
+			p.nextToken()
+		}
+	}
+
+	if p.currentToken.Type != token.RBRACKET {
+		panic(ParserError{msg: fmt.Sprintf("expectd token type is %q, got %q", token.RBRACKET, p.currentToken.Type), errorToken: p.currentToken})
+	}
+	return array
+}
+
+//TODO: merge with parseArrayLiteral()
 func (p *Parser) parseParameters() []*ast.Identifier {
 	p.nextToken()
 	params := []*ast.Identifier{}

@@ -66,6 +66,22 @@ func TestParseReturnStatement(t *testing.T) {
 	}
 }
 
+func TestParseArrayLiteral(t *testing.T) {
+	input := "[123, hahaha, 666] "
+
+	program := parseTestingProgram(t, input, 1)
+	express, ok := program.Statements[0].(*ast.ExpressionStatement)
+
+	if !ok {
+		t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+	}
+
+	array := express.Value.(*ast.ArrayLiteral)
+	if array.String() != "[123, hahaha, 666]" {
+		t.Errorf("parsed not expected statement %q. got %q", "[123, hahaha, 666]", array.String())
+	}
+}
+
 func TestParseLiteralExpression(t *testing.T) {
 	tests := []struct {
 		input       string

@@ -368,3 +368,28 @@ func (c *CallExpression) String() string {
 
 	return buffer.String()
 }
+
+type ArrayLiteral struct {
+	Token    token.Token
+	Elements []Expression
+}
+
+func (a *ArrayLiteral) expressionNode() {}
+
+func (a *ArrayLiteral) TokenLieteral() string {
+	return a.Token.Literal
+}
+
+func (a *ArrayLiteral) String() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("[")
+
+	args := []string{}
+	for _, arg := range a.Elements {
+		args = append(args, arg.String())
+	}
+	buffer.WriteString(strings.Join(args, ", "))
+	buffer.WriteString("]")
+
+	return buffer.String()
+}

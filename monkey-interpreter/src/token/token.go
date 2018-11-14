@@ -36,6 +36,9 @@ const (
 	EQ    = "=="
 	NOTEQ = "!="
 
+	LBRACKET = "["
+	RBRACKET = "]"
+
 	// Delimiters
 	COMMA     = ","
 	SEMICOLON = ";"
