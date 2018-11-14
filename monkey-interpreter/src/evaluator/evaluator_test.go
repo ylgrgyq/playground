@@ -51,6 +51,24 @@ func TestEvalBooleanValue(t *testing.T) {
 		{"true == false", false},
 		{"1 + 5 == 7 - 1", true},
 		{"1 + 5 == 8 - 1", false},
+		{"\"haha\" == \"haha\"", true},
+		{"\"haha\" == \"hoho\"", false},
+	}
+
+	for _, test := range tests {
+		assertEvalResultEqual(t, test.input, test.expect)
+	}
+}
+
+func TestEvalStringValue(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{`"niuniu"`, "niuniu"},
+		{`"hello"`, "hello"},
+		{`"a\t\'\"\\"`, "a\t'\"\\"},
+		{`"a\t\'\"\\" + " nihao"`, "a\t'\"\\ nihao"},
 	}
 
 	for _, test := range tests {
@@ -81,6 +99,7 @@ func TestReturnStatement(t *testing.T) {
 		expect interface{}
 	}{
 		{"return 1 + 2 + 3", 6},
+		{"return \"hello\"", "hello"},
 		{"return;", NULL},
 		{"if (true){ 1 + 1; return 3;}", 3},
 		{`if (true)
@@ -163,6 +182,8 @@ func assertEvalResultEqual(t *testing.T, input string, expect interface{}) {
 		err = testCompareInteger(t, actual, v)
 	case bool:
 		err = testCompareBoolean(t, actual, v)
+	case string:
+		err = testCompareString(t, actual, v)
 	default:
 		err = testCompareNull(t, actual)
 	}
@@ -226,6 +247,23 @@ func testCompareBoolean(t *testing.T, actual object.Object, expect bool) error {
 
 	if boolean.Inspect() != fmt.Sprintf("%t", expect) {
 		return fmt.Errorf("Inspect() for boolean object is not %t. got %q", expect, boolean.Inspect())
+	}
+
+	return nil
+}
+
+func testCompareString(t *testing.T, actual object.Object, expect string) error {
+	s, ok := actual.(*object.String)
+	if !ok {
+		return fmt.Errorf("evaluated object is not string. got %T", actual)
+	}
+
+	if s.Value != expect {
+		return fmt.Errorf("evaluated object is not %s. got %s", expect, s.Value)
+	}
+
+	if s.Inspect() != fmt.Sprintf("%s", expect) {
+		return fmt.Errorf("Inspect() for string object is not %s. got %q", expect, s.Inspect())
 	}
 
 	return nil
