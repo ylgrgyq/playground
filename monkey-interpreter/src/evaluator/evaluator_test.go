@@ -76,6 +76,22 @@ func TestEvalStringValue(t *testing.T) {
 	}
 }
 
+func TestLenBuiltin(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect int
+	}{
+		{`len("niuniu")`, 6},
+		{`len("hello")`, 5},
+		{`len("a\t\'\"\\")`, 5},
+		{`len("a\t\'\"\\" + " nihao")`, 11},
+	}
+
+	for _, test := range tests {
+		assertEvalResultEqual(t, test.input, test.expect)
+	}
+}
+
 func TestIfElseExpression(t *testing.T) {
 	tests := []struct {
 		input  string

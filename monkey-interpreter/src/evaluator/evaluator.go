@@ -48,6 +48,10 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			return val
 		}
 
+		if builtin, ok := builtins[node.Value]; ok {
+			return builtin
+		}
+
 		return newError(fmt.Sprintf("unbind identifier: %s", val))
 	default:
 		return newError(fmt.Sprintf("unknown node type %T", node))
@@ -130,29 +134,45 @@ func evalCallExpression(node *ast.CallExpression, env *object.Environment) objec
 		return function
 	}
 
-	fn, ok := function.(*object.Function)
-	if !ok {
-		return newError(fmt.Sprintf("unknown function: %s", function.Inspect()))
+	params, err := evalArguments(node.Arguments, env)
+	if err != nil {
+		return err
 	}
 
-	newEnv := object.NewNestedEnvironment(fn.Env)
+	switch fn := function.(type) {
 
-	for i, param := range fn.Parameters {
-		arg := node.Arguments[i]
-		p := Eval(arg, env)
-		if IsError(p) {
-			return p
+	case *object.Function:
+		newEnv := object.NewNestedEnvironment(fn.Env)
+
+		for i, param := range fn.Parameters {
+			p := params[i]
+			newEnv.Set(param.Value, p)
 		}
 
-		newEnv.Set(param.Value, p)
-	}
+		ret := Eval(fn.Body, newEnv)
 
-	ret := Eval(fn.Body, newEnv)
-
-	if val, ok := ret.(*object.ReturnValue); ok {
-		return val.Value
+		if val, ok := ret.(*object.ReturnValue); ok {
+			return val.Value
+		}
+		return ret
+	case *object.Builtin:
+		return fn.Fn(params...)
+	default:
+		return newError(fmt.Sprintf("unknown function: %s", function.Inspect()))
 	}
-	return ret
+}
+
+func evalArguments(args []ast.Expression, env *object.Environment) ([]object.Object, object.Object) {
+	var params []object.Object
+	for _, arg := range args {
+		p := Eval(arg, env)
+		if IsError(p) {
+			return nil, p
+		}
+
+		params = append(params, p)
+	}
+	return params, nil
 }
 
 func evalPrefixExpression(node *ast.PrefixExpression, env *object.Environment) object.Object {

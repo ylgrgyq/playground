@@ -11,7 +11,7 @@ type LexerParseError struct {
 	Msg    string
 }
 
-func (l *LexerParseError) Error() string {
+func (l LexerParseError) Error() string {
 	return fmt.Sprintf("%s at line: %d, column: %d", l.Msg, l.Line, l.Column)
 }
 
@@ -96,7 +96,7 @@ func (l *Lexer) NextToken() token.Token {
 		} else if isNumber(l.ch) {
 			tok = newToken(token.INT, l.readInt())
 		} else {
-			panic(&LexerParseError{Msg: "Unrecognized character", Line: l.line, Column: l.column})
+			panic(LexerParseError{Msg: "Unrecognized character", Line: l.line, Column: l.column})
 		}
 	}
 
@@ -114,13 +114,13 @@ Loop:
 		l.readChar()
 		switch l.ch {
 		case 0:
-			panic(&LexerParseError{Msg: "EOF while reading string", Line: startLine, Column: startColumn})
+			panic(LexerParseError{Msg: "EOF while reading string", Line: startLine, Column: startColumn})
 		case '\\':
 			l.readChar()
 			var nextCh byte
 			switch l.ch {
 			case 0:
-				panic(&LexerParseError{Msg: "EOF while reading string", Line: startLine, Column: startColumn})
+				panic(LexerParseError{Msg: "EOF while reading string", Line: startLine, Column: startColumn})
 			case 't':
 				nextCh = '\t'
 			case 'n':
@@ -134,7 +134,7 @@ Loop:
 			case '\\':
 				nextCh = '\\'
 			default:
-				panic(&LexerParseError{Msg: "Unsupported escape character", Line: l.line, Column: l.column})
+				panic(LexerParseError{Msg: "Unsupported escape character", Line: l.line, Column: l.column})
 			}
 
 			ret = append(ret, nextCh)
