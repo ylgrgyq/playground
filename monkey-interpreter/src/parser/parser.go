@@ -48,11 +48,11 @@ func (p *ParserError) Error() string {
 }
 
 type Parser struct {
-	lex *lexer.Lexer
+	lex         *lexer.Lexer
+	initialized bool
 
 	currentToken token.Token
 	peekToken    token.Token
-	errors       []string
 
 	prefixFns map[token.TokenType]prefixParseFn
 	infixFns  map[token.TokenType]infixParseFn
@@ -62,8 +62,6 @@ func New(l *lexer.Lexer) *Parser {
 	p := Parser{lex: l,
 		prefixFns: make(map[token.TokenType]prefixParseFn),
 		infixFns:  make(map[token.TokenType]infixParseFn)}
-	p.nextToken()
-	p.nextToken()
 
 	p.registerPrefixParseFn(token.IDENT, p.parseIdentifier)
 	p.registerPrefixParseFn(token.INT, p.parseInteger)
@@ -113,6 +111,12 @@ func (p *Parser) ParseProgram() (program *ast.Program, err error) {
 			program = nil
 		}
 	}()
+
+	if !p.initialized {
+		p.nextToken()
+		p.nextToken()
+		p.initialized = true
+	}
 
 	program = &ast.Program{}
 
