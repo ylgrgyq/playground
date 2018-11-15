@@ -4,26 +4,37 @@ import (
 	"ast"
 	"bytes"
 	"fmt"
+	"hash/fnv"
 	"strings"
 )
 
 type ObjectType string
 
 const (
-	INTEGER_OBJ  = "INTEGER"
-	BOOLEAN_OBJ  = "BOOLEAN"
-	STRING_OBJ   = "STRING"
-	NULL_OBJ     = "NULL"
-	RETURN_OBJ   = "RETURN_VALUE"
-	ERROR_OBJ    = "ERROR"
-	FUNCTION_OBJ = "FUNCTION"
-	BUILTIN_OBJ  = "BUILTIN"
-	ARRAY_OBJ    = "ARRAY"
+	INTEGER_OBJ   = "INTEGER"
+	BOOLEAN_OBJ   = "BOOLEAN"
+	STRING_OBJ    = "STRING"
+	NULL_OBJ      = "NULL"
+	RETURN_OBJ    = "RETURN_VALUE"
+	ERROR_OBJ     = "ERROR"
+	FUNCTION_OBJ  = "FUNCTION"
+	BUILTIN_OBJ   = "BUILTIN"
+	ARRAY_OBJ     = "ARRAY"
+	HASHTABLE_OBJ = "HASHTABLE"
 )
 
 type Object interface {
 	Type() ObjectType
 	Inspect() string
+}
+
+type Hashable interface {
+	Hash() HashKey
+}
+
+type HashKey struct {
+	Type  ObjectType
+	Value uint64
 }
 
 type Integer struct {
@@ -38,6 +49,10 @@ func (i *Integer) Inspect() string {
 	return fmt.Sprintf("%d", i.Value)
 }
 
+func (i *Integer) Hash() HashKey {
+	return HashKey{Type: INTEGER_OBJ, Value: uint64(i.Value)}
+}
+
 type Boolean struct {
 	Value bool
 }
@@ -50,6 +65,17 @@ func (b *Boolean) Inspect() string {
 	return fmt.Sprintf("%t", b.Value)
 }
 
+func (b *Boolean) Hash() HashKey {
+	var v uint64
+	if b.Value {
+		v = 1
+	} else {
+		v = 0
+	}
+
+	return HashKey{Type: BOOLEAN_OBJ, Value: v}
+}
+
 type String struct {
 	Value string
 }
@@ -60,6 +86,12 @@ func (s *String) Type() ObjectType {
 
 func (s *String) Inspect() string {
 	return fmt.Sprintf("%s", s.Value)
+}
+
+func (s *String) Hash() HashKey {
+	h := fnv.New64a()
+	h.Write([]byte(s.Value))
+	return HashKey{Type: STRING_OBJ, Value: h.Sum64()}
 }
 
 type Null struct {
@@ -142,6 +174,33 @@ func (a *Array) Inspect() string {
 
 	buffer.WriteString(strings.Join(elems, ", "))
 	buffer.WriteString("]")
+
+	return buffer.String()
+}
+
+type HashPair struct {
+	Key   Object
+	Value Object
+}
+type HashTable struct {
+	Pair map[HashKey]HashPair
+}
+
+func (h *HashTable) Type() ObjectType {
+	return HASHTABLE_OBJ
+}
+
+func (h *HashTable) Inspect() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("{")
+
+	pairs := []string{}
+	for _, v := range h.Pair {
+		pairs = append(pairs, fmt.Sprintf("%s:%s", v.Key.Inspect(), v.Value.Inspect()))
+	}
+
+	buffer.WriteString(strings.Join(pairs, ", "))
+	buffer.WriteString("}")
 
 	return buffer.String()
 }

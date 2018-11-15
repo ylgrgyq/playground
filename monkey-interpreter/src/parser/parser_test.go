@@ -82,6 +82,22 @@ func TestParseArrayLiteral(t *testing.T) {
 	}
 }
 
+func TestParseHashLiteral(t *testing.T) {
+	input := "{hahaha:123, 555: 666} "
+
+	program := parseTestingProgram(t, input, 1)
+	express, ok := program.Statements[0].(*ast.ExpressionStatement)
+
+	if !ok {
+		t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+	}
+
+	hash := express.Value.(*ast.HashLiteral)
+	if hash.String() != "{hahaha:123, 555:666}" {
+		t.Errorf("parsed not expected statement %q. got %q", "{hahaha:123, 555:666}", hash.String())
+	}
+}
+
 func TestIndexExpression(t *testing.T) {
 	tests := []struct {
 		input                    string

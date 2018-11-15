@@ -51,6 +51,26 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			elems = append(elems, elem)
 		}
 		return &object.Array{Elements: elems}
+	case *ast.HashLiteral:
+		pairs := make(map[object.HashKey]object.HashPair)
+		for kx, vx := range node.Pair {
+			k := Eval(kx, env)
+			if IsError(k) {
+				return k
+			}
+
+			v := Eval(vx, env)
+			if IsError(v) {
+				return v
+			}
+
+			h, ok := k.(object.Hashable)
+			if !ok {
+				return newError(fmt.Sprintf("key type in HashLiteral is not Hashable. got %q", k.Type()))
+			}
+			pairs[h.Hash()] = object.HashPair{Key: k, Value: v}
+		}
+		return &object.HashTable{Pair: pairs}
 	case *ast.FunctionExpression:
 		return evalFunctionExpression(node, env)
 	case *ast.Identifier:
@@ -242,6 +262,7 @@ func evalInfixExpression(node *ast.InfixExpression, env *object.Environment) obj
 
 	switch {
 	case node.Operator == "[":
+		print("asdfasdf", node.TokenLieteral(), left.Inspect(), right.Inspect())
 		return evalIndexExpression(left, right)
 	case left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ:
 		return evalIntegerInfixExpression(node.Operator, left, right)
@@ -257,17 +278,26 @@ func evalInfixExpression(node *ast.InfixExpression, env *object.Environment) obj
 }
 
 func evalIndexExpression(left object.Object, right object.Object) object.Object {
-	array, ok := left.(*object.Array)
-	if !ok {
-		newError(fmt.Sprintf("expect Array, got %q", left.Type()))
+	switch l := left.(type) {
+	case *object.Array:
+		index, ok := right.(*object.Integer)
+		if !ok {
+			newError(fmt.Sprintf("expect Integer for Array Index, got %q", right.Type()))
+		}
+		return l.Elements[index.Value]
+	case *object.HashTable:
+		h, ok := right.(object.Hashable)
+		if !ok {
+			return newError(fmt.Sprintf("expect Hashable for HashTable key, got %q", right.Type()))
+		}
+		v, ok := l.Pair[h.Hash()]
+		if ok {
+			return v.Value
+		}
+		return NULL
+	default:
+		return newError(fmt.Sprintf("unsupported type for index operator, got %q", left.Type()))
 	}
-
-	index, ok := right.(*object.Integer)
-	if !ok {
-		newError(fmt.Sprintf("expect Integer for Array Index, got %q", right.Type()))
-	}
-
-	return array.Elements[index.Value]
 }
 
 func evalIntegerInfixExpression(operator string, left object.Object, right object.Object) object.Object {

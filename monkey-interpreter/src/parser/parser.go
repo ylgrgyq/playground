@@ -73,6 +73,7 @@ func New(l *lexer.Lexer) *Parser {
 	p.registerPrefixParseFn(token.IF, p.parseIfExpression)
 	p.registerPrefixParseFn(token.FUNCTION, p.parseFunction)
 	p.registerPrefixParseFn(token.LBRACKET, p.parseArrayLiteral)
+	p.registerPrefixParseFn(token.LBRACE, p.parseHashLiteral)
 
 	p.registerPrefixParseFn(token.BANG, p.parsePrefix)
 	p.registerPrefixParseFn(token.MINUS, p.parsePrefix)
@@ -444,6 +445,34 @@ func (p *Parser) parseArrayLiteral() ast.Expression {
 		panic(ParserError{msg: fmt.Sprintf("expectd token type is %q, got %q", token.RBRACKET, p.currentToken.Type), errorToken: p.currentToken})
 	}
 	return array
+}
+
+func (p *Parser) parseHashLiteral() ast.Expression {
+	hash := &ast.HashLiteral{Token: p.currentToken, Pair: make(map[ast.Expression]ast.Expression)}
+
+	p.assertCurrentTokenType(token.LBRACE)
+	if p.peekTokenTypeIs(token.RBRACE) {
+		p.nextToken()
+		return hash
+	}
+
+	for p.currentToken.Type != token.RBRACE && p.currentToken.Type != token.EOF {
+		k := p.parseExpression(LOWEST)
+		p.assertNextTokenType(token.COLON)
+		p.nextToken()
+		v := p.parseExpression(LOWEST)
+
+		hash.Pair[k] = v
+		p.nextToken()
+		if p.currentTokenTypeIs(token.COMMA) {
+			p.nextToken()
+		}
+	}
+
+	if p.currentToken.Type != token.RBRACE {
+		panic(ParserError{msg: fmt.Sprintf("expectd token type is %q, got %q", token.RBRACE, p.currentToken.Type), errorToken: p.currentToken})
+	}
+	return hash
 }
 
 //TODO: merge with parseArrayLiteral()

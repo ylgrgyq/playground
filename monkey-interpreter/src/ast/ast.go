@@ -2,6 +2,7 @@ package ast
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"token"
 )
@@ -392,6 +393,31 @@ func (a *ArrayLiteral) String() string {
 	}
 	buffer.WriteString(strings.Join(args, ", "))
 	buffer.WriteString("]")
+
+	return buffer.String()
+}
+
+type HashLiteral struct {
+	Token token.Token
+	Pair  map[Expression]Expression
+}
+
+func (h *HashLiteral) expressionNode() {}
+
+func (h *HashLiteral) TokenLieteral() string {
+	return h.Token.Literal
+}
+
+func (h *HashLiteral) String() string {
+	var buffer bytes.Buffer
+	buffer.WriteString("{")
+
+	pairs := []string{}
+	for k, v := range h.Pair {
+		pairs = append(pairs, fmt.Sprintf("%s:%s", k.String(), v.String()))
+	}
+	buffer.WriteString(strings.Join(pairs, ", "))
+	buffer.WriteString("}")
 
 	return buffer.String()
 }

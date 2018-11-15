@@ -130,6 +130,20 @@ func TestArrayExpression(t *testing.T) {
 	}
 }
 
+func TestHashExpression(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect interface{}
+	}{
+		{"{1: \"haha\", \"hoho\":2}[\"hoho\"]", 2},
+		{"{1: \"haha\", \"hoho\":2}[1]", "haha"},
+	}
+
+	for _, test := range tests {
+		assertEvalResultEqual(t, test.input, test.expect)
+	}
+}
+
 func TestReturnStatement(t *testing.T) {
 	tests := []struct {
 		input  string
