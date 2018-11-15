@@ -323,6 +323,7 @@ func (f *FunctionExpression) TokenLieteral() string {
 
 func (f *FunctionExpression) String() string {
 	var buffer bytes.Buffer
+	buffer.WriteString("(")
 	buffer.WriteString("fn ")
 	if f.Name != nil {
 		buffer.WriteString(f.Name.String())
@@ -338,6 +339,7 @@ func (f *FunctionExpression) String() string {
 	buffer.WriteString(strings.Join(params, ", "))
 	buffer.WriteString(") ")
 	buffer.WriteString(f.Body.String())
+	buffer.WriteString(")")
 	return buffer.String()
 }
 

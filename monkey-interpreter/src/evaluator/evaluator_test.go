@@ -109,6 +109,21 @@ func TestIfElseExpression(t *testing.T) {
 	}
 }
 
+func TestArrayExpression(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect interface{}
+	}{
+		{"[1, \"haha\", 333][2]", 333},
+		{"let a = 1; let b = 2; [true, 11, 1 == 2, 23 + 1][a + b]", 24},
+		{"let a = [[23, 12], [22 + 12, 11 == 11, 51, \"niu\"]]; (fn(x){return a[x]})(1)[3]", "niu"},
+	}
+
+	for _, test := range tests {
+		assertEvalResultEqual(t, test.input, test.expect)
+	}
+}
+
 func TestReturnStatement(t *testing.T) {
 	tests := []struct {
 		input  string

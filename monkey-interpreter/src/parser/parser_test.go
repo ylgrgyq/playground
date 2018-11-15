@@ -82,6 +82,35 @@ func TestParseArrayLiteral(t *testing.T) {
 	}
 }
 
+func TestIndexExpression(t *testing.T) {
+	tests := []struct {
+		input                    string
+		expectedExpressionString string
+	}{
+		{"array[111]", "array[111]"},
+		{"(x + y)[a + b]", "(x + y)[(a + b)]"},
+		{"(fn(x){return x})(100)[44]", "(fn (x) {return x; })(100)[44]"},
+	}
+
+	for _, test := range tests {
+		program := parseTestingProgram(t, test.input, 1)
+		state, ok := program.Statements[0].(*ast.ExpressionStatement)
+
+		if !ok {
+			t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+		}
+
+		express, ok := state.Value.(ast.Expression)
+		if !ok {
+			t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
+		}
+
+		if express.String() != test.expectedExpressionString {
+			t.Errorf("parsed not expected statement %q. got %q", test.expectedExpressionString, express.String())
+		}
+	}
+}
+
 func TestParseLiteralExpression(t *testing.T) {
 	tests := []struct {
 		input       string
@@ -278,7 +307,7 @@ func TestFunctionExpression(t *testing.T) {
 		t.Errorf("statement not *ast.ExpressionStatement. got '%T'", program.Statements[0])
 	}
 
-	expectStr := "fn hello (x, y) {x = 1; return (x + y); }"
+	expectStr := "(fn hello (x, y) {x = 1; return (x + y); })"
 	funExpress, ok := express.Value.(*ast.FunctionExpression)
 	if funExpress.String() != expectStr {
 		t.Errorf("expect function expression String() %q. got %q", expectStr, funExpress.String())

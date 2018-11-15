@@ -40,6 +40,17 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		return &object.String{Value: node.Value}
 	case *ast.Boolean:
 		return nativeBoolToBooleanObj(node.Value)
+	case *ast.ArrayLiteral:
+		elems := []object.Object{}
+		for _, ex := range node.Elements {
+			elem := Eval(ex, env)
+			if IsError(elem) {
+				return elem
+			}
+
+			elems = append(elems, elem)
+		}
+		return &object.Array{Elements: elems}
 	case *ast.FunctionExpression:
 		return evalFunctionExpression(node, env)
 	case *ast.Identifier:
@@ -230,6 +241,8 @@ func evalInfixExpression(node *ast.InfixExpression, env *object.Environment) obj
 	}
 
 	switch {
+	case node.Operator == "[":
+		return evalIndexExpression(left, right)
 	case left.Type() == object.INTEGER_OBJ && right.Type() == object.INTEGER_OBJ:
 		return evalIntegerInfixExpression(node.Operator, left, right)
 	case left.Type() == object.STRING_OBJ && right.Type() == object.STRING_OBJ:
@@ -241,6 +254,20 @@ func evalInfixExpression(node *ast.InfixExpression, env *object.Environment) obj
 	}
 
 	return newError(fmt.Sprintf("unknown operator: %s %s %s", node.Left.String(), node.Operator, node.Right.String()))
+}
+
+func evalIndexExpression(left object.Object, right object.Object) object.Object {
+	array, ok := left.(*object.Array)
+	if !ok {
+		newError(fmt.Sprintf("expect Array, got %q", left.Type()))
+	}
+
+	index, ok := right.(*object.Integer)
+	if !ok {
+		newError(fmt.Sprintf("expect Integer for Array Index, got %q", right.Type()))
+	}
+
+	return array.Elements[index.Value]
 }
 
 func evalIntegerInfixExpression(operator string, left object.Object, right object.Object) object.Object {
