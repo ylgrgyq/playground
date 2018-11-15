@@ -115,6 +115,12 @@ func TestArrayExpression(t *testing.T) {
 		expect interface{}
 	}{
 		{"[1, \"haha\", 333][2]", 333},
+		{"len([1, \"haha\", 333])", 3},
+		{"first([1, \"haha\", 333])", 1},
+		{"last([1, \"haha\", 333])", 333},
+		{"first(rest([1, \"haha\", 333]))", "haha"},
+		{"first(rest(rest([1, \"haha\", 333])))", 333},
+		{"first(rest(rest(rest([1, \"haha\", 333]))))", NULL},
 		{"let a = 1; let b = 2; [true, 11, 1 == 2, 23 + 1][a + b]", 24},
 		{"let a = [[23, 12], [22 + 12, 11 == 11, 51, \"niu\"]]; (fn(x){return a[x]})(1)[3]", "niu"},
 	}
