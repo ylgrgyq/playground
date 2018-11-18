@@ -2,7 +2,6 @@ package parser
 
 import (
 	"ast"
-	"lexer"
 	"strconv"
 	"testing"
 )
@@ -103,9 +102,9 @@ func TestIndexExpression(t *testing.T) {
 		input                    string
 		expectedExpressionString string
 	}{
-		{"array[111]", "array[111]"},
-		{"(x + y)[a + b]", "(x + y)[(a + b)]"},
-		{"(fn(x){return x})(100)[44]", "(fn (x) {return x; })(100)[44]"},
+		{"array[111]", "(array [ 111)"},
+		{"(x + y)[a + b]", "((x + y) [ (a + b))"},
+		{"(fn(x){return x})(100)[44]", "((fn (x) {return x; })(100) [ 44)"},
 	}
 
 	for _, test := range tests {
@@ -450,8 +449,7 @@ func testBooleanExpression(t *testing.T, expression ast.Expression, v bool) bool
 }
 
 func parseTestingProgram(t *testing.T, input string, expectedStatementCount int) *ast.Program {
-	lex := lexer.New(input)
-	par := New(lex)
+	par := New(input)
 
 	program, err := par.ParseProgram()
 	if err != nil {

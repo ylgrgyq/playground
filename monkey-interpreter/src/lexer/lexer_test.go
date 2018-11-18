@@ -107,6 +107,8 @@ func TestOperatorToken(t *testing.T) {
 
 	array[15]
 	{a:1, b:2}
+
+	5 <= 10 >= 5;
 	`
 	tests := []struct {
 		expectedType    token.TokenType
@@ -204,7 +206,15 @@ func TestOperatorToken(t *testing.T) {
 		{token.INT, "2", 19, 10},
 		{token.RBRACE, "}", 19, 11},
 
-		{token.EOF, "", 20, 2},
+		// 5 <= 10 >= 5;
+		{token.INT, "5", 21, 2},
+		{token.LTE, "<=", 21, 4},
+		{token.INT, "10", 21, 7},
+		{token.GTE, ">=", 21, 10},
+		{token.INT, "5", 21, 13},
+		{token.SEMICOLON, ";", 21, 14},
+
+		{token.EOF, "", 22, 2},
 	}
 
 	l := New(input)

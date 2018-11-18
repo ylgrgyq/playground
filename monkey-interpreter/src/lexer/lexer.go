@@ -17,19 +17,28 @@ func (l LexerParseError) Error() string {
 	return fmt.Sprintf("%s at line: %d, column: %d", l.Msg, l.Line, l.Column)
 }
 
+// A Lexer holding the state while scanning the input string
 type Lexer struct {
-	input        []byte
-	position     int
-	readPosition int
-	ch           rune
-	line         int
-	column       int
+	input        []byte // the byte array being scanned
+	position     int    // the offset of the character current reading
+	readPosition int    // offset after current reading character
+	ch           rune   // current character
+
+	line   int // the line number for current reading character in the input string
+	column int // the column nuber for current reading character in the input string
+
+	ErrorList []string
 }
 
+// New create a Lexer to scan the input string
 func New(input string) *Lexer {
 	l := &Lexer{input: []byte(input), line: 1, column: 0}
 	l.readRune()
 	return l
+}
+
+func (l *Lexer) error(msg string) {
+	l.ErrorList = append(l.ErrorList, msg)
 }
 
 // token0 is the default token type for current l.ch
@@ -59,6 +68,7 @@ func (l *Lexer) switch3(ch rune, token0, token1 token.TokenType, ch2 rune, token
 	return newToken(token0, string(ch))
 }
 
+// NextToken scan and return the next token parsed from the input string
 func (l *Lexer) NextToken() token.Token {
 	l.skipWhiteSpaces()
 
@@ -79,17 +89,17 @@ func (l *Lexer) NextToken() token.Token {
 		case '!':
 			tok = l.switch2('!', token.BANG, token.NOTEQ)
 		case '<':
-			tok = newToken(token.LT, "<")
+			tok = l.switch2('<', token.LT, token.LTE)
 		case '>':
-			tok = newToken(token.GT, ">")
+			tok = l.switch2('>', token.GT, token.GTE)
 		case '*':
-			tok = newToken(token.ASTERISK, "*")
+			tok = l.switch2('*', token.ASTERISK, token.ASTERISK_ASSIGN)
 		case '-':
 			tok = l.switch3('-', token.MINUS, token.MINUS_ASSIGN, '-', token.MINUSMINUS)
 		case '+':
 			tok = l.switch3('+', token.PLUS, token.PLUS_ASSIGN, '+', token.PLUSPLUS)
 		case '/':
-			tok = newToken(token.DIVIDE, "/")
+			tok = l.switch2('/', token.DIVIDE, token.DIVIDE_ASSIGN)
 		case ';':
 			tok = newToken(token.SEMICOLON, ";")
 		case '[':
