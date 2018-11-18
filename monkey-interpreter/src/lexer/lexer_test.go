@@ -220,11 +220,11 @@ func TestLexerError(t *testing.T) {
 	}{
 		{"hello你好", "Unrecognized character at line: 1, column: 6"},
 		{`hello * 1;
-		"哈哈哈哈`, "EOF while reading string at line: 2, column: 3"},
-		{`a + b; 
+		"哈哈哈哈`, "EOF while reading string at line: 2, column: 4"},
+		{`a + b;
 		c + d;
-		 "哈哈哈哈\`, "EOF while reading string at line: 3, column: 4"},
-		{`"哈哈哈\x哈\"`, "Unsupported escape character at line: 1, column: 12"},
+		 "哈哈哈哈\`, "EOF while reading string at line: 3, column: 5"},
+		{`"哈哈哈\x哈\"`, "Unsupported escape character at line: 1, column: 6"},
 	}
 
 	for _, test := range tests {
@@ -290,5 +290,5 @@ func (l *Lexer) lineAtPosition() string {
 	for end < len(l.input) && l.input[end] != '\n' && l.input[end] != '\r' {
 		end++
 	}
-	return l.input[start:end]
+	return string(l.input[start:end])
 }
