@@ -1,5 +1,7 @@
 package ZeroToFifty;
 
+import java.util.Arrays;
+
 public class LongestPalindromicSubstring {
 
     private static boolean isPalindrom(String s, int start, int stop) {
@@ -90,18 +92,15 @@ public class LongestPalindromicSubstring {
             for (int i = 0; i < s.length() - step; i++) {
                 int j = i + step;
 
-                // i is adjacent to j, such as "bb", i = 0, j = 1
-                // or only single character between i and j, such as "bab", i = 0, j = 2
-                if (j - i < 3) {
-                    palindromeTable[i][j] = s.charAt(i) == s.charAt(j);
-                } else {
-                    // a palindrome is between i and j, such as "cbaabc", i = 0, j = 5
-                    palindromeTable[i][j] = s.charAt(i) == s.charAt(j) && palindromeTable[i + 1][j - 1];
-                }
-
-                if (palindromeTable[i][j]) {
-                    if (j - i + 1 > max.length()) {
-                        max = s.substring(i, j + 1);
+                if (s.charAt(i) == s.charAt(j)) {
+                    // i is adjacent to j, such as "bb", i = 0, j = 1
+                    // or only single character between i and j, such as "bab", i = 0, j = 2
+                    // or a palindrome is between i and j, such as "cbaabc", i = 0, j = 5
+                    if (j - i < 3 || palindromeTable[i + 1][j - 1]) {
+                        palindromeTable[i][j] = true;
+                        if (j - i + 1 > max.length()) {
+                            max = s.substring(i, j + 1);
+                        }
                     }
                 }
 
@@ -111,4 +110,16 @@ public class LongestPalindromicSubstring {
         return max;
     }
 
+    private static void printArray(boolean[][] palindromeTable) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < palindromeTable.length; i++) {
+            for (int j = 0; j < palindromeTable.length; j++) {
+                builder.append(palindromeTable[i][j]);
+                builder.append(" ");
+            }
+            builder.append("\n");
+        }
+
+        System.out.println(builder.toString());
+    }
 }
