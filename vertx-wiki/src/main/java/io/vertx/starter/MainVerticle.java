@@ -93,7 +93,7 @@ public class MainVerticle extends AbstractVerticle {
     router.post().handler(BodyHandler.create());
     router.post("/save").handler(this::pageUpdateHandler);
     router.post("/create").handler(this::pageCreateHandler);
-//    router.post("/delete").handler(this::pageDeletionHandler);
+    router.post("/delete").handler(this::pageDeletionHandler);
 
     vertx.createHttpServer()
       .requestHandler(router)
@@ -236,5 +236,28 @@ public class MainVerticle extends AbstractVerticle {
     });
   }
 
+  private void pageDeletionHandler(RoutingContext context) {
+    String id = context.request().getParam("id");
 
+    jdbcClient.getConnection(result -> {
+      if (result.succeeded()) {
+        SQLConnection conn = result.result();
+        conn.queryWithParams(SQL_DELETE_PAGE, new JsonArray().add(id), res -> {
+          conn.close();
+
+          if (res.succeeded()) {
+            context.response().setStatusCode(303);
+            context.response().putHeader("Location", "/");
+            context.response().end();
+          } else {
+            logger.error("Get index from database failed", res.cause());
+            context.fail(500);
+          }
+        });
+      } else {
+        logger.error("Open Connection to Database failed", result.cause());
+        context.fail(500);
+      }
+    });
+  }
 }
