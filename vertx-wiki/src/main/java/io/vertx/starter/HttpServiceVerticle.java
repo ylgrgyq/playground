@@ -127,7 +127,6 @@ public class HttpServiceVerticle extends AbstractVerticle {
     String id = context.request().getParam("id");
     String markdown = context.request().getParam("markdown");
     boolean newPage = "yes".equals(context.request().getParam("newPage"));
-    logger.info("page update handler22 {}", newPage);
 
     JsonObject reqMsg = new JsonObject()
       .put("title", title)
@@ -135,8 +134,6 @@ public class HttpServiceVerticle extends AbstractVerticle {
       .put("markdown", markdown)
       .put("isNewPage", newPage);
 
-    logger.info("page update handler2211");
-    logger.info("page update handler {}", reqMsg);
     DeliveryOptions options = new DeliveryOptions().addHeader("action", "update-page");
 
     vertx.eventBus().send(wikiDbQueue, reqMsg, options, reply -> {
