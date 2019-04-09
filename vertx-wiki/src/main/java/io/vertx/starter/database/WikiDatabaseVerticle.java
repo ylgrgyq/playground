@@ -1,4 +1,4 @@
-package io.vertx.starter;
+package io.vertx.starter.database;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
@@ -35,15 +35,6 @@ public class WikiDatabaseVerticle extends AbstractVerticle {
   private String wikidbQueue;
   private JDBCClient jdbcClient;
   private HashMap<SqlQuery, String> queriesMap;
-
-  private enum SqlQuery {
-    SQL_CREATE_PAGES_TABLE,
-    SQL_GET_PAGE,
-    SQL_CREATE_PAGE,
-    SQL_SAVE_PAGE,
-    SQL_ALL_PAGES,
-    SQL_DELETE_PAGE,
-  }
 
   @Override
   public void start(Future<Void> startFuture) throws Exception {
@@ -208,9 +199,5 @@ public class WikiDatabaseVerticle extends AbstractVerticle {
 
   }
 
-  public enum ErrorCodes {
-    NO_ACTION_SPECIFIED,
-    BAD_ACTION,
-    DB_ERROR
-  }
+
 }

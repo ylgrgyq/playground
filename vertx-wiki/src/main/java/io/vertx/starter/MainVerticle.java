@@ -3,6 +3,7 @@ package io.vertx.starter;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Future;
+import io.vertx.starter.database.WikiDatabaseVerticle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +17,7 @@ public class MainVerticle extends AbstractVerticle {
 
     deploy.compose(id -> {
       Future<String> httpDeploy = Future.future();
-      vertx.deployVerticle("io.vertx.starter.HttpServiceVerticle",
+      vertx.deployVerticle("io.vertx.starter.http.HttpServiceVerticle",
         new DeploymentOptions().setInstances(8),
         httpDeploy);
       return httpDeploy;

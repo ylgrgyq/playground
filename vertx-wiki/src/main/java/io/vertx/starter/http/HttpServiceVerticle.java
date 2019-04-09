@@ -1,4 +1,4 @@
-package io.vertx.starter;
+package io.vertx.starter.http;
 
 import com.github.rjeschke.txtmark.Processor;
 import io.vertx.core.AbstractVerticle;
