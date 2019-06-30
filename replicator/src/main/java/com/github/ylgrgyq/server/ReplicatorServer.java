@@ -1,44 +1,40 @@
 package com.github.ylgrgyq.server;
 
-import com.github.ylgrgyq.server.storage.Storage;
-
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 public class ReplicatorServer {
-    private Map<String, Source> topicToSource;
+    private Map<String, Sequence> topicToSource;
 
     public ReplicatorServer() {
         this.topicToSource = new HashMap<>();
     }
 
-    public synchronized Source createSource(String topic, SourceOptions options) {
-        Source source = new Source(topic, options);
-        Source oldSource = topicToSource.computeIfAbsent(topic, k -> source);
+    public synchronized Sequence createSequence(String topic, SequenceOptions options) {
+        Sequence sequence = new Sequence(topic, options);
+        Sequence oldSequence = topicToSource.computeIfAbsent(topic, k -> sequence);
 
-        if (source == oldSource) {
-            source.init();
+        if (sequence == oldSequence) {
+            sequence.init();
         }
 
-        return oldSource;
+        return oldSequence;
     }
 
-    public synchronized void deleteSource(String topic) {
+    public synchronized void deleteSequence(String topic) {
         topicToSource.remove(topic);
     }
 
-    public synchronized Source replaceSnapshotGenerator(String topic, SourceOptions options) {
-        Source source = new Source(topic, options);
-        source.init();
+    public synchronized Sequence replaceSnapshotGenerator(String topic, SequenceOptions options) {
+        Sequence sequence = new Sequence(topic, options);
+        sequence.init();
 
-        topicToSource.put(topic, source);
+        topicToSource.put(topic, sequence);
 
-        return source;
+        return sequence;
     }
 
-    public synchronized Source getSource(String topic) {
+    public synchronized Sequence getSequence(String topic) {
         return topicToSource.get(topic);
     }
 }

@@ -1,8 +1,12 @@
 package com.github.ylgrgyq.server;
 
-public class SourceOptions {
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+
+public class SequenceOptions {
     private SnapshotGenerator snapshotGenerator;
     private long maxPendingLogSize;
+    private ExecutorService sequenceExecutor;
 
     public SnapshotGenerator getSnapshotGenerator() {
         return snapshotGenerator;
@@ -10,5 +14,9 @@ public class SourceOptions {
 
     public long getMaxPendingLogSize() {
         return maxPendingLogSize;
+    }
+
+    public ExecutorService getSequenceExecutor() {
+        return sequenceExecutor;
     }
 }
