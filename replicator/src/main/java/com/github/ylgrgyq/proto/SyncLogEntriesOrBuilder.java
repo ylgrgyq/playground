@@ -8,22 +8,26 @@ public interface SyncLogEntriesOrBuilder extends
     com.google.protobuf.MessageOrBuilder {
 
   /**
-   * <code>optional int64 startIndex = 1;</code>
+   * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
    */
-  long getStartIndex();
-
+  java.util.List<com.github.ylgrgyq.proto.LogEntry> 
+      getEntriesList();
   /**
-   * <code>optional string topic = 2;</code>
+   * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
    */
-  java.lang.String getTopic();
+  com.github.ylgrgyq.proto.LogEntry getEntries(int index);
   /**
-   * <code>optional string topic = 2;</code>
+   * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
    */
-  com.google.protobuf.ByteString
-      getTopicBytes();
-
+  int getEntriesCount();
   /**
-   * <code>optional bytes data = 3;</code>
+   * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
    */
-  com.google.protobuf.ByteString getData();
+  java.util.List<? extends com.github.ylgrgyq.proto.LogEntryOrBuilder> 
+      getEntriesOrBuilderList();
+  /**
+   * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+   */
+  com.github.ylgrgyq.proto.LogEntryOrBuilder getEntriesOrBuilder(
+      int index);
 }

@@ -1,5 +1,7 @@
 package com.github.ylgrgyq.server.storage;
 
+import com.github.ylgrgyq.proto.LogEntry;
+
 import java.util.List;
 
 public interface Storage {
@@ -7,7 +9,7 @@ public interface Storage {
     long getFirstIndex();
     long getLastIndex();
     void append(byte[] data);
-    List<byte[]> getEntries(long fromIndex, int limit);
+    List<LogEntry> getEntries(long fromIndex, int limit);
     long pendingLogSize();
     void trimToIndex(long index);
 }

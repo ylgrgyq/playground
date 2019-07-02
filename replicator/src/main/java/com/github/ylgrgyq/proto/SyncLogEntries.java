@@ -15,9 +15,7 @@ public  final class SyncLogEntries extends
     super(builder);
   }
   private SyncLogEntries() {
-    startIndex_ = 0L;
-    topic_ = "";
-    data_ = com.google.protobuf.ByteString.EMPTY;
+    entries_ = java.util.Collections.emptyList();
   }
 
   @java.lang.Override
@@ -45,20 +43,13 @@ public  final class SyncLogEntries extends
             }
             break;
           }
-          case 8: {
-
-            startIndex_ = input.readInt64();
-            break;
-          }
-          case 18: {
-            java.lang.String s = input.readStringRequireUtf8();
-
-            topic_ = s;
-            break;
-          }
-          case 26: {
-
-            data_ = input.readBytes();
+          case 10: {
+            if (!((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
+              entries_ = new java.util.ArrayList<com.github.ylgrgyq.proto.LogEntry>();
+              mutable_bitField0_ |= 0x00000001;
+            }
+            entries_.add(
+                input.readMessage(com.github.ylgrgyq.proto.LogEntry.parser(), extensionRegistry));
             break;
           }
         }
@@ -69,6 +60,9 @@ public  final class SyncLogEntries extends
       throw new com.google.protobuf.InvalidProtocolBufferException(
           e).setUnfinishedMessage(this);
     } finally {
+      if (((mutable_bitField0_ & 0x00000001) == 0x00000001)) {
+        entries_ = java.util.Collections.unmodifiableList(entries_);
+      }
       makeExtensionsImmutable();
     }
   }
@@ -84,56 +78,39 @@ public  final class SyncLogEntries extends
             com.github.ylgrgyq.proto.SyncLogEntries.class, com.github.ylgrgyq.proto.SyncLogEntries.Builder.class);
   }
 
-  public static final int STARTINDEX_FIELD_NUMBER = 1;
-  private long startIndex_;
+  public static final int ENTRIES_FIELD_NUMBER = 1;
+  private java.util.List<com.github.ylgrgyq.proto.LogEntry> entries_;
   /**
-   * <code>optional int64 startIndex = 1;</code>
+   * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
    */
-  public long getStartIndex() {
-    return startIndex_;
-  }
-
-  public static final int TOPIC_FIELD_NUMBER = 2;
-  private volatile java.lang.Object topic_;
-  /**
-   * <code>optional string topic = 2;</code>
-   */
-  public java.lang.String getTopic() {
-    java.lang.Object ref = topic_;
-    if (ref instanceof java.lang.String) {
-      return (java.lang.String) ref;
-    } else {
-      com.google.protobuf.ByteString bs = 
-          (com.google.protobuf.ByteString) ref;
-      java.lang.String s = bs.toStringUtf8();
-      topic_ = s;
-      return s;
-    }
+  public java.util.List<com.github.ylgrgyq.proto.LogEntry> getEntriesList() {
+    return entries_;
   }
   /**
-   * <code>optional string topic = 2;</code>
+   * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
    */
-  public com.google.protobuf.ByteString
-      getTopicBytes() {
-    java.lang.Object ref = topic_;
-    if (ref instanceof java.lang.String) {
-      com.google.protobuf.ByteString b = 
-          com.google.protobuf.ByteString.copyFromUtf8(
-              (java.lang.String) ref);
-      topic_ = b;
-      return b;
-    } else {
-      return (com.google.protobuf.ByteString) ref;
-    }
+  public java.util.List<? extends com.github.ylgrgyq.proto.LogEntryOrBuilder> 
+      getEntriesOrBuilderList() {
+    return entries_;
   }
-
-  public static final int DATA_FIELD_NUMBER = 3;
-  private com.google.protobuf.ByteString data_;
   /**
-   * <code>optional bytes data = 3;</code>
+   * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
    */
-  public com.google.protobuf.ByteString getData() {
-    return data_;
+  public int getEntriesCount() {
+    return entries_.size();
+  }
+  /**
+   * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+   */
+  public com.github.ylgrgyq.proto.LogEntry getEntries(int index) {
+    return entries_.get(index);
+  }
+  /**
+   * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+   */
+  public com.github.ylgrgyq.proto.LogEntryOrBuilder getEntriesOrBuilder(
+      int index) {
+    return entries_.get(index);
   }
 
   private byte memoizedIsInitialized = -1;
@@ -148,14 +125,8 @@ public  final class SyncLogEntries extends
 
   public void writeTo(com.google.protobuf.CodedOutputStream output)
                       throws java.io.IOException {
-    if (startIndex_ != 0L) {
-      output.writeInt64(1, startIndex_);
-    }
-    if (!getTopicBytes().isEmpty()) {
-      com.google.protobuf.GeneratedMessageV3.writeString(output, 2, topic_);
-    }
-    if (!data_.isEmpty()) {
-      output.writeBytes(3, data_);
+    for (int i = 0; i < entries_.size(); i++) {
+      output.writeMessage(1, entries_.get(i));
     }
   }
 
@@ -164,16 +135,9 @@ public  final class SyncLogEntries extends
     if (size != -1) return size;
 
     size = 0;
-    if (startIndex_ != 0L) {
+    for (int i = 0; i < entries_.size(); i++) {
       size += com.google.protobuf.CodedOutputStream
-        .computeInt64Size(1, startIndex_);
-    }
-    if (!getTopicBytes().isEmpty()) {
-      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(2, topic_);
-    }
-    if (!data_.isEmpty()) {
-      size += com.google.protobuf.CodedOutputStream
-        .computeBytesSize(3, data_);
+        .computeMessageSize(1, entries_.get(i));
     }
     memoizedSize = size;
     return size;
@@ -191,12 +155,8 @@ public  final class SyncLogEntries extends
     com.github.ylgrgyq.proto.SyncLogEntries other = (com.github.ylgrgyq.proto.SyncLogEntries) obj;
 
     boolean result = true;
-    result = result && (getStartIndex()
-        == other.getStartIndex());
-    result = result && getTopic()
-        .equals(other.getTopic());
-    result = result && getData()
-        .equals(other.getData());
+    result = result && getEntriesList()
+        .equals(other.getEntriesList());
     return result;
   }
 
@@ -207,13 +167,10 @@ public  final class SyncLogEntries extends
     }
     int hash = 41;
     hash = (19 * hash) + getDescriptorForType().hashCode();
-    hash = (37 * hash) + STARTINDEX_FIELD_NUMBER;
-    hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
-        getStartIndex());
-    hash = (37 * hash) + TOPIC_FIELD_NUMBER;
-    hash = (53 * hash) + getTopic().hashCode();
-    hash = (37 * hash) + DATA_FIELD_NUMBER;
-    hash = (53 * hash) + getData().hashCode();
+    if (getEntriesCount() > 0) {
+      hash = (37 * hash) + ENTRIES_FIELD_NUMBER;
+      hash = (53 * hash) + getEntriesList().hashCode();
+    }
     hash = (29 * hash) + unknownFields.hashCode();
     memoizedHashCode = hash;
     return hash;
@@ -328,16 +285,17 @@ public  final class SyncLogEntries extends
     private void maybeForceBuilderInitialization() {
       if (com.google.protobuf.GeneratedMessageV3
               .alwaysUseFieldBuilders) {
+        getEntriesFieldBuilder();
       }
     }
     public Builder clear() {
       super.clear();
-      startIndex_ = 0L;
-
-      topic_ = "";
-
-      data_ = com.google.protobuf.ByteString.EMPTY;
-
+      if (entriesBuilder_ == null) {
+        entries_ = java.util.Collections.emptyList();
+        bitField0_ = (bitField0_ & ~0x00000001);
+      } else {
+        entriesBuilder_.clear();
+      }
       return this;
     }
 
@@ -360,9 +318,16 @@ public  final class SyncLogEntries extends
 
     public com.github.ylgrgyq.proto.SyncLogEntries buildPartial() {
       com.github.ylgrgyq.proto.SyncLogEntries result = new com.github.ylgrgyq.proto.SyncLogEntries(this);
-      result.startIndex_ = startIndex_;
-      result.topic_ = topic_;
-      result.data_ = data_;
+      int from_bitField0_ = bitField0_;
+      if (entriesBuilder_ == null) {
+        if (((bitField0_ & 0x00000001) == 0x00000001)) {
+          entries_ = java.util.Collections.unmodifiableList(entries_);
+          bitField0_ = (bitField0_ & ~0x00000001);
+        }
+        result.entries_ = entries_;
+      } else {
+        result.entries_ = entriesBuilder_.build();
+      }
       onBuilt();
       return result;
     }
@@ -404,15 +369,31 @@ public  final class SyncLogEntries extends
 
     public Builder mergeFrom(com.github.ylgrgyq.proto.SyncLogEntries other) {
       if (other == com.github.ylgrgyq.proto.SyncLogEntries.getDefaultInstance()) return this;
-      if (other.getStartIndex() != 0L) {
-        setStartIndex(other.getStartIndex());
-      }
-      if (!other.getTopic().isEmpty()) {
-        topic_ = other.topic_;
-        onChanged();
-      }
-      if (other.getData() != com.google.protobuf.ByteString.EMPTY) {
-        setData(other.getData());
+      if (entriesBuilder_ == null) {
+        if (!other.entries_.isEmpty()) {
+          if (entries_.isEmpty()) {
+            entries_ = other.entries_;
+            bitField0_ = (bitField0_ & ~0x00000001);
+          } else {
+            ensureEntriesIsMutable();
+            entries_.addAll(other.entries_);
+          }
+          onChanged();
+        }
+      } else {
+        if (!other.entries_.isEmpty()) {
+          if (entriesBuilder_.isEmpty()) {
+            entriesBuilder_.dispose();
+            entriesBuilder_ = null;
+            entries_ = other.entries_;
+            bitField0_ = (bitField0_ & ~0x00000001);
+            entriesBuilder_ = 
+              com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders ?
+                 getEntriesFieldBuilder() : null;
+          } else {
+            entriesBuilder_.addAllMessages(other.entries_);
+          }
+        }
       }
       onChanged();
       return this;
@@ -439,129 +420,246 @@ public  final class SyncLogEntries extends
       }
       return this;
     }
+    private int bitField0_;
 
-    private long startIndex_ ;
-    /**
-     * <code>optional int64 startIndex = 1;</code>
-     */
-    public long getStartIndex() {
-      return startIndex_;
-    }
-    /**
-     * <code>optional int64 startIndex = 1;</code>
-     */
-    public Builder setStartIndex(long value) {
-      
-      startIndex_ = value;
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>optional int64 startIndex = 1;</code>
-     */
-    public Builder clearStartIndex() {
-      
-      startIndex_ = 0L;
-      onChanged();
-      return this;
+    private java.util.List<com.github.ylgrgyq.proto.LogEntry> entries_ =
+      java.util.Collections.emptyList();
+    private void ensureEntriesIsMutable() {
+      if (!((bitField0_ & 0x00000001) == 0x00000001)) {
+        entries_ = new java.util.ArrayList<com.github.ylgrgyq.proto.LogEntry>(entries_);
+        bitField0_ |= 0x00000001;
+       }
     }
 
-    private java.lang.Object topic_ = "";
+    private com.google.protobuf.RepeatedFieldBuilderV3<
+        com.github.ylgrgyq.proto.LogEntry, com.github.ylgrgyq.proto.LogEntry.Builder, com.github.ylgrgyq.proto.LogEntryOrBuilder> entriesBuilder_;
+
     /**
-     * <code>optional string topic = 2;</code>
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
      */
-    public java.lang.String getTopic() {
-      java.lang.Object ref = topic_;
-      if (!(ref instanceof java.lang.String)) {
-        com.google.protobuf.ByteString bs =
-            (com.google.protobuf.ByteString) ref;
-        java.lang.String s = bs.toStringUtf8();
-        topic_ = s;
-        return s;
+    public java.util.List<com.github.ylgrgyq.proto.LogEntry> getEntriesList() {
+      if (entriesBuilder_ == null) {
+        return java.util.Collections.unmodifiableList(entries_);
       } else {
-        return (java.lang.String) ref;
+        return entriesBuilder_.getMessageList();
       }
     }
     /**
-     * <code>optional string topic = 2;</code>
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
      */
-    public com.google.protobuf.ByteString
-        getTopicBytes() {
-      java.lang.Object ref = topic_;
-      if (ref instanceof String) {
-        com.google.protobuf.ByteString b = 
-            com.google.protobuf.ByteString.copyFromUtf8(
-                (java.lang.String) ref);
-        topic_ = b;
-        return b;
+    public int getEntriesCount() {
+      if (entriesBuilder_ == null) {
+        return entries_.size();
       } else {
-        return (com.google.protobuf.ByteString) ref;
+        return entriesBuilder_.getCount();
       }
     }
     /**
-     * <code>optional string topic = 2;</code>
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
      */
-    public Builder setTopic(
-        java.lang.String value) {
-      if (value == null) {
-    throw new NullPointerException();
-  }
-  
-      topic_ = value;
-      onChanged();
+    public com.github.ylgrgyq.proto.LogEntry getEntries(int index) {
+      if (entriesBuilder_ == null) {
+        return entries_.get(index);
+      } else {
+        return entriesBuilder_.getMessage(index);
+      }
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public Builder setEntries(
+        int index, com.github.ylgrgyq.proto.LogEntry value) {
+      if (entriesBuilder_ == null) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        ensureEntriesIsMutable();
+        entries_.set(index, value);
+        onChanged();
+      } else {
+        entriesBuilder_.setMessage(index, value);
+      }
       return this;
     }
     /**
-     * <code>optional string topic = 2;</code>
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
      */
-    public Builder clearTopic() {
-      
-      topic_ = getDefaultInstance().getTopic();
-      onChanged();
+    public Builder setEntries(
+        int index, com.github.ylgrgyq.proto.LogEntry.Builder builderForValue) {
+      if (entriesBuilder_ == null) {
+        ensureEntriesIsMutable();
+        entries_.set(index, builderForValue.build());
+        onChanged();
+      } else {
+        entriesBuilder_.setMessage(index, builderForValue.build());
+      }
       return this;
     }
     /**
-     * <code>optional string topic = 2;</code>
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
      */
-    public Builder setTopicBytes(
-        com.google.protobuf.ByteString value) {
-      if (value == null) {
-    throw new NullPointerException();
-  }
-  checkByteStringIsUtf8(value);
-      
-      topic_ = value;
-      onChanged();
-      return this;
-    }
-
-    private com.google.protobuf.ByteString data_ = com.google.protobuf.ByteString.EMPTY;
-    /**
-     * <code>optional bytes data = 3;</code>
-     */
-    public com.google.protobuf.ByteString getData() {
-      return data_;
-    }
-    /**
-     * <code>optional bytes data = 3;</code>
-     */
-    public Builder setData(com.google.protobuf.ByteString value) {
-      if (value == null) {
-    throw new NullPointerException();
-  }
-  
-      data_ = value;
-      onChanged();
+    public Builder addEntries(com.github.ylgrgyq.proto.LogEntry value) {
+      if (entriesBuilder_ == null) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        ensureEntriesIsMutable();
+        entries_.add(value);
+        onChanged();
+      } else {
+        entriesBuilder_.addMessage(value);
+      }
       return this;
     }
     /**
-     * <code>optional bytes data = 3;</code>
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
      */
-    public Builder clearData() {
-      
-      data_ = getDefaultInstance().getData();
-      onChanged();
+    public Builder addEntries(
+        int index, com.github.ylgrgyq.proto.LogEntry value) {
+      if (entriesBuilder_ == null) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        ensureEntriesIsMutable();
+        entries_.add(index, value);
+        onChanged();
+      } else {
+        entriesBuilder_.addMessage(index, value);
+      }
       return this;
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public Builder addEntries(
+        com.github.ylgrgyq.proto.LogEntry.Builder builderForValue) {
+      if (entriesBuilder_ == null) {
+        ensureEntriesIsMutable();
+        entries_.add(builderForValue.build());
+        onChanged();
+      } else {
+        entriesBuilder_.addMessage(builderForValue.build());
+      }
+      return this;
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public Builder addEntries(
+        int index, com.github.ylgrgyq.proto.LogEntry.Builder builderForValue) {
+      if (entriesBuilder_ == null) {
+        ensureEntriesIsMutable();
+        entries_.add(index, builderForValue.build());
+        onChanged();
+      } else {
+        entriesBuilder_.addMessage(index, builderForValue.build());
+      }
+      return this;
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public Builder addAllEntries(
+        java.lang.Iterable<? extends com.github.ylgrgyq.proto.LogEntry> values) {
+      if (entriesBuilder_ == null) {
+        ensureEntriesIsMutable();
+        com.google.protobuf.AbstractMessageLite.Builder.addAll(
+            values, entries_);
+        onChanged();
+      } else {
+        entriesBuilder_.addAllMessages(values);
+      }
+      return this;
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public Builder clearEntries() {
+      if (entriesBuilder_ == null) {
+        entries_ = java.util.Collections.emptyList();
+        bitField0_ = (bitField0_ & ~0x00000001);
+        onChanged();
+      } else {
+        entriesBuilder_.clear();
+      }
+      return this;
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public Builder removeEntries(int index) {
+      if (entriesBuilder_ == null) {
+        ensureEntriesIsMutable();
+        entries_.remove(index);
+        onChanged();
+      } else {
+        entriesBuilder_.remove(index);
+      }
+      return this;
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public com.github.ylgrgyq.proto.LogEntry.Builder getEntriesBuilder(
+        int index) {
+      return getEntriesFieldBuilder().getBuilder(index);
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public com.github.ylgrgyq.proto.LogEntryOrBuilder getEntriesOrBuilder(
+        int index) {
+      if (entriesBuilder_ == null) {
+        return entries_.get(index);  } else {
+        return entriesBuilder_.getMessageOrBuilder(index);
+      }
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public java.util.List<? extends com.github.ylgrgyq.proto.LogEntryOrBuilder> 
+         getEntriesOrBuilderList() {
+      if (entriesBuilder_ != null) {
+        return entriesBuilder_.getMessageOrBuilderList();
+      } else {
+        return java.util.Collections.unmodifiableList(entries_);
+      }
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public com.github.ylgrgyq.proto.LogEntry.Builder addEntriesBuilder() {
+      return getEntriesFieldBuilder().addBuilder(
+          com.github.ylgrgyq.proto.LogEntry.getDefaultInstance());
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public com.github.ylgrgyq.proto.LogEntry.Builder addEntriesBuilder(
+        int index) {
+      return getEntriesFieldBuilder().addBuilder(
+          index, com.github.ylgrgyq.proto.LogEntry.getDefaultInstance());
+    }
+    /**
+     * <code>repeated .com.github.ylgrgyq.proto.LogEntry entries = 1;</code>
+     */
+    public java.util.List<com.github.ylgrgyq.proto.LogEntry.Builder> 
+         getEntriesBuilderList() {
+      return getEntriesFieldBuilder().getBuilderList();
+    }
+    private com.google.protobuf.RepeatedFieldBuilderV3<
+        com.github.ylgrgyq.proto.LogEntry, com.github.ylgrgyq.proto.LogEntry.Builder, com.github.ylgrgyq.proto.LogEntryOrBuilder> 
+        getEntriesFieldBuilder() {
+      if (entriesBuilder_ == null) {
+        entriesBuilder_ = new com.google.protobuf.RepeatedFieldBuilderV3<
+            com.github.ylgrgyq.proto.LogEntry, com.github.ylgrgyq.proto.LogEntry.Builder, com.github.ylgrgyq.proto.LogEntryOrBuilder>(
+                entries_,
+                ((bitField0_ & 0x00000001) == 0x00000001),
+                getParentForChildren(),
+                isClean());
+        entries_ = null;
+      }
+      return entriesBuilder_;
     }
     public final Builder setUnknownFields(
         final com.google.protobuf.UnknownFieldSet unknownFields) {

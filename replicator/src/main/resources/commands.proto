@@ -2,14 +2,41 @@ syntax = "proto3";
 package com.github.ylgrgyq.proto;
 option java_multiple_files = true;
 
+message LogEntry {
+    int64 index = 1;
+    bytes data = 2;
+}
+
 message SyncLogEntries {
-    int64 startIndex = 1;
-    string topic = 2;
-    bytes data = 3;
+    repeated LogEntry entries = 1;
 }
 
 message Snapshot {
-	bytes data = 1;
-	int64 index = 2;
+    bytes data = 1;
+    int64 index = 2;
     string topic = 3;
+}
+
+message ErrorInfo {
+    int32 error_code = 1;
+    string error_msg = 2;
+}
+
+message ReplicatorCommand {
+    enum CommandType {
+        UNKNOWN = 0;
+        GET = 1;
+        GET_RESP = 2;
+        SNAPSHOT = 3;
+        SNAPSHOT_RESP = 4;
+        ERROR = 5;
+    }
+
+    CommandType type = 1;
+    string topic = 2;
+    int64 fromIndex = 3;
+    int32 limit = 4;
+    SyncLogEntries logs = 5;
+    Snapshot snapshot = 6;
+    ErrorInfo error = 7;
 }

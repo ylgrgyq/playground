@@ -1,11 +1,12 @@
 package com.github.ylgrgyq.server;
 
+import com.github.ylgrgyq.proto.LogEntry;
 import com.github.ylgrgyq.proto.Snapshot;
+import com.github.ylgrgyq.proto.SyncLogEntries;
 import com.github.ylgrgyq.server.storage.MemoryStorage;
 import com.github.ylgrgyq.server.storage.Storage;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
@@ -53,30 +54,27 @@ public class Sequence {
         }
     }
 
-    public List<byte[]> getSyncLogs(long fromIndex, int limit) {
+    public SyncLogEntries syncLogs(long fromIndex, int limit) {
         readLock.lock();
         try {
-            if (fromIndex < lastSnapshot.getIndex()) {
-                throw new RuntimeException("fetch last snapshot");
+            if (lastSnapshot != null && fromIndex < lastSnapshot.getIndex()) {
+                throw new ReplicatorException(ReplicatorError.ENEEDCATCHUP);
             }
         } finally {
             readLock.unlock();
         }
 
-        return storage.getEntries(fromIndex, limit);
+        List<LogEntry> entries = storage.getEntries(fromIndex, limit);
+        SyncLogEntries.Builder builder = SyncLogEntries.newBuilder();
+        builder.addAllEntries(entries);
+        return builder.build();
     }
 
-    public CompletableFuture<Snapshot> getSnapshot(long requestIndex) {
+    public Snapshot getSnapshot() {
         readLock.lock();
         try {
             if (lastSnapshot != null) {
-                if (requestIndex <= lastSnapshot.getIndex()) {
-                    return CompletableFuture.completedFuture(lastSnapshot);
-                }
-
-                if (requestIndex > storage.getLastIndex()) {
-                    return CompletableFuture.completedFuture(lastSnapshot);
-                }
+                return lastSnapshot;
             }
         } finally {
             readLock.unlock();
@@ -84,8 +82,7 @@ public class Sequence {
         return null;
     }
 
-    private CompletableFuture<Snapshot> scheduleGenerateSnapshot() {
-        CompletableFuture<Snapshot> future = new CompletableFuture<>();
+    private void scheduleGenerateSnapshot() {
         if (generateSnapshotJobScheduled.compareAndSet(false, true)) {
             executor.submit(() -> {
                 Snapshot snapshot = snapshotGenerator.generateSnapshot();
@@ -98,10 +95,7 @@ public class Sequence {
                 } finally {
                     writeLock.unlock();
                 }
-                future.complete(snapshot);
             });
         }
-
-        return future;
     }
 }

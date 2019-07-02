@@ -1,5 +1,8 @@
 package com.github.ylgrgyq.server.storage;
 
+import com.github.ylgrgyq.proto.LogEntry;
+import com.google.protobuf.ByteString;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -8,7 +11,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class MemoryStorage implements Storage {
-    private List<byte[]> datas;
+    private List<LogEntry> datas;
     private long offsetIndex;
     private Lock readLock;
     private Lock writeLock;
@@ -30,10 +33,6 @@ public class MemoryStorage implements Storage {
     public long getFirstIndex() {
         readLock.lock();
         try {
-            if (datas.isEmpty()) {
-                return -1;
-            }
-
             return offsetIndex;
         } finally {
             readLock.unlock();
@@ -44,10 +43,6 @@ public class MemoryStorage implements Storage {
     public long getLastIndex() {
         readLock.lock();
         try {
-            if (datas.isEmpty()) {
-                return -1;
-            }
-
             return offsetIndex + datas.size();
         } finally {
             readLock.unlock();
@@ -58,7 +53,7 @@ public class MemoryStorage implements Storage {
     public long pendingLogSize() {
         readLock.lock();
         try {
-            return datas.stream().mapToInt(d -> d.length).sum();
+            return datas.stream().mapToInt(d -> d.getData().size()).sum();
         } finally {
             readLock.unlock();
         }
@@ -68,19 +63,22 @@ public class MemoryStorage implements Storage {
     public void append(byte[] data) {
         writeLock.lock();
         try {
-            datas.add(data);
+            LogEntry.Builder builder = LogEntry.newBuilder();
+            builder.setData(ByteString.copyFrom(data));
+            builder.setIndex(offsetIndex + datas.size());
+            datas.add(builder.build());
         } finally {
             writeLock.unlock();
         }
     }
 
     @Override
-    public List<byte[]> getEntries(long fromIndex, int limit) {
+    public List<LogEntry> getEntries(long fromIndex, int limit) {
         readLock.lock();
         try {
             int index = (int) (fromIndex - offsetIndex);
             if (index < 0) {
-                return Collections.emptyList();
+                throw new LogsCompactedException(fromIndex);
             }
 
             if (index > datas.size()) {
@@ -97,17 +95,17 @@ public class MemoryStorage implements Storage {
     public void trimToIndex(long toIndex) {
         writeLock.lock();
         try {
-            long index = toIndex;
-            if (index < offsetIndex) {
+            int index = (int) (toIndex - offsetIndex);
+
+            if (index < 0) {
                 return;
             }
 
-            if (index > offsetIndex + datas.size()) {
+            if (index > datas.size()) {
                 datas = new ArrayList<>();
             }
 
-            index = index - offsetIndex;
-            datas = new ArrayList<>(datas.subList((int) index, datas.size()));
+            datas = new ArrayList<>(datas.subList(index, datas.size()));
         } finally {
             writeLock.unlock();
         }

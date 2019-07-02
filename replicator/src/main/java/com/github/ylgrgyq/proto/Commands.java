@@ -15,6 +15,11 @@ public final class Commands {
         (com.google.protobuf.ExtensionRegistryLite) registry);
   }
   static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_com_github_ylgrgyq_proto_LogEntry_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_com_github_ylgrgyq_proto_LogEntry_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
     internal_static_com_github_ylgrgyq_proto_SyncLogEntries_descriptor;
   static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
@@ -24,6 +29,16 @@ public final class Commands {
   static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_com_github_ylgrgyq_proto_Snapshot_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_com_github_ylgrgyq_proto_ErrorInfo_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_com_github_ylgrgyq_proto_ErrorInfo_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_com_github_ylgrgyq_proto_ReplicatorCommand_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_com_github_ylgrgyq_proto_ReplicatorCommand_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -34,10 +49,22 @@ public final class Commands {
   static {
     java.lang.String[] descriptorData = {
       "\n\016commands.proto\022\030com.github.ylgrgyq.pro" +
-      "to\"A\n\016SyncLogEntries\022\022\n\nstartIndex\030\001 \001(\003" +
-      "\022\r\n\005topic\030\002 \001(\t\022\014\n\004data\030\003 \001(\014\"6\n\010Snapsho" +
-      "t\022\014\n\004data\030\001 \001(\014\022\r\n\005index\030\002 \001(\003\022\r\n\005topic\030" +
-      "\003 \001(\tB\002P\001b\006proto3"
+      "to\"\'\n\010LogEntry\022\r\n\005index\030\001 \001(\003\022\014\n\004data\030\002 " +
+      "\001(\014\"E\n\016SyncLogEntries\0223\n\007entries\030\001 \003(\0132\"" +
+      ".com.github.ylgrgyq.proto.LogEntry\"6\n\010Sn" +
+      "apshot\022\014\n\004data\030\001 \001(\014\022\r\n\005index\030\002 \001(\003\022\r\n\005t" +
+      "opic\030\003 \001(\t\"2\n\tErrorInfo\022\022\n\nerror_code\030\001 " +
+      "\001(\005\022\021\n\terror_msg\030\002 \001(\t\"\214\003\n\021ReplicatorCom" +
+      "mand\022E\n\004type\030\001 \001(\01627.com.github.ylgrgyq." +
+      "proto.ReplicatorCommand.CommandType\022\r\n\005t" +
+      "opic\030\002 \001(\t\022\021\n\tfromIndex\030\003 \001(\003\022\r\n\005limit\030\004",
+      " \001(\005\0226\n\004logs\030\005 \001(\0132(.com.github.ylgrgyq." +
+      "proto.SyncLogEntries\0224\n\010snapshot\030\006 \001(\0132\"" +
+      ".com.github.ylgrgyq.proto.Snapshot\0222\n\005er" +
+      "ror\030\007 \001(\0132#.com.github.ylgrgyq.proto.Err" +
+      "orInfo\"]\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\007\n\003GE" +
+      "T\020\001\022\014\n\010GET_RESP\020\002\022\014\n\010SNAPSHOT\020\003\022\021\n\rSNAPS" +
+      "HOT_RESP\020\004\022\t\n\005ERROR\020\005B\002P\001b\006proto3"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
         new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
@@ -51,18 +78,36 @@ public final class Commands {
       .internalBuildGeneratedFileFrom(descriptorData,
         new com.google.protobuf.Descriptors.FileDescriptor[] {
         }, assigner);
-    internal_static_com_github_ylgrgyq_proto_SyncLogEntries_descriptor =
+    internal_static_com_github_ylgrgyq_proto_LogEntry_descriptor =
       getDescriptor().getMessageTypes().get(0);
+    internal_static_com_github_ylgrgyq_proto_LogEntry_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_com_github_ylgrgyq_proto_LogEntry_descriptor,
+        new java.lang.String[] { "Index", "Data", });
+    internal_static_com_github_ylgrgyq_proto_SyncLogEntries_descriptor =
+      getDescriptor().getMessageTypes().get(1);
     internal_static_com_github_ylgrgyq_proto_SyncLogEntries_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_com_github_ylgrgyq_proto_SyncLogEntries_descriptor,
-        new java.lang.String[] { "StartIndex", "Topic", "Data", });
+        new java.lang.String[] { "Entries", });
     internal_static_com_github_ylgrgyq_proto_Snapshot_descriptor =
-      getDescriptor().getMessageTypes().get(1);
+      getDescriptor().getMessageTypes().get(2);
     internal_static_com_github_ylgrgyq_proto_Snapshot_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_com_github_ylgrgyq_proto_Snapshot_descriptor,
         new java.lang.String[] { "Data", "Index", "Topic", });
+    internal_static_com_github_ylgrgyq_proto_ErrorInfo_descriptor =
+      getDescriptor().getMessageTypes().get(3);
+    internal_static_com_github_ylgrgyq_proto_ErrorInfo_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_com_github_ylgrgyq_proto_ErrorInfo_descriptor,
+        new java.lang.String[] { "ErrorCode", "ErrorMsg", });
+    internal_static_com_github_ylgrgyq_proto_ReplicatorCommand_descriptor =
+      getDescriptor().getMessageTypes().get(4);
+    internal_static_com_github_ylgrgyq_proto_ReplicatorCommand_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_com_github_ylgrgyq_proto_ReplicatorCommand_descriptor,
+        new java.lang.String[] { "Type", "Topic", "FromIndex", "Limit", "Logs", "Snapshot", "Error", });
   }
 
   // @@protoc_insertion_point(outer_class_scope)
