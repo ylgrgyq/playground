@@ -11,5 +11,14 @@
 
     <artifactId>replicator-example</artifactId>
 
-
+    <dependencies>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>replicator-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>replicator-client</artifactId>
+        </dependency>
+    </dependencies>
 </project>

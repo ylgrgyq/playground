@@ -14,11 +14,16 @@ import io.vertx.core.net.NetSocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.Executors;
+
 public class ReplicatorServer extends AbstractVerticle {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorServer.class);
 
     @Override
     public void start(Future<Void> startFuture) {
+
+        logger.info("jhajasdfasf");
 
         NetServerOptions options = new NetServerOptions();
         options.setHost("8888");
@@ -49,7 +54,11 @@ public class ReplicatorServer extends AbstractVerticle {
                             long fromIndex = cmd.getFromIndex();
                             int limit = cmd.getLimit();
                             SyncLogEntries log = seq.syncLogs(fromIndex, limit);
-                            Buffer buf = Buffer.buffer(log.toByteArray());
+
+                            ReplicatorCommand.Builder resp = ReplicatorCommand.newBuilder();
+                            resp.setType(ReplicatorCommand.CommandType.GET_RESP);
+                            resp.setLogs(log);
+                            Buffer buf = Buffer.buffer(resp.build().toByteArray());
                             socket.write(buf, ret -> {
                                 if (!ret.succeeded()) {
                                     logger.warn("write log failed", ret.cause());
@@ -67,7 +76,11 @@ public class ReplicatorServer extends AbstractVerticle {
                                 seq = groups.createSequence(topic, new SequenceOptions());
                             }
                             Snapshot snapshot = seq.getSnapshot();
-                            Buffer buf = Buffer.buffer(snapshot.toByteArray());
+
+                            ReplicatorCommand.Builder resp = ReplicatorCommand.newBuilder();
+                            resp.setType(ReplicatorCommand.CommandType.SNAPSHOT_RESP);
+                            resp.setSnapshot(snapshot);
+                            Buffer buf = Buffer.buffer(resp.build().toByteArray());
                             socket.write(buf, ret -> {
                                 if (!ret.succeeded()) {
                                     logger.warn("write snapshot failed");
@@ -86,6 +99,15 @@ public class ReplicatorServer extends AbstractVerticle {
         server.listen(8888, ret -> {
             if (ret.succeeded()) {
                 startFuture.complete();
+
+                SequenceOptions op = new SequenceOptions();
+                op.setSequenceExecutor(Executors.newSingleThreadExecutor());
+                Sequence seq = groups.createSequence("hahaha", op);
+                for (int i = 0; i < 100000; ++i) {
+                    String msg = "wahaha-" + i;
+                    seq.append(msg.getBytes(StandardCharsets.UTF_8));
+                }
+                logger.info("generate log done");
             } else {
                 startFuture.fail(ret.cause());
             }

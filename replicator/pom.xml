@@ -106,77 +106,62 @@
                         <target>1.8</target>
 
                         <useIncrementalCompilation>false</useIncrementalCompilation>
-
-                        <annotationProcessors>
-                            <annotationProcessor>io.vertx.codegen.CodeGenProcessor</annotationProcessor>
-                        </annotationProcessors>
-                        <generatedSourcesDirectory>${project.basedir}/src/main/generated</generatedSourcesDirectory>
                         <compilerArgs>
                             <arg>-AoutputDirectory=${project.basedir}/src/main</arg>
                         </compilerArgs>
                     </configuration>
                 </plugin>
+                <plugin>
+                    <artifactId>maven-clean-plugin</artifactId>
+                    <version>3.0.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>2.4.3</version>
+                    <executions>
+                        <execution>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>shade</goal>
+                            </goals>
+                            <configuration>
+                                <transformers>
+                                    <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                        <manifestEntries>
+                                            <Main-Class>io.vertx.core.Launcher</Main-Class>
+                                            <Main-Verticle>${main.verticle}</Main-Verticle>
+                                        </manifestEntries>
+                                    </transformer>
+                                    <transformer
+                                            implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
+                                        <resource>META-INF/services/io.vertx.core.spi.VerticleFactory</resource>
+                                    </transformer>
+                                </transformers>
+                                <artifactSet>
+                                </artifactSet>
+                                <outputFile>${project.build.directory}/${project.artifactId}-${project.version}-fat.jar
+                                </outputFile>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>exec-maven-plugin</artifactId>
+                    <version>1.5.0</version>
+                    <configuration>
+                        <mainClass>io.vertx.core.Launcher</mainClass>
+                        <arguments>
+                            <argument>run</argument>
+                            <argument>${main.verticle}</argument>
+                        </arguments>
+                    </configuration>
+                </plugin>
             </plugins>
         </pluginManagement>
-
-        <plugins>
-            <plugin>
-                <artifactId>maven-clean-plugin</artifactId>
-                <version>3.0.0</version>
-                <configuration>
-                    <filesets>
-                        <fileset>
-                            <directory>${project.basedir}/src/main/generated</directory>
-                        </fileset>
-                    </filesets>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>2.4.3</version>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <transformers>
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <manifestEntries>
-                                        <Main-Class>io.vertx.core.Launcher</Main-Class>
-                                        <Main-Verticle>${main.verticle}</Main-Verticle>
-                                    </manifestEntries>
-                                </transformer>
-                                <transformer
-                                        implementation="org.apache.maven.plugins.shade.resource.AppendingTransformer">
-                                    <resource>META-INF/services/io.vertx.core.spi.VerticleFactory</resource>
-                                </transformer>
-                            </transformers>
-                            <artifactSet>
-                            </artifactSet>
-                            <outputFile>${project.build.directory}/${project.artifactId}-${project.version}-fat.jar
-                            </outputFile>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>1.5.0</version>
-                <configuration>
-                    <mainClass>io.vertx.core.Launcher</mainClass>
-                    <arguments>
-                        <argument>run</argument>
-                        <argument>${main.verticle}</argument>
-                    </arguments>
-                </configuration>
-            </plugin>
-        </plugins>
     </build>
 
 </project>
