@@ -16,6 +16,7 @@ public  final class LogEntry extends
   }
   private LogEntry() {
     index_ = 0L;
+    id_ = 0L;
     data_ = com.google.protobuf.ByteString.EMPTY;
   }
 
@@ -49,7 +50,12 @@ public  final class LogEntry extends
             index_ = input.readInt64();
             break;
           }
-          case 18: {
+          case 16: {
+
+            id_ = input.readInt64();
+            break;
+          }
+          case 26: {
 
             data_ = input.readBytes();
             break;
@@ -86,10 +92,19 @@ public  final class LogEntry extends
     return index_;
   }
 
-  public static final int DATA_FIELD_NUMBER = 2;
+  public static final int ID_FIELD_NUMBER = 2;
+  private long id_;
+  /**
+   * <code>optional int64 id = 2;</code>
+   */
+  public long getId() {
+    return id_;
+  }
+
+  public static final int DATA_FIELD_NUMBER = 3;
   private com.google.protobuf.ByteString data_;
   /**
-   * <code>optional bytes data = 2;</code>
+   * <code>optional bytes data = 3;</code>
    */
   public com.google.protobuf.ByteString getData() {
     return data_;
@@ -110,8 +125,11 @@ public  final class LogEntry extends
     if (index_ != 0L) {
       output.writeInt64(1, index_);
     }
+    if (id_ != 0L) {
+      output.writeInt64(2, id_);
+    }
     if (!data_.isEmpty()) {
-      output.writeBytes(2, data_);
+      output.writeBytes(3, data_);
     }
   }
 
@@ -124,9 +142,13 @@ public  final class LogEntry extends
       size += com.google.protobuf.CodedOutputStream
         .computeInt64Size(1, index_);
     }
+    if (id_ != 0L) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeInt64Size(2, id_);
+    }
     if (!data_.isEmpty()) {
       size += com.google.protobuf.CodedOutputStream
-        .computeBytesSize(2, data_);
+        .computeBytesSize(3, data_);
     }
     memoizedSize = size;
     return size;
@@ -146,6 +168,8 @@ public  final class LogEntry extends
     boolean result = true;
     result = result && (getIndex()
         == other.getIndex());
+    result = result && (getId()
+        == other.getId());
     result = result && getData()
         .equals(other.getData());
     return result;
@@ -161,6 +185,9 @@ public  final class LogEntry extends
     hash = (37 * hash) + INDEX_FIELD_NUMBER;
     hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
         getIndex());
+    hash = (37 * hash) + ID_FIELD_NUMBER;
+    hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
+        getId());
     hash = (37 * hash) + DATA_FIELD_NUMBER;
     hash = (53 * hash) + getData().hashCode();
     hash = (29 * hash) + unknownFields.hashCode();
@@ -283,6 +310,8 @@ public  final class LogEntry extends
       super.clear();
       index_ = 0L;
 
+      id_ = 0L;
+
       data_ = com.google.protobuf.ByteString.EMPTY;
 
       return this;
@@ -308,6 +337,7 @@ public  final class LogEntry extends
     public com.github.ylgrgyq.replicator.proto.LogEntry buildPartial() {
       com.github.ylgrgyq.replicator.proto.LogEntry result = new com.github.ylgrgyq.replicator.proto.LogEntry(this);
       result.index_ = index_;
+      result.id_ = id_;
       result.data_ = data_;
       onBuilt();
       return result;
@@ -352,6 +382,9 @@ public  final class LogEntry extends
       if (other == com.github.ylgrgyq.replicator.proto.LogEntry.getDefaultInstance()) return this;
       if (other.getIndex() != 0L) {
         setIndex(other.getIndex());
+      }
+      if (other.getId() != 0L) {
+        setId(other.getId());
       }
       if (other.getData() != com.google.protobuf.ByteString.EMPTY) {
         setData(other.getData());
@@ -408,15 +441,41 @@ public  final class LogEntry extends
       return this;
     }
 
+    private long id_ ;
+    /**
+     * <code>optional int64 id = 2;</code>
+     */
+    public long getId() {
+      return id_;
+    }
+    /**
+     * <code>optional int64 id = 2;</code>
+     */
+    public Builder setId(long value) {
+      
+      id_ = value;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>optional int64 id = 2;</code>
+     */
+    public Builder clearId() {
+      
+      id_ = 0L;
+      onChanged();
+      return this;
+    }
+
     private com.google.protobuf.ByteString data_ = com.google.protobuf.ByteString.EMPTY;
     /**
-     * <code>optional bytes data = 2;</code>
+     * <code>optional bytes data = 3;</code>
      */
     public com.google.protobuf.ByteString getData() {
       return data_;
     }
     /**
-     * <code>optional bytes data = 2;</code>
+     * <code>optional bytes data = 3;</code>
      */
     public Builder setData(com.google.protobuf.ByteString value) {
       if (value == null) {
@@ -428,7 +487,7 @@ public  final class LogEntry extends
       return this;
     }
     /**
-     * <code>optional bytes data = 2;</code>
+     * <code>optional bytes data = 3;</code>
      */
     public Builder clearData() {
       

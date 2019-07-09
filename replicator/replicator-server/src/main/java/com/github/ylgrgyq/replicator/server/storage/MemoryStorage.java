@@ -1,7 +1,10 @@
 package com.github.ylgrgyq.replicator.server.storage;
 
 import com.github.ylgrgyq.replicator.proto.LogEntry;
+import com.github.ylgrgyq.replicator.server.Sequence;
 import com.google.protobuf.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -11,6 +14,8 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class MemoryStorage implements Storage {
+    private static final Logger logger = LoggerFactory.getLogger(Sequence.class);
+
     private List<LogEntry> datas;
     private long offsetIndex;
     private Lock readLock;
@@ -33,7 +38,11 @@ public class MemoryStorage implements Storage {
     public long getFirstIndex() {
         readLock.lock();
         try {
-            return offsetIndex;
+            if (datas.isEmpty()) {
+                return offsetIndex;
+            } else {
+                return offsetIndex + 1;
+            }
         } finally {
             readLock.unlock();
         }
@@ -60,12 +69,14 @@ public class MemoryStorage implements Storage {
     }
 
     @Override
-    public void append(byte[] data) {
+    public void append(long id, byte[] data) {
         writeLock.lock();
         try {
+            logger.info("append {} {}", id, data);
             LogEntry.Builder builder = LogEntry.newBuilder();
             builder.setData(ByteString.copyFrom(data));
-            builder.setIndex(offsetIndex + datas.size());
+            builder.setId(id);
+            builder.setIndex(offsetIndex + datas.size() + 1);
             datas.add(builder.build());
         } finally {
             writeLock.unlock();
@@ -76,12 +87,13 @@ public class MemoryStorage implements Storage {
     public List<LogEntry> getEntries(long fromIndex, int limit) {
         readLock.lock();
         try {
+            logger.info("hahaha {} {}", datas, datas.size());
             int index = (int) (fromIndex - offsetIndex);
             if (index < 0) {
                 throw new LogsCompactedException(fromIndex);
             }
 
-            if (index > datas.size()) {
+            if (index >= datas.size()) {
                 return Collections.emptyList();
             }
 
@@ -92,20 +104,33 @@ public class MemoryStorage implements Storage {
     }
 
     @Override
-    public void trimToIndex(long toIndex) {
+    public void trimToId(long toId) {
         writeLock.lock();
         try {
-            int index = (int) (toIndex - offsetIndex);
-
-            if (index < 0) {
+            logger.info("trim {}", toId);
+            if (datas.isEmpty()) {
                 return;
             }
 
-            if (index > datas.size()) {
-                datas = new ArrayList<>();
+            int maxIndex = Integer.MAX_VALUE;
+            for (int i = 0; i < datas.size(); ++i) {
+                LogEntry entry = datas.get(i);
+                if (entry.getId() > toId) {
+                    maxIndex = i;
+                    break;
+                }
             }
 
-            datas = new ArrayList<>(datas.subList(index, datas.size()));
+            if (maxIndex >= datas.size()) {
+                offsetIndex = datas.get(datas.size() - 1).getIndex();
+                datas = new ArrayList<>();
+
+            } else {
+                datas = new ArrayList<>(datas.subList(maxIndex, datas.size()));
+                offsetIndex = datas.get(0).getIndex() - 1;
+            }
+
+
         } finally {
             writeLock.unlock();
         }

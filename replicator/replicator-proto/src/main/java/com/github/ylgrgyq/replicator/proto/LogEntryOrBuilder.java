@@ -13,7 +13,12 @@ public interface LogEntryOrBuilder extends
   long getIndex();
 
   /**
-   * <code>optional bytes data = 2;</code>
+   * <code>optional int64 id = 2;</code>
+   */
+  long getId();
+
+  /**
+   * <code>optional bytes data = 3;</code>
    */
   com.google.protobuf.ByteString getData();
 }

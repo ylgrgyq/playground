@@ -4,7 +4,8 @@ option java_multiple_files = true;
 
 message LogEntry {
     int64 index = 1;
-    bytes data = 2;
+    int64 id = 2;
+    bytes data = 3;
 }
 
 message SyncLogEntries {
@@ -13,7 +14,7 @@ message SyncLogEntries {
 
 message Snapshot {
     bytes data = 1;
-    int64 index = 2;
+    int64 id = 2;
     string topic = 3;
 }
 

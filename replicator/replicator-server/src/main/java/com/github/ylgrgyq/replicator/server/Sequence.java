@@ -5,6 +5,8 @@ import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.proto.SyncLogEntries;
 import com.github.ylgrgyq.replicator.server.storage.MemoryStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -14,6 +16,8 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class Sequence {
+    private static final Logger logger = LoggerFactory.getLogger(Sequence.class);
+
     private final Snapshot emptySnapshot;
     private String topic;
     private Storage storage;
@@ -30,7 +34,7 @@ public class Sequence {
         this.topic = topic;
         Snapshot.Builder builder = Snapshot.newBuilder();
         builder.setTopic(topic);
-        builder.setIndex(-1);
+        builder.setId(-1);
         this.emptySnapshot = builder.build();
 
         this.snapshotGenerator = options.getSnapshotGenerator();
@@ -48,10 +52,10 @@ public class Sequence {
         storage.init();
     }
 
-    public void append(byte[] data) {
+    public void append(long id, byte[] data) {
         writeLock.lock();
         try {
-            storage.append(data);
+            storage.append(id, data);
             pendingSize = pendingSize + data.length;
 
             if (pendingSize >= maxPendingLogSize) {
@@ -63,16 +67,11 @@ public class Sequence {
     }
 
     public SyncLogEntries syncLogs(long fromIndex, int limit) {
-        readLock.lock();
-        try {
-            if (lastSnapshot != null && fromIndex < lastSnapshot.getIndex()) {
-                throw new ReplicatorException(ReplicatorError.ENEEDCATCHUP);
-            }
-        } finally {
-            readLock.unlock();
-        }
+        logger.info("sy {} {} {}", fromIndex, limit);
 
         List<LogEntry> entries = storage.getEntries(fromIndex, limit);
+        logger.info("sy2 {} {} {}", fromIndex, limit, entries);
+
         SyncLogEntries.Builder builder = SyncLogEntries.newBuilder();
         builder.addAllEntries(entries);
         return builder.build();
@@ -97,7 +96,7 @@ public class Sequence {
                 Snapshot snapshot = snapshotGenerator.generateSnapshot();
                 writeLock.lock();
                 try {
-                    storage.trimToIndex(lastSnapshot.getIndex());
+                    storage.trimToId(lastSnapshot.getId());
                     lastSnapshot = snapshot;
                     pendingSize = storage.pendingLogSize();
                     generateSnapshotJobScheduled.set(false);

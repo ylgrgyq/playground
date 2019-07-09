@@ -9,8 +9,8 @@ public class Write {
         SequenceGroups server = new SequenceGroups();
         SequenceOptions options = new SequenceOptions();
         Sequence sequence = server.createSequence("haha", options);
-        sequence.append("111".getBytes());
-        sequence.append("222".getBytes());
+//        sequence.append("111".getBytes());
+//        sequence.append("222".getBytes());
 
 
 

@@ -16,7 +16,7 @@ public  final class Snapshot extends
   }
   private Snapshot() {
     data_ = com.google.protobuf.ByteString.EMPTY;
-    index_ = 0L;
+    id_ = 0L;
     topic_ = "";
   }
 
@@ -52,7 +52,7 @@ public  final class Snapshot extends
           }
           case 16: {
 
-            index_ = input.readInt64();
+            id_ = input.readInt64();
             break;
           }
           case 26: {
@@ -93,13 +93,13 @@ public  final class Snapshot extends
     return data_;
   }
 
-  public static final int INDEX_FIELD_NUMBER = 2;
-  private long index_;
+  public static final int ID_FIELD_NUMBER = 2;
+  private long id_;
   /**
-   * <code>optional int64 index = 2;</code>
+   * <code>optional int64 id = 2;</code>
    */
-  public long getIndex() {
-    return index_;
+  public long getId() {
+    return id_;
   }
 
   public static final int TOPIC_FIELD_NUMBER = 3;
@@ -151,8 +151,8 @@ public  final class Snapshot extends
     if (!data_.isEmpty()) {
       output.writeBytes(1, data_);
     }
-    if (index_ != 0L) {
-      output.writeInt64(2, index_);
+    if (id_ != 0L) {
+      output.writeInt64(2, id_);
     }
     if (!getTopicBytes().isEmpty()) {
       com.google.protobuf.GeneratedMessageV3.writeString(output, 3, topic_);
@@ -168,9 +168,9 @@ public  final class Snapshot extends
       size += com.google.protobuf.CodedOutputStream
         .computeBytesSize(1, data_);
     }
-    if (index_ != 0L) {
+    if (id_ != 0L) {
       size += com.google.protobuf.CodedOutputStream
-        .computeInt64Size(2, index_);
+        .computeInt64Size(2, id_);
     }
     if (!getTopicBytes().isEmpty()) {
       size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, topic_);
@@ -193,8 +193,8 @@ public  final class Snapshot extends
     boolean result = true;
     result = result && getData()
         .equals(other.getData());
-    result = result && (getIndex()
-        == other.getIndex());
+    result = result && (getId()
+        == other.getId());
     result = result && getTopic()
         .equals(other.getTopic());
     return result;
@@ -209,9 +209,9 @@ public  final class Snapshot extends
     hash = (19 * hash) + getDescriptorForType().hashCode();
     hash = (37 * hash) + DATA_FIELD_NUMBER;
     hash = (53 * hash) + getData().hashCode();
-    hash = (37 * hash) + INDEX_FIELD_NUMBER;
+    hash = (37 * hash) + ID_FIELD_NUMBER;
     hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
-        getIndex());
+        getId());
     hash = (37 * hash) + TOPIC_FIELD_NUMBER;
     hash = (53 * hash) + getTopic().hashCode();
     hash = (29 * hash) + unknownFields.hashCode();
@@ -334,7 +334,7 @@ public  final class Snapshot extends
       super.clear();
       data_ = com.google.protobuf.ByteString.EMPTY;
 
-      index_ = 0L;
+      id_ = 0L;
 
       topic_ = "";
 
@@ -361,7 +361,7 @@ public  final class Snapshot extends
     public com.github.ylgrgyq.replicator.proto.Snapshot buildPartial() {
       com.github.ylgrgyq.replicator.proto.Snapshot result = new com.github.ylgrgyq.replicator.proto.Snapshot(this);
       result.data_ = data_;
-      result.index_ = index_;
+      result.id_ = id_;
       result.topic_ = topic_;
       onBuilt();
       return result;
@@ -407,8 +407,8 @@ public  final class Snapshot extends
       if (other.getData() != com.google.protobuf.ByteString.EMPTY) {
         setData(other.getData());
       }
-      if (other.getIndex() != 0L) {
-        setIndex(other.getIndex());
+      if (other.getId() != 0L) {
+        setId(other.getId());
       }
       if (!other.getTopic().isEmpty()) {
         topic_ = other.topic_;
@@ -469,28 +469,28 @@ public  final class Snapshot extends
       return this;
     }
 
-    private long index_ ;
+    private long id_ ;
     /**
-     * <code>optional int64 index = 2;</code>
+     * <code>optional int64 id = 2;</code>
      */
-    public long getIndex() {
-      return index_;
+    public long getId() {
+      return id_;
     }
     /**
-     * <code>optional int64 index = 2;</code>
+     * <code>optional int64 id = 2;</code>
      */
-    public Builder setIndex(long value) {
+    public Builder setId(long value) {
       
-      index_ = value;
+      id_ = value;
       onChanged();
       return this;
     }
     /**
-     * <code>optional int64 index = 2;</code>
+     * <code>optional int64 id = 2;</code>
      */
-    public Builder clearIndex() {
+    public Builder clearId() {
       
-      index_ = 0L;
+      id_ = 0L;
       onChanged();
       return this;
     }

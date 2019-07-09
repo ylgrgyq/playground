@@ -13,9 +13,9 @@ public interface SnapshotOrBuilder extends
   com.google.protobuf.ByteString getData();
 
   /**
-   * <code>optional int64 index = 2;</code>
+   * <code>optional int64 id = 2;</code>
    */
-  long getIndex();
+  long getId();
 
   /**
    * <code>optional string topic = 3;</code>
