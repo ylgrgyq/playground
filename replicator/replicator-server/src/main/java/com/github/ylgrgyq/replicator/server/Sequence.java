@@ -25,6 +25,8 @@ public class Sequence {
     private SnapshotGenerator snapshotGenerator;
     private Snapshot lastSnapshot;
     private long maxPendingLogSize;
+    private long lastGenerateSnapshotNanos;
+    private SequenceOptions options;
     private ExecutorService executor;
     private Lock readLock;
     private Lock writeLock;
@@ -32,6 +34,7 @@ public class Sequence {
 
     public Sequence(String topic, SequenceOptions options) {
         this.topic = topic;
+        this.options = options;
         Snapshot.Builder builder = Snapshot.newBuilder();
         builder.setTopic(topic);
         builder.setId(-1);
@@ -58,7 +61,7 @@ public class Sequence {
             storage.append(id, data);
             pendingSize = pendingSize + data.length;
 
-            if (pendingSize >= maxPendingLogSize) {
+            if (isNeedGenerateNewSnapshot()) {
                 scheduleGenerateSnapshot();
             }
         } finally {
@@ -66,11 +69,13 @@ public class Sequence {
         }
     }
 
-    public SyncLogEntries syncLogs(long fromIndex, int limit) {
-        logger.info("sy {} {} {}", fromIndex, limit);
+    private boolean isNeedGenerateNewSnapshot() {
+        return pendingSize >= maxPendingLogSize ||
+                (System.nanoTime() - lastGenerateSnapshotNanos) >= options.getMaxSnapshotInterval();
+    }
 
+    public SyncLogEntries syncLogs(long fromIndex, int limit) {
         List<LogEntry> entries = storage.getEntries(fromIndex, limit);
-        logger.info("sy2 {} {} {}", fromIndex, limit, entries);
 
         SyncLogEntries.Builder builder = SyncLogEntries.newBuilder();
         builder.addAllEntries(entries);
@@ -95,6 +100,7 @@ public class Sequence {
             executor.submit(() -> {
                 Snapshot snapshot = snapshotGenerator.generateSnapshot();
                 writeLock.lock();
+                lastGenerateSnapshotNanos = System.nanoTime();
                 try {
                     storage.trimToId(lastSnapshot.getId());
                     lastSnapshot = snapshot;

@@ -14,7 +14,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class MemoryStorage implements Storage {
-    private static final Logger logger = LoggerFactory.getLogger(Sequence.class);
+    private static final Logger logger = LoggerFactory.getLogger(MemoryStorage.class);
 
     private List<LogEntry> datas;
     private long offsetIndex;
@@ -87,7 +87,6 @@ public class MemoryStorage implements Storage {
     public List<LogEntry> getEntries(long fromIndex, int limit) {
         readLock.lock();
         try {
-            logger.info("hahaha {} {}", datas, datas.size());
             int index = (int) (fromIndex - offsetIndex);
             if (index < 0) {
                 throw new LogsCompactedException(fromIndex);

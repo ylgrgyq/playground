@@ -19,6 +19,12 @@ public class MemoryStorageTest {
         storage.append(0, "1".getBytes(StandardCharsets.UTF_8));
         assertEquals(0, storage.getFirstIndex());
         assertEquals(0, storage.getLastIndex());
+        List<LogEntry> entries = storage.getEntries(-1, 100);
+        assertEquals(1, entries.size());
+        LogEntry entry = entries.get(0);
+        assertEquals(0, entry.getIndex());
+        assertEquals(0, entry.getId());
+        assertEquals("1", entry.getData().toStringUtf8());
 
         storage.append(1, "2".getBytes(StandardCharsets.UTF_8));
         assertEquals(0, storage.getFirstIndex());

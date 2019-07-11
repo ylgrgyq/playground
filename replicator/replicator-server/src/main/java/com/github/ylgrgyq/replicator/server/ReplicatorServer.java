@@ -22,9 +22,6 @@ public class ReplicatorServer extends AbstractVerticle {
 
     @Override
     public void start(Future<Void> startFuture) {
-
-        logger.info("jhajasdfasf");
-
         HttpServerOptions options = new HttpServerOptions();
         options.setHost("localhost");
 
@@ -33,61 +30,40 @@ public class ReplicatorServer extends AbstractVerticle {
         SequenceGroups groups = new SequenceGroups();
 
         server.websocketHandler(socket ->
-            socket.binaryMessageHandler(buffer -> {
-                ReplicatorCommand cmd;
-                try {
-                    cmd = ReplicatorCommand.parseFrom(buffer.getBytes());
-                } catch (InvalidProtocolBufferException ex) {
-                    writeError(socket, ReplicatorError.EUNKNOWNPROTOCOL);
-                    return;
-                }
+                socket.binaryMessageHandler(buffer -> {
+                    ReplicatorCommand cmd;
+                    try {
+                        cmd = ReplicatorCommand.parseFrom(buffer.getBytes());
+                    } catch (InvalidProtocolBufferException ex) {
+                        writeError(socket, ReplicatorError.EUNKNOWNPROTOCOL);
+                        return;
+                    }
 
-                switch (cmd.getType()) {
-                    case GET:
-                        try {
-                            String topic = cmd.getTopic();
-                            Sequence seq = groups.getSequence(topic);
-                            if (seq == null) {
-                                seq = groups.createSequence(topic, new SequenceOptions());
-                            }
+                    String topic = cmd.getTopic();
+                    Sequence seq = groups.getSequence(topic);
+                    if (seq == null) {
+                        seq = groups.createSequence(topic, new SequenceOptions());
+                    }
+                    try {
+                        switch (cmd.getType()) {
+                            case GET:
+                                long fromIndex = cmd.getFromIndex();
+                                int limit = cmd.getLimit();
 
-                            long fromIndex = cmd.getFromIndex();
-                            int limit = cmd.getLimit();
+                                logger.info("sync {} {} {} {}", topic, seq, fromIndex, limit);
+                                SyncLogEntries log = seq.syncLogs(fromIndex, limit);
 
-                            logger.info("sync {} {} {} {}", topic, seq, fromIndex, limit);
-                            SyncLogEntries log = seq.syncLogs(fromIndex, limit);
-
-                            ReplicatorCommand.Builder resp = ReplicatorCommand.newBuilder();
-                            resp.setType(ReplicatorCommand.CommandType.GET_RESP);
-                            resp.setLogs(log);
-                            logger.info("send get resp {} {}", resp, resp.build().toByteArray().length);
-                            Buffer buf = Buffer.buffer(resp.build().toByteArray());
-                            socket.writeBinaryMessage(buf);
-                        } catch (ReplicatorException ex) {
-                            writeError(socket, ex.getError());
+                                writeSyncLog(socket, log);
+                                break;
+                            case SNAPSHOT:
+                                Snapshot snapshot = seq.getSnapshot();
+                                writeSnapshot(socket, snapshot);
+                                break;
                         }
-                        break;
-                    case SNAPSHOT:
-                        try {
-                            String topic = cmd.getTopic();
-                            Sequence seq = groups.getSequence(topic);
-                            if (seq == null) {
-                                seq = groups.createSequence(topic, new SequenceOptions());
-                            }
-                            Snapshot snapshot = seq.getSnapshot();
-
-                            ReplicatorCommand.Builder resp = ReplicatorCommand.newBuilder();
-                            resp.setType(ReplicatorCommand.CommandType.SNAPSHOT_RESP);
-                            resp.setSnapshot(snapshot);
-                            logger.info("send snapshot resp {}", resp);
-                            Buffer buf = Buffer.buffer(resp.build().toByteArray());
-                            socket.write(buf);
-                        } catch (ReplicatorException ex) {
-                            writeError(socket, ex.getError());
-                        }
-                        break;
-                }
-            })
+                    } catch (ReplicatorException ex) {
+                        writeError(socket, ex.getError());
+                    }
+                })
         );
 
         server.exceptionHandler(t -> logger.error("Receive unexpected error", t));
@@ -99,7 +75,7 @@ public class ReplicatorServer extends AbstractVerticle {
                 SequenceOptions op = new SequenceOptions();
                 op.setSequenceExecutor(Executors.newSingleThreadExecutor());
                 Sequence seq = groups.createSequence("hahaha", op);
-                for (int i = 0; i < 100000; ++i) {
+                for (int i = 0; i < 10000; ++i) {
                     String msg = "wahaha-" + i;
                     seq.append(i, msg.getBytes(StandardCharsets.UTF_8));
                 }
@@ -108,6 +84,24 @@ public class ReplicatorServer extends AbstractVerticle {
                 startFuture.fail(ret.cause());
             }
         });
+    }
+
+    private void writeSnapshot(ServerWebSocket socket, Snapshot snapshot) {
+        ReplicatorCommand.Builder resp = ReplicatorCommand.newBuilder();
+        resp.setType(ReplicatorCommand.CommandType.SNAPSHOT_RESP);
+        resp.setSnapshot(snapshot);
+        logger.info("send snapshot resp {}", resp);
+        Buffer buf = Buffer.buffer(resp.build().toByteArray());
+        socket.write(buf);
+    }
+
+    private void writeSyncLog(ServerWebSocket socket, SyncLogEntries log) {
+        ReplicatorCommand.Builder resp = ReplicatorCommand.newBuilder();
+        resp.setType(ReplicatorCommand.CommandType.GET_RESP);
+        resp.setLogs(log);
+        logger.info("send get resp {} {}", resp, resp.build().toByteArray().length);
+        Buffer buf = Buffer.buffer(resp.build().toByteArray());
+        socket.writeBinaryMessage(buf);
     }
 
     private void writeError(ServerWebSocket socket, ReplicatorError error) {
@@ -120,6 +114,6 @@ public class ReplicatorServer extends AbstractVerticle {
         builder.setError(errorInfo);
         logger.info("send error {}", errorInfo);
         Buffer buf = Buffer.buffer(builder.build().toByteArray());
-        socket.write(buf);
+        socket.writeBinaryMessage(buf);
     }
 }

@@ -5,7 +5,7 @@ import java.util.concurrent.ExecutorService;
 
 public class SequenceOptions {
     private SnapshotGenerator snapshotGenerator;
-    private long maxSnapshotInterval;
+    private long maxSnapshotInterval = Long.MAX_VALUE;
     private long maxPendingLogSize;
     private ExecutorService sequenceExecutor;
 
