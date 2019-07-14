@@ -4,6 +4,7 @@ import com.github.ylgrgyq.replicator.proto.ReplicatorCommand;
 import com.github.ylgrgyq.replicator.server.*;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.timeout.IdleStateEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,6 +61,13 @@ public class ReplicatorServerHandler extends SimpleChannelInboundHandler<Replica
         } else {
             logger.error("Got unexpected exception", cause);
             channel.writeError(ReplicatorError.UNKNOWN);
+        }
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent) {
+            ctx.close();
         }
     }
 }

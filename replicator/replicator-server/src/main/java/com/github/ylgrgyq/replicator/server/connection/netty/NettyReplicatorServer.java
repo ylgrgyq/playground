@@ -14,6 +14,7 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
+import io.netty.handler.timeout.IdleStateHandler;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -40,6 +41,7 @@ public class NettyReplicatorServer extends AbstractReplicatorServer {
             protected void initChannel(SocketChannel serverChannel) throws Exception {
                 ChannelPipeline pipeline = serverChannel.pipeline();
 
+                pipeline.addLast(new IdleStateHandler(30, 0, 0));
                 pipeline.addLast(new HttpServerCodec());
                 pipeline.addLast(new HttpObjectAggregator(65536));
                 pipeline.addLast(new WebSocketServerCompressionHandler());
