@@ -2,28 +2,35 @@ package com.github.ylgrgyq.replicator.server;
 
 import com.github.ylgrgyq.replicator.proto.ReplicatorCommand;
 import com.google.protobuf.InvalidProtocolBufferException;
-import io.vertx.core.AbstractVerticle;
-import io.vertx.core.Future;
+import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 
-public class VertxReplicatorServer extends AbstractVerticle {
-    private static final Logger logger = LoggerFactory.getLogger(VertxReplicatorServer.class);
+public class VertxReplicatorServer {
+    private static final Logger logger = LoggerFactory.getLogger(VertxReplicatorServerBootstrap.class);
 
-    @Override
-    public void start(Future<Void> startFuture) {
-        HttpServerOptions options = new HttpServerOptions();
-        options.setHost("localhost");
+    private Vertx vertx;
+    private ReplicatorOptions options;
+    private SequenceGroups groups;
 
-        HttpServer server = vertx.createHttpServer(options);
+    public VertxReplicatorServer(Vertx vertx, ReplicatorOptions options){
+        this.vertx = vertx;
+        this.options = options;
+        this.groups = new SequenceGroups();
+    }
 
-        SequenceGroups groups = new SequenceGroups();
+    public CompletableFuture<Void> start() {
+        CompletableFuture<Void> future = new CompletableFuture<>();
 
+        HttpServerOptions httpServerOptions = new HttpServerOptions();
+        httpServerOptions.setHost("localhost");
+
+        HttpServer server = vertx.createHttpServer(httpServerOptions);
         server.websocketHandler(socket -> {
                     VertxReplicateChannel channel = new VertxReplicateChannel(socket);
                     ReplicateRequestHandler handler = new Replica(channel);
@@ -61,21 +68,31 @@ public class VertxReplicatorServer extends AbstractVerticle {
 
         server.exceptionHandler(t -> logger.error("Receive unexpected error", t));
 
-        server.listen(8888, ret -> {
+        server.listen(options.getPort(), ret -> {
             if (ret.succeeded()) {
-                startFuture.complete();
-
-                SequenceOptions op = new SequenceOptions();
-                op.setSequenceExecutor(Executors.newSingleThreadExecutor());
-                Sequence seq = groups.createSequence("hahaha", op);
-                for (int i = 0; i < 10000; ++i) {
-                    String msg = "wahaha-" + i;
-                    seq.append(i, msg.getBytes(StandardCharsets.UTF_8));
-                }
-                logger.info("generate log done {}", seq);
+                future.complete(null);
             } else {
-                startFuture.fail(ret.cause());
+                future.completeExceptionally(ret.cause());
             }
         });
+
+        return future;
+    }
+
+    public Appender createSequenceAppender(String topic) {
+        SequenceOptions op = new SequenceOptions();
+        op.setSequenceExecutor(Executors.newSingleThreadExecutor());
+        Sequence seq = groups.createSequence(topic, op);
+        return new Appender(seq);
+    }
+
+    public static class Appender{
+        private Sequence seq;
+        private Appender(Sequence seq) {
+            this.seq = seq;
+        }
+        public void append(long id, byte[] log) {
+            seq.append(id, log);
+        }
     }
 }
