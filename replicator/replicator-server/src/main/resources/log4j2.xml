@@ -4,13 +4,13 @@
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout pattern="%d{HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
         </Console>
-        <RollingFile name="Root" fileName="${sys:log4j.logdir}/root.log" filePattern="${sys:log4j.logdir}/root.log.%d{yyyy-MM-dd}">
+        <RollingFile name="Root" fileName="logs/root.log" filePattern="${sys:log4j.logdir}/root.log.%d{yyyy-MM-dd}">
             <PatternLayout pattern="%d %-5p %c: %m%n" />
             <Policies>
                 <TimeBasedTriggeringPolicy modulate="true"/>
             </Policies>
             <DefaultRolloverStrategy>
-                <Delete basePath="${sys:log4j.logdir}">
+                <Delete basePath="logs">
                     <IfFileName glob="root.*"/>
                     <IfLastModified age="7d" />
                 </Delete>

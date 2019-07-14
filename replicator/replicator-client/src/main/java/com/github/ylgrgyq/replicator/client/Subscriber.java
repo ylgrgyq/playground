@@ -31,6 +31,9 @@ public class Subscriber {
                 logger.info("receive bytes {}", buffer.getBytes().length);
                 ReplicatorCommand cmd = ReplicatorCommand.parseFrom(buffer.getBytes());
                 switch (cmd.getType()) {
+                    case HANDSHAKE_RESP:
+                        requestSnapshot(topic);
+                        break;
                     case GET_RESP:
                         SyncLogEntries logs = cmd.getLogs();
                         logger.info("GET RESP {}", logs);
@@ -73,7 +76,17 @@ public class Subscriber {
             }
         });
 
-        requestSnapshot(topic);
+        handshake(topic);
+    }
+
+    private void handshake(String topic) {
+        ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
+        get.setType(ReplicatorCommand.CommandType.HANDSHAKE);
+        get.setTopic(topic);
+        get.build();
+
+        Buffer buf = Buffer.buffer(get.build().toByteArray());
+        socket.write(buf);
     }
 
     private void requestLogs(String topic, long fromIndex) {

@@ -30,7 +30,9 @@ message ReplicatorCommand {
         GET_RESP = 2;
         SNAPSHOT = 3;
         SNAPSHOT_RESP = 4;
-        ERROR = 5;
+        HANDSHAKE = 5;
+        HANDSHAKE_RESP = 6;
+        ERROR = 7;
     }
 
     CommandType type = 1;

@@ -156,9 +156,17 @@ public  final class ReplicatorCommand extends
      */
     SNAPSHOT_RESP(4),
     /**
-     * <code>ERROR = 5;</code>
+     * <code>HANDSHAKE = 5;</code>
      */
-    ERROR(5),
+    HANDSHAKE(5),
+    /**
+     * <code>HANDSHAKE_RESP = 6;</code>
+     */
+    HANDSHAKE_RESP(6),
+    /**
+     * <code>ERROR = 7;</code>
+     */
+    ERROR(7),
     UNRECOGNIZED(-1),
     ;
 
@@ -183,9 +191,17 @@ public  final class ReplicatorCommand extends
      */
     public static final int SNAPSHOT_RESP_VALUE = 4;
     /**
-     * <code>ERROR = 5;</code>
+     * <code>HANDSHAKE = 5;</code>
      */
-    public static final int ERROR_VALUE = 5;
+    public static final int HANDSHAKE_VALUE = 5;
+    /**
+     * <code>HANDSHAKE_RESP = 6;</code>
+     */
+    public static final int HANDSHAKE_RESP_VALUE = 6;
+    /**
+     * <code>ERROR = 7;</code>
+     */
+    public static final int ERROR_VALUE = 7;
 
 
     public final int getNumber() {
@@ -211,7 +227,9 @@ public  final class ReplicatorCommand extends
         case 2: return GET_RESP;
         case 3: return SNAPSHOT;
         case 4: return SNAPSHOT_RESP;
-        case 5: return ERROR;
+        case 5: return HANDSHAKE;
+        case 6: return HANDSHAKE_RESP;
+        case 7: return ERROR;
         default: return null;
       }
     }

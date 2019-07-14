@@ -6,6 +6,8 @@ public enum ReplicatorError {
     ENEEDCATCHUP(10001, "Please fetch recent snapshot to catch up"),
 
     EUNKNOWNPROTOCOL(10002, "Unknown protocol"),
+
+    ENEEDHANDSHAKE(10003, "Need handshake first, then send other requests"),
     ;
 
 

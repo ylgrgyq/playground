@@ -55,7 +55,7 @@ public final class Commands {
       "yq.replicator.proto.LogEntry\"3\n\010Snapshot" +
       "\022\014\n\004data\030\001 \001(\014\022\n\n\002id\030\002 \001(\003\022\r\n\005topic\030\003 \001(" +
       "\t\"2\n\tErrorInfo\022\022\n\nerror_code\030\001 \001(\005\022\021\n\ter" +
-      "ror_msg\030\002 \001(\t\"\270\003\n\021ReplicatorCommand\022P\n\004t" +
+      "ror_msg\030\002 \001(\t\"\334\003\n\021ReplicatorCommand\022P\n\004t" +
       "ype\030\001 \001(\0162B.com.github.ylgrgyq.replicato" +
       "r.proto.ReplicatorCommand.CommandType\022\r\n",
       "\005topic\030\002 \001(\t\022\021\n\tfromIndex\030\003 \001(\003\022\r\n\005limit" +
@@ -64,9 +64,10 @@ public final class Commands {
       "pshot\030\006 \001(\0132-.com.github.ylgrgyq.replica" +
       "tor.proto.Snapshot\022=\n\005error\030\007 \001(\0132..com." +
       "github.ylgrgyq.replicator.proto.ErrorInf" +
-      "o\"]\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\007\n\003GET\020\001\022\014" +
-      "\n\010GET_RESP\020\002\022\014\n\010SNAPSHOT\020\003\022\021\n\rSNAPSHOT_R" +
-      "ESP\020\004\022\t\n\005ERROR\020\005B\002P\001b\006proto3"
+      "o\"\200\001\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\007\n\003GET\020\001\022" +
+      "\014\n\010GET_RESP\020\002\022\014\n\010SNAPSHOT\020\003\022\021\n\rSNAPSHOT_" +
+      "RESP\020\004\022\r\n\tHANDSHAKE\020\005\022\022\n\016HANDSHAKE_RESP\020" +
+      "\006\022\t\n\005ERROR\020\007B\002P\001b\006proto3"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
         new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
