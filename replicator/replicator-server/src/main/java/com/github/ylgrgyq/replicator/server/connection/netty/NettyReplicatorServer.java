@@ -2,11 +2,11 @@ package com.github.ylgrgyq.replicator.server.connection.netty;
 
 import com.github.ylgrgyq.replicator.server.AbstractReplicatorServer;
 import com.github.ylgrgyq.replicator.server.ReplicatorOptions;
-import com.github.ylgrgyq.replicator.server.SequenceGroups;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -19,10 +19,14 @@ import java.util.concurrent.CompletableFuture;
 
 public class NettyReplicatorServer extends AbstractReplicatorServer {
     private ReplicatorOptions options;
+    private EventLoopGroup parentGroup;
+    private EventLoopGroup childGroup;
 
     public NettyReplicatorServer(ReplicatorOptions options) {
         super();
         this.options = options;
+        this.parentGroup = new NioEventLoopGroup(1);
+        this.childGroup = new NioEventLoopGroup();
     }
 
     public CompletableFuture<Void> start() {
@@ -30,7 +34,7 @@ public class NettyReplicatorServer extends AbstractReplicatorServer {
 
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.channel(NioServerSocketChannel.class);
-        bootstrap.group(new NioEventLoopGroup(1), new NioEventLoopGroup());
+        bootstrap.group(parentGroup, childGroup);
         bootstrap.childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel serverChannel) throws Exception {
@@ -41,6 +45,7 @@ public class NettyReplicatorServer extends AbstractReplicatorServer {
                 pipeline.addLast(new WebSocketServerCompressionHandler());
                 pipeline.addLast(new WebSocketServerProtocolHandler("/", null, true));
                 pipeline.addLast(new ReplicatorEncoder());
+                pipeline.addLast(new ReplicatorDecoder());
                 pipeline.addLast(new ReplicatorServerHandler(getGroups()));
             }
         });
@@ -54,5 +59,11 @@ public class NettyReplicatorServer extends AbstractReplicatorServer {
         });
 
         return future;
+    }
+
+    @Override
+    public void shutdown() {
+        parentGroup.shutdownGracefully();
+        childGroup.shutdownGracefully();
     }
 }

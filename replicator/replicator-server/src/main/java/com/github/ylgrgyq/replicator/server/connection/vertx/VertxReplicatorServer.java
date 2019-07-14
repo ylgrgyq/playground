@@ -43,7 +43,31 @@ public class VertxReplicatorServer extends AbstractReplicatorServer {
                             return;
                         }
 
-                        handleRequest(channel, cmd, handler);
+                        try {
+                            switch (cmd.getType()) {
+                                case HANDSHAKE:
+                                    String topic = cmd.getTopic();
+
+                                    Sequence seq = groups.getSequence(topic);
+                                    if (seq == null) {
+                                        seq = groups.createSequence(topic, new SequenceOptions());
+                                    }
+
+                                    handler.onStart(topic, seq);
+                                    break;
+                                case GET:
+                                    long fromIndex = cmd.getFromIndex();
+                                    int limit = cmd.getLimit();
+
+                                    handler.heandleSyncLogs(fromIndex, limit);
+                                    break;
+                                case SNAPSHOT:
+                                    handler.handleSyncSnapshot();
+                                    break;
+                            }
+                        } catch (ReplicatorException ex) {
+                            channel.writeError(ex.getError());
+                        }
                     });
                 }
         );

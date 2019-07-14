@@ -2,15 +2,12 @@ package com.github.ylgrgyq.replicator.server.connection.netty;
 
 import com.github.ylgrgyq.replicator.proto.ReplicatorCommand;
 import com.github.ylgrgyq.replicator.server.*;
-import com.google.protobuf.InvalidProtocolBufferException;
-import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ReplicatorServerHandler extends SimpleChannelInboundHandler<WebSocketFrame> {
+public class ReplicatorServerHandler extends SimpleChannelInboundHandler<ReplicatorCommand> {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorServerHandler.class);
     private SequenceGroups groups;
     private Replica replica;
@@ -28,16 +25,7 @@ public class ReplicatorServerHandler extends SimpleChannelInboundHandler<WebSock
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, WebSocketFrame frame) throws Exception {
-        ReplicatorCommand cmd;
-        try {
-            ByteBufInputStream stream = new ByteBufInputStream(frame.content());
-            cmd = ReplicatorCommand.parseFrom(stream);
-        } catch (InvalidProtocolBufferException ex) {
-            ctx.channel().write(ReplicatorError.EUNKNOWNPROTOCOL);
-            return;
-        }
-
+    protected void channelRead0(ChannelHandlerContext ctx, ReplicatorCommand cmd) throws Exception {
         try {
             switch (cmd.getType()) {
                 case HANDSHAKE:
@@ -62,6 +50,16 @@ public class ReplicatorServerHandler extends SimpleChannelInboundHandler<WebSock
             }
         } catch (ReplicatorException ex) {
             channel.writeError(ex.getError());
+        }
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        if (cause instanceof ReplicatorException) {
+            channel.writeError(((ReplicatorException)cause).getError());
+        } else {
+            logger.error("Got unexpected exception", cause);
+            channel.writeError(ReplicatorError.UNKNOWN);
         }
     }
 }
