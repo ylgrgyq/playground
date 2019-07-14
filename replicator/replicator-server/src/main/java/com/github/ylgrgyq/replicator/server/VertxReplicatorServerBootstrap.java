@@ -21,7 +21,7 @@ public class VertxReplicatorServerBootstrap extends AbstractVerticle {
                 logger.error("Start replicator failed", t);
             }
 
-            VertxReplicatorServer.Appender appender = server.createSequenceAppender("hahaha");
+            SequenceAppender appender = server.createSequenceAppender("hahaha");
 
             for (int i = 0; i < 10000; ++i) {
                 String msg = "wahaha-" + i;

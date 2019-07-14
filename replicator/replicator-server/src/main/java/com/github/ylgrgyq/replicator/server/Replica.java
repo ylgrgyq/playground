@@ -21,12 +21,9 @@ public class Replica implements ReplicateRequestHandler {
     }
 
     @Override
-    public void onStart(SequenceGroups groups, String topic) {
+    public void onStart(String topic, Sequence seq) {
         this.topic = topic;
-        seq = groups.getSequence(topic);
-        if (seq == null) {
-            seq = groups.createSequence(topic, new SequenceOptions());
-        }
+        this.seq = seq;
         handshaked.set(true);
         channel.writeHandshakeResult();
     }
