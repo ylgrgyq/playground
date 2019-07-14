@@ -1,5 +1,7 @@
-package com.github.ylgrgyq.replicator.server;
+package com.github.ylgrgyq.replicator.server.connection.vertx;
 
+import com.github.ylgrgyq.replicator.server.ReplicatorOptions;
+import com.github.ylgrgyq.replicator.server.SequenceAppender;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import org.slf4j.Logger;

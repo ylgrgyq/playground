@@ -40,6 +40,10 @@ public abstract class AbstractReplicatorServer implements ReplicatorServer {
         }
     }
 
+    protected SequenceGroups getGroups() {
+        return groups;
+    }
+
     @Override
     public CompletableFuture<Void> start() {
         return CompletableFuture.completedFuture(null);

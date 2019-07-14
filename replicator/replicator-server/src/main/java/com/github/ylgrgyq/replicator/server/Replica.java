@@ -15,7 +15,7 @@ public class Replica implements ReplicateRequestHandler {
     private Sequence seq;
     private String topic;
 
-    Replica(ReplicateChannel channel) {
+    public Replica(ReplicateChannel channel) {
         this.channel = channel;
         this.handshaked = new AtomicBoolean(false);
     }

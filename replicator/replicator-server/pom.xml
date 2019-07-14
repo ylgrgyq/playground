@@ -14,7 +14,7 @@
     <name>replicator-server ${project.version}</name>
 
     <properties>
-        <main.verticle>com.github.ylgrgyq.replicator.server.VertxReplicatorServerBootstrap</main.verticle>
+        <main.verticle>com.github.ylgrgyq.replicator.server.connection.netty.NettyReplicatorServerBootstrap</main.verticle>
     </properties>
 
     <dependencies>

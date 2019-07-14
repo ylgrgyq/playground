@@ -1,15 +1,17 @@
-package com.github.ylgrgyq.replicator.server;
+package com.github.ylgrgyq.replicator.server.connection.vertx;
 
 import com.github.ylgrgyq.replicator.proto.ErrorInfo;
 import com.github.ylgrgyq.replicator.proto.ReplicatorCommand;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.proto.SyncLogEntries;
+import com.github.ylgrgyq.replicator.server.ReplicateChannel;
+import com.github.ylgrgyq.replicator.server.ReplicatorError;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.ServerWebSocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class VertxReplicateChannel implements ReplicateChannel{
+public class VertxReplicateChannel implements ReplicateChannel {
     private static final Logger logger = LoggerFactory.getLogger(VertxReplicateChannel.class);
 
     private ServerWebSocket socket;
