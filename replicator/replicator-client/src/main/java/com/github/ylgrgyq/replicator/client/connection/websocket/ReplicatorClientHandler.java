@@ -24,7 +24,7 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     public ReplicatorClientHandler(String topic, StateMachine stateMachine) {
         this.topic = topic;
         this.stateMachine = stateMachine;
-        this.lastIndex = -1;
+        this.lastIndex = Long.MIN_VALUE;
     }
 
     @Override
@@ -44,28 +44,35 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
                 SyncLogEntries logs = cmd.getLogs();
                 logger.info("GET RESP {}", logs);
                 List<LogEntry> entryList = logs.getEntriesList();
-                List<byte[]> entris = new ArrayList<>(entryList.size());
+
                 if (entryList.isEmpty()) {
                     logger.info("GET RESP return empty");
                 } else {
                     LogEntry firstEntry = entryList.get(0);
-                    if (lastIndex + 1 == firstEntry.getIndex()) {
+                    LogEntry lastEntry = entryList.get(entryList.size() - 1);
+                    if (firstEntry.getIndex() > lastIndex + 1) {
+                        requestSnapshot(ch, topic);
+                    } else if (lastEntry.getIndex() > lastIndex) {
+                        List<byte[]> entris = new ArrayList<>(entryList.size());
                         for (LogEntry entry : entryList) {
-                            entris.add(entry.getData().toByteArray());
-                            lastIndex = entry.getIndex();
+                            if (entry.getIndex() == lastIndex + 1) {
+                                entris.add(entry.getData().toByteArray());
+                                lastIndex = entry.getIndex();
+                            }
                         }
                         stateMachine.apply(entris);
                         requestLogs(ch, topic, lastIndex);
-                    } else {
-                        requestSnapshot(ch, topic);
                     }
                 }
                 break;
             case SNAPSHOT_RESP:
                 Snapshot snapshot = cmd.getSnapshot();
-                stateMachine.snapshot(snapshot.toByteArray());
-                lastIndex = snapshot.getId();
-                requestLogs(ch, topic, snapshot.getId());
+                long snapshotId = snapshot.getId();
+                if (snapshotId > lastIndex) {
+                    stateMachine.snapshot(snapshot.toByteArray());
+                    lastIndex = snapshotId;
+                    requestLogs(ch, topic, snapshotId);
+                }
                 break;
             case ERROR:
                 ErrorInfo errorInfo = cmd.getError();
@@ -91,7 +98,7 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
         if (evt instanceof IdleStateEvent) {
-            ctx.close();
+            requestLogs(ctx.channel(), topic, lastIndex);
         } else if (evt == WebSocketClientProtocolHandler.ClientHandshakeStateEvent.HANDSHAKE_COMPLETE) {
             handshake(ctx.channel(), topic);
         }

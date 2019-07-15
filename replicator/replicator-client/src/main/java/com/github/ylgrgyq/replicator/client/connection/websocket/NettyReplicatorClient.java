@@ -54,7 +54,7 @@ public class NettyReplicatorClient {
             protected void initChannel(SocketChannel channel) throws Exception {
                 ChannelPipeline pipeline = channel.pipeline();
 
-                pipeline.addLast(new IdleStateHandler(30, 0, 0));
+                pipeline.addLast(new IdleStateHandler(10, 0, 0));
                 pipeline.addLast(new HttpClientCodec());
                 pipeline.addLast(new HttpObjectAggregator(65536));
                 pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
