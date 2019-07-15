@@ -8,11 +8,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public class ReplicatorClient {
-    private static final Logger logger = LoggerFactory.getLogger(ReplicatorClient.class);
+public class ReplicatorClientBootstrap {
+    private static final Logger logger = LoggerFactory.getLogger(ReplicatorClientBootstrap.class);
 
     public static void main(String[] args) throws Exception{
-        ReplicatorOptions options = new ReplicatorOptions();
+        ReplicatorClientOptions options = new ReplicatorClientOptions();
         NettyReplicatorClient client = new NettyReplicatorClient("hahaha", new StateMachine() {
             @Override
             public void apply(List<byte[]> logs) {
