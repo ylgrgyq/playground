@@ -1,8 +1,8 @@
-package com.github.ylgrgyq.replicator.server;
+package com.github.ylgrgyq.replicator.client;
 
 public class ReplicatorOptions {
 
-    private int port = 8080;
+    private int port = 8888;
     private String host = "localhost";
 
     public void setPort(int port) {

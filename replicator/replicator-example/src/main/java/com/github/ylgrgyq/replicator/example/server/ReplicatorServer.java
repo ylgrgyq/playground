@@ -1,8 +1,8 @@
 package com.github.ylgrgyq.replicator.example.server;
 
 import com.github.ylgrgyq.replicator.server.*;
-import com.github.ylgrgyq.replicator.server.connection.netty.NettyReplicateChannel;
-import com.github.ylgrgyq.replicator.server.connection.netty.NettyReplicatorServer;
+import com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicateChannel;
+import com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicatorServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

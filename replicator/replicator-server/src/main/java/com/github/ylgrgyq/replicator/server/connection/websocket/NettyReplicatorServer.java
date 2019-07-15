@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.server.connection.netty;
+package com.github.ylgrgyq.replicator.server.connection.websocket;
 
 import com.github.ylgrgyq.replicator.server.AbstractReplicatorServer;
 import com.github.ylgrgyq.replicator.server.ReplicatorOptions;

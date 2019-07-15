@@ -1,6 +1,9 @@
-package com.github.ylgrgyq.replicator.client;
+package com.github.ylgrgyq.replicator.example.client;
 
+import com.github.ylgrgyq.replicator.client.ReplicatorOptions;
+import com.github.ylgrgyq.replicator.client.StateMachine;
 import com.github.ylgrgyq.replicator.client.connection.websocket.NettyReplicatorClient;
+import com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicateChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,7 +12,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class ReplicatorClient {
-    private static final Logger logger = LoggerFactory.getLogger(ReplicatorClient.class);
+    private static final Logger logger = LoggerFactory.getLogger(NettyReplicateChannel.class);
 
     public static void main(String[] args) throws Exception{
         ReplicatorOptions options = new ReplicatorOptions();

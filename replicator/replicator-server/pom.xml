@@ -14,7 +14,7 @@
     <name>replicator-server ${project.version}</name>
 
     <properties>
-        <main.verticle>com.github.ylgrgyq.replicator.server.connection.netty.NettyReplicatorServerBootstrap</main.verticle>
+        <main.verticle>com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicatorServerBootstrap</main.verticle>
     </properties>
 
     <dependencies>
@@ -23,6 +23,10 @@
             <artifactId>replicator-proto</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-all</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>

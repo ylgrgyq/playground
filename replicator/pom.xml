@@ -20,8 +20,6 @@
     </modules>
 
     <properties>
-        <vertx.version>3.7.0</vertx.version>
-        <main.verticle>io.vertx.starter.MainVerticle</main.verticle>
     </properties>
 
     <dependencyManagement>
@@ -45,16 +43,9 @@
 
             <!-- dependencies -->
             <dependency>
-                <groupId>io.vertx</groupId>
-                <artifactId>vertx-stack-depchain</artifactId>
-                <version>${vertx.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>io.vertx</groupId>
-                <artifactId>vertx-core</artifactId>
-                <version>${vertx.version}</version>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-all</artifactId>
+                <version>4.1.30.Final</version>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
@@ -85,11 +76,6 @@
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
                 <version>4.12</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>io.vertx</groupId>
-                <artifactId>vertx-unit</artifactId>
                 <scope>test</scope>
             </dependency>
         </dependencies>
