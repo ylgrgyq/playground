@@ -21,10 +21,10 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     private long lastIndex;
     private StateMachine stateMachine;
 
-    public ReplicatorClientHandler(String topic, StateMachine stateMachine) {
+    public ReplicatorClientHandler(String topic, StateMachine stateMachine, long lastIndex) {
         this.topic = topic;
         this.stateMachine = stateMachine;
-        this.lastIndex = Long.MIN_VALUE;
+        this.lastIndex = lastIndex;
     }
 
     @Override
@@ -102,6 +102,10 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
         } else if (evt == WebSocketClientProtocolHandler.ClientHandshakeStateEvent.HANDSHAKE_COMPLETE) {
             handshake(ctx.channel(), topic);
         }
+    }
+
+    public long getLastIndex() {
+        return lastIndex;
     }
 
     public void handshake(Channel ch, String topic) {

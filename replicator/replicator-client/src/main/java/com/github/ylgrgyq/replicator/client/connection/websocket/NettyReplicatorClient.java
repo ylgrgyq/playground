@@ -26,29 +26,31 @@ public class NettyReplicatorClient {
 
     private ReplicatorClientOptions options;
     private EventLoopGroup group;
-    private String topic;
-    private StateMachine stateMachine;
     private volatile boolean stop;
     private Channel channel;
+    private String topic;
+    private StateMachine stateMachine;
+    private volatile long lastIndex;
 
     public NettyReplicatorClient(String topic, StateMachine stateMachine, ReplicatorClientOptions options) {
         super();
-        this.options = options;
-        this.group = new NioEventLoopGroup();
         this.topic = topic;
         this.stateMachine = stateMachine;
+        this.options = options;
+        this.group = new NioEventLoopGroup();
         this.stop = false;
+        this.lastIndex = Long.MIN_VALUE;
     }
 
     public CompletableFuture<Void> start() throws Exception {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
-        URI uri = new URI( "ws://127.0.0.1:8888");
-
-        ReplicatorClientHandler handler = new ReplicatorClientHandler(topic, stateMachine);
+        URI uri = new URI("ws://127.0.0.1:8888");
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.group(group);
+
+        ReplicatorClientHandler clientHandler = new ReplicatorClientHandler(topic, stateMachine, lastIndex);
         bootstrap.handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel channel) throws Exception {
@@ -62,14 +64,21 @@ public class NettyReplicatorClient {
                         new DefaultHttpHeaders(), 65536));
                 pipeline.addLast(new ReplicatorEncoder());
                 pipeline.addLast(new ReplicatorDecoder());
-                pipeline.addLast(handler);
+                pipeline.addLast(clientHandler);
             }
         });
 
         bootstrap.connect(options.getHost(), options.getPort()).addListener((ChannelFuture f) -> {
             if (f.isSuccess()) {
                 channel = f.channel();
-                channel.closeFuture().addListener(closeFuture -> restart(channel.eventLoop()));
+                channel.closeFuture().addListener(closeFuture -> {
+                    logger.info("connection broken");
+                    long nextIndex = clientHandler.getLastIndex();
+                    if (nextIndex > lastIndex) {
+                        lastIndex = nextIndex;
+                    }
+                    restart(channel.eventLoop());
+                });
                 logger.info("connection success");
                 future.complete(null);
             } else {
