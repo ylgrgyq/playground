@@ -30,7 +30,7 @@ public class NettyReplicatorClient {
     private Channel channel;
     private String topic;
     private StateMachine stateMachine;
-    private volatile long lastIndex;
+    private long lastIndex;
 
     public NettyReplicatorClient(String topic, StateMachine stateMachine, ReplicatorClientOptions options) {
         super();
@@ -62,8 +62,8 @@ public class NettyReplicatorClient {
                 pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
                 pipeline.addLast(new WebSocketClientProtocolHandler(uri, WebSocketVersion.V13, null, true,
                         new DefaultHttpHeaders(), 65536));
-                pipeline.addLast(new ReplicatorEncoder());
-                pipeline.addLast(new ReplicatorDecoder());
+                pipeline.addLast(ReplicatorEncoder.INSTANCE);
+                pipeline.addLast(ReplicatorDecoder.INSTANCE);
                 pipeline.addLast(clientHandler);
             }
         });
@@ -79,7 +79,7 @@ public class NettyReplicatorClient {
                     }
                     restart(channel.eventLoop());
                 });
-                logger.info("connection success");
+                logger.info("connect succeed");
                 future.complete(null);
             } else {
                 future.completeExceptionally(f.cause());

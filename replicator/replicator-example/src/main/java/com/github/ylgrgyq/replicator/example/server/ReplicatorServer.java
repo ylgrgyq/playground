@@ -21,15 +21,20 @@ public class ReplicatorServer {
                 logger.error("Start replicator failed", t);
             }
 
-            SequenceAppender appender = server.createSequenceAppender("hahaha");
+            new Thread(() ->{
+                SequenceAppender appender = server.createSequenceAppender("hahaha");
+                for (int i = 0; i < 10000; ++i) {
+                    String msg = "wahaha-" + i;
+                    appender.append(i, msg.getBytes(StandardCharsets.UTF_8));
+                    try {
+//                        Thread.sleep(1000);
+                    } catch (Exception ex) {
+                        logger.error("exception", ex);
+                    }
+                }
 
-            for (int i = 0; i < 10000; ++i) {
-                String msg = "wahaha-" + i;
-                appender.append(i, msg.getBytes(StandardCharsets.UTF_8));
-            }
-
-            logger.info("generate log done {}");
-
+                logger.info("generate log done {}");
+            }).start();
         });
     }
 }

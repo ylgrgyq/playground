@@ -14,6 +14,10 @@ import java.util.List;
 
 @ChannelHandler.Sharable
 public class ReplicatorDecoder extends MessageToMessageDecoder<WebSocketFrame> {
+    public static ReplicatorDecoder INSTANCE = new ReplicatorDecoder();
+
+    private ReplicatorDecoder() {}
+
     @Override
     protected void decode(ChannelHandlerContext ctx, WebSocketFrame frame, List<Object> out) throws Exception {
         ReplicatorCommand cmd;

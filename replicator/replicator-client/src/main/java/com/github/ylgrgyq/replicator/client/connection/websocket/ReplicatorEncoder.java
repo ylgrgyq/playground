@@ -16,6 +16,10 @@ import java.util.List;
 public class ReplicatorEncoder extends MessageToMessageEncoder<ReplicatorCommand> {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorClientHandler.class);
 
+    public static ReplicatorEncoder INSTANCE = new ReplicatorEncoder();
+
+    private ReplicatorEncoder() {}
+
     @Override
     protected void encode(ChannelHandlerContext ctx, ReplicatorCommand o, List<Object> list) throws Exception {
         ByteBuf buf = ctx.alloc().buffer(o.getSerializedSize());

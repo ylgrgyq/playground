@@ -46,8 +46,8 @@ public class NettyReplicatorServer extends AbstractReplicatorServer {
                 pipeline.addLast(new HttpObjectAggregator(65536));
                 pipeline.addLast(new WebSocketServerCompressionHandler());
                 pipeline.addLast(new WebSocketServerProtocolHandler("/", null, true));
-                pipeline.addLast(new ReplicatorEncoder());
-                pipeline.addLast(new ReplicatorDecoder());
+                pipeline.addLast(ReplicatorEncoder.INSTANCE);
+                pipeline.addLast(ReplicatorDecoder.INSTANCE);
                 pipeline.addLast(new ReplicatorServerHandler(getGroups()));
             }
         });
