@@ -9,10 +9,11 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 public class ReplicatorClient {
-    private static final Logger logger = LoggerFactory.getLogger(NettyReplicateChannel.class);
+    private static final Logger logger = LoggerFactory.getLogger(ReplicatorClient.class);
 
     public static void main(String[] args) throws Exception{
         ReplicatorClientOptions options = new ReplicatorClientOptions();
@@ -30,7 +31,12 @@ public class ReplicatorClient {
         }, options);
 
 
-        client.start();
+        CompletableFuture<Void> f = client.start();
+        f.exceptionally(t -> {
+            logger.error("connect to server failed", t);
+            return null;
+        });
+
         Thread.sleep(10000);
     }
 }

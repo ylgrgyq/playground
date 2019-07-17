@@ -68,6 +68,7 @@ public class NettyReplicatorClient {
             }
         });
 
+        bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000);
         bootstrap.connect(options.getHost(), options.getPort()).addListener((ChannelFuture f) -> {
             if (f.isSuccess()) {
                 channel = f.channel();
