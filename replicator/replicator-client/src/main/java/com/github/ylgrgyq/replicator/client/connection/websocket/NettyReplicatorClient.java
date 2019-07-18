@@ -2,6 +2,7 @@ package com.github.ylgrgyq.replicator.client.connection.websocket;
 
 import com.github.ylgrgyq.replicator.client.ReplicatorClientOptions;
 import com.github.ylgrgyq.replicator.client.StateMachine;
+import com.github.ylgrgyq.replicator.client.StateMachineCaller;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -29,31 +30,37 @@ public class NettyReplicatorClient {
     private volatile boolean stop;
     private Channel channel;
     private String topic;
-    private StateMachine stateMachine;
+    private StateMachineCaller stateMachineCaller;
     private long lastIndex;
 
     public NettyReplicatorClient(String topic, StateMachine stateMachine, ReplicatorClientOptions options) {
         super();
         this.topic = topic;
-        this.stateMachine = stateMachine;
         this.options = options;
         this.group = new NioEventLoopGroup();
         this.stop = false;
         this.lastIndex = Long.MIN_VALUE;
+        this.stateMachineCaller = new StateMachineCaller(stateMachine);
     }
 
-    public CompletableFuture<Void> start() throws Exception {
+    public CompletableFuture<Void> start() {
+        stateMachineCaller.start();
+
+        return connect();
+    }
+
+    private CompletableFuture<Void> connect(){
         CompletableFuture<Void> future = new CompletableFuture<>();
 
-        URI uri = new URI("ws://127.0.0.1:8888");
+        URI uri = options.getUri();
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.group(group);
 
-        ReplicatorClientHandler clientHandler = new ReplicatorClientHandler(topic, stateMachine, lastIndex);
+        ReplicatorClientHandler clientHandler = new ReplicatorClientHandler(topic, stateMachineCaller, lastIndex, options);
         bootstrap.handler(new ChannelInitializer<SocketChannel>() {
             @Override
-            protected void initChannel(SocketChannel channel) throws Exception {
+            protected void initChannel(SocketChannel channel) {
                 ChannelPipeline pipeline = channel.pipeline();
 
                 pipeline.addLast(new IdleStateHandler(10, 0, 0));
@@ -78,7 +85,7 @@ public class NettyReplicatorClient {
                     if (nextIndex > lastIndex) {
                         lastIndex = nextIndex;
                     }
-                    restart(channel.eventLoop());
+                    scheduleReconnect(channel.eventLoop());
                 });
                 logger.info("connect succeed");
                 future.complete(null);
@@ -90,24 +97,24 @@ public class NettyReplicatorClient {
         return future;
     }
 
-    private void restart(EventLoop loop) {
+    private void scheduleReconnect(EventLoop loop) {
         if (!stop) {
             logger.info("reconnect in {} seconds", options.getReconnectDelaySeconds());
             loop.schedule(() -> {
                 if (!stop) {
-                    CompletableFuture<Void> restartF;
+                    CompletableFuture<Void> reconnectFuture;
                     try {
                         logger.info("start reconnecting...");
-                        restartF = start();
+                        reconnectFuture = connect();
                     } catch (Exception ex) {
-                        restartF = new CompletableFuture<>();
-                        restartF.completeExceptionally(ex);
+                        reconnectFuture = new CompletableFuture<>();
+                        reconnectFuture.completeExceptionally(ex);
                     }
 
-                    restartF.whenComplete((ret, t) -> {
+                    reconnectFuture.whenComplete((ret, t) -> {
                         if (t != null) {
                             logger.error("reconnect failed", t);
-                            restart(loop);
+                            scheduleReconnect(loop);
                         }
                     });
                 }

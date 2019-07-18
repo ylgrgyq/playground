@@ -1,7 +1,8 @@
 package com.github.ylgrgyq.replicator.client.connection.websocket;
 
+import com.github.ylgrgyq.replicator.client.ReplicatorClientOptions;
 import com.github.ylgrgyq.replicator.client.ReplicatorException;
-import com.github.ylgrgyq.replicator.client.StateMachine;
+import com.github.ylgrgyq.replicator.client.StateMachineCaller;
 import com.github.ylgrgyq.replicator.proto.*;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -11,78 +12,147 @@ import io.netty.handler.timeout.IdleStateEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class ReplicatorClientHandler extends SimpleChannelInboundHandler<ReplicatorCommand> {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorClientHandler.class);
 
     private String topic;
     private long lastIndex;
-    private StateMachine stateMachine;
+    private StateMachineCaller stateMachineCaller;
+    private volatile boolean suspend;
+    private int pendingApplyLogsRequestCount;
+    private ReplicatorClientOptions options;
 
-    public ReplicatorClientHandler(String topic, StateMachine stateMachine, long lastIndex) {
+    public ReplicatorClientHandler(String topic, StateMachineCaller stateMachineCaller, long lastIndex, ReplicatorClientOptions options) {
         this.topic = topic;
-        this.stateMachine = stateMachine;
+        this.stateMachineCaller = stateMachineCaller;
         this.lastIndex = lastIndex;
-    }
-
-    @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        super.channelRegistered(ctx);
+        this.suspend = false;
+        this.options = options;
     }
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, ReplicatorCommand cmd) throws Exception {
-        Channel ch = ctx.channel();
-
         switch (cmd.getType()) {
             case HANDSHAKE_RESP:
-                requestSnapshot(ch, topic);
+                requestSnapshot(ctx.channel(), topic);
                 break;
             case GET_RESP:
                 SyncLogEntries logs = cmd.getLogs();
-                logger.info("GET RESP {}", logs);
-                List<LogEntry> entryList = logs.getEntriesList();
-
-                if (entryList.isEmpty()) {
-                    logger.info("GET RESP return empty");
-                } else {
-                    LogEntry firstEntry = entryList.get(0);
-                    LogEntry lastEntry = entryList.get(entryList.size() - 1);
-                    if (firstEntry.getIndex() > lastIndex + 1) {
-                        requestSnapshot(ch, topic);
-                    } else if (lastEntry.getIndex() > lastIndex) {
-                        List<byte[]> entris = new ArrayList<>(entryList.size());
-                        for (LogEntry entry : entryList) {
-                            if (entry.getIndex() == lastIndex + 1) {
-                                entris.add(entry.getData().toByteArray());
-                                lastIndex = entry.getIndex();
-                            }
-                        }
-                        stateMachine.apply(entris);
-                        requestLogs(ch, topic, lastIndex);
-                    }
-                }
+                handleSyncLogs(ctx, logs);
                 break;
             case SNAPSHOT_RESP:
                 Snapshot snapshot = cmd.getSnapshot();
-                long snapshotId = snapshot.getId();
-                if (snapshotId > lastIndex) {
-                    stateMachine.snapshot(snapshot.toByteArray());
-                    lastIndex = snapshotId;
-                    requestLogs(ch, topic, snapshotId);
-                }
+                handleApplySnapshot(ctx, snapshot);
                 break;
             case ERROR:
                 ErrorInfo errorInfo = cmd.getError();
-                logger.info("got error {}", errorInfo);
                 if (errorInfo.getErrorCode() == 10001) {
-                    requestSnapshot(ch, topic);
+                    requestSnapshot(ctx.channel(), topic);
                 } else {
                     logger.error("got error", errorInfo);
                 }
                 break;
+        }
+    }
+
+    private void requestSnapshot(Channel ch, String topic) {
+        ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
+        get.setType(ReplicatorCommand.CommandType.SNAPSHOT);
+        get.setTopic(topic);
+
+        ch.writeAndFlush(get.build());
+    }
+
+    private void handleSyncLogs(ChannelHandlerContext ctx, SyncLogEntries logs) {
+        List<LogEntry> entryList = logs.getEntriesList();
+
+        if (!entryList.isEmpty()) {
+            LogEntry firstEntry = entryList.get(0);
+            LogEntry lastEntry = entryList.get(entryList.size() - 1);
+            if (firstEntry.getIndex() > lastIndex + 1) {
+                logger.warn("lastIndex:{} is too far behind sync logs {}", lastIndex, firstEntry.getIndex());
+                requestSnapshot(ctx.channel(), topic);
+            } else if (lastEntry.getIndex() > lastIndex) {
+                int i = 0;
+                for (; i < entryList.size(); ++i) {
+                    LogEntry entry = entryList.get(i);
+                    if (entry.getIndex() == lastIndex + 1) {
+                        break;
+                    }
+                }
+
+                lastIndex = lastEntry.getIndex();
+                List<byte[]> logDataList = entryList.subList(i, entryList.size())
+                        .stream()
+                        .map(e -> e.getData().toByteArray())
+                        .collect(Collectors.toList());
+
+                handleApplyLogs(ctx, logDataList);
+            }
+        }
+    }
+
+    private void handleApplyLogs(ChannelHandlerContext ctx, List<byte[]> logs) {
+        ++pendingApplyLogsRequestCount;
+        stateMachineCaller.applyLogs(logs)
+                .whenComplete((ret, t) -> {
+                    if (t != null) {
+                        assert (t instanceof ReplicatorException) : t;
+                        logger.warn("state machine is busy, apply snapshot latter", t);
+                        suspend = true;
+                        ctx.executor().schedule(() -> handleApplyLogs(ctx, logs), 10, TimeUnit.SECONDS);
+                    } else {
+                        ctx.executor().submit(() -> {
+                            if (--pendingApplyLogsRequestCount < options.getPendingFlushLogsLowWaterMark()) {
+                                suspend = false;
+                            }
+                            assert pendingApplyLogsRequestCount >= 0 : pendingApplyLogsRequestCount;
+                            requestLogs(ctx.channel(), topic, lastIndex);
+                        });
+                    }
+                });
+    }
+
+    private void requestLogs(Channel ch, String topic, long fromIndex) {
+        if (suspend) {
+            return;
+        }
+
+        ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
+        get.setType(ReplicatorCommand.CommandType.GET);
+        get.setTopic(topic);
+        get.setFromIndex(fromIndex);
+        get.setLimit(100);
+
+        ch.writeAndFlush(get.build());
+    }
+
+    private void handleApplySnapshot(ChannelHandlerContext ctx, Snapshot snapshot) {
+        long snapshotId = snapshot.getId();
+        if (snapshotId > lastIndex) {
+            stateMachineCaller.applySnapshot(snapshot)
+                    .whenComplete((ret, t) -> {
+                        if (t != null) {
+                            assert (t instanceof ReplicatorException) : t;
+                            logger.warn("state machine is busy, apply snapshot latter", t);
+                            suspend = true;
+                            ctx.executor().schedule(() ->
+                                    handleApplySnapshot(ctx, snapshot), 10, TimeUnit.SECONDS);
+                        } else {
+                            ctx.executor().submit(() -> {
+                                assert lastIndex > snapshotId;
+                                if (pendingApplyLogsRequestCount < options.getPendingFlushLogsLowWaterMark()) {
+                                    suspend = false;
+                                }
+                                lastIndex = snapshotId;
+                                requestLogs(ctx.channel(), topic, snapshotId);
+                            });
+                        }
+                    });
         }
     }
 
@@ -111,24 +181,6 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     public void handshake(Channel ch, String topic) {
         ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
         get.setType(ReplicatorCommand.CommandType.HANDSHAKE);
-        get.setTopic(topic);
-
-        ch.writeAndFlush(get.build());
-    }
-
-    private void requestLogs(Channel ch, String topic, long fromIndex) {
-        ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
-        get.setType(ReplicatorCommand.CommandType.GET);
-        get.setTopic(topic);
-        get.setFromIndex(fromIndex);
-        get.setLimit(100);
-
-        ch.writeAndFlush(get.build());
-    }
-
-    private void requestSnapshot(Channel ch, String topic) {
-        ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
-        get.setType(ReplicatorCommand.CommandType.SNAPSHOT);
         get.setTopic(topic);
 
         ch.writeAndFlush(get.build());

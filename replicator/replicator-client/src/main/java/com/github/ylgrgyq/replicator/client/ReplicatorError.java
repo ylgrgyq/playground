@@ -8,6 +8,8 @@ public enum ReplicatorError {
     EUNKNOWNPROTOCOL(10002, "Unknown protocol"),
 
     ENEEDHANDSHAKE(10003, "Need handshake first, then send other requests"),
+
+    ESTATEMACHINEQUEUEFULL(10004, "State machine queue full")
     ;
 
 
