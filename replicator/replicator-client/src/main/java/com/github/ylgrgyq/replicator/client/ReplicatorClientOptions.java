@@ -9,6 +9,7 @@ public class ReplicatorClientOptions {
     private long reconnectDelaySeconds = 10;
     private URI uri;
     private int pendingFlushLogsLowWaterMark = 10;
+    private int pingIntervalSec = 10;
 
     public ReplicatorClientOptions() {
         try {
@@ -48,5 +49,9 @@ public class ReplicatorClientOptions {
 
     public int getPendingFlushLogsLowWaterMark() {
         return pendingFlushLogsLowWaterMark;
+    }
+
+    public int getPingIntervalSec() {
+        return pingIntervalSec;
     }
 }

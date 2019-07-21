@@ -26,8 +26,7 @@ public class StateMachineCaller {
     public CompletableFuture<Void> applySnapshot(Snapshot snapshot) {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
-        Job newJob = new Job(() -> stateMachine.snapshot(snapshot.toByteArray()), future);
-        if (! jobQueue.offer(newJob)) {
+        if (! jobQueue.offer(StateMachineJob.newApplySnapshotJob(stateMachine, snapshot, future))) {
             future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINEQUEUEFULL));
         }
 
@@ -37,8 +36,7 @@ public class StateMachineCaller {
     public CompletableFuture<Void> applyLogs(List<byte[]> logs) {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
-        Job newJob = new Job(() -> stateMachine.apply(logs), future);
-        if (! jobQueue.offer(newJob)) {
+        if (! jobQueue.offer(StateMachineJob.newApplyLogsJob(stateMachine, logs, future))) {
             future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINEQUEUEFULL));
         }
 
@@ -52,34 +50,67 @@ public class StateMachineCaller {
                 try {
                     Job job = jobQueue.take();
                     try {
-                        job.job.run();
+                        job.run();
                     } catch (Throwable ex) {
-                        try {
-                            stateMachine.exceptionCaught(ex);
-                        } catch (Exception ex2) {
-                            logger.error("got exception when handle state machine exception", ex2);
+                        if (job instanceof StateMachineJob) {
+                            try {
+                                stateMachine.exceptionCaught(ex);
+                            } catch (Exception ex2) {
+                                logger.error("got exception when handling state machine exception", ex2);
+                            }
+                        } else {
+                            throw ex;
                         }
                     } finally {
-                        job.future.complete(null);
+                        job.done();
                     }
                 } catch (Exception ex) {
-
+                    logger.error("got unexpected exception while running job");
                 }
             }
-        });
+        }).start();
     }
 
     public void shutdown() {
         stop = true;
     }
 
-    private static class Job {
+    private static class Job implements Runnable{
         private Runnable job;
         private CompletableFuture<Void> future;
 
         public Job(Runnable job, CompletableFuture<Void> future) {
             this.job = job;
             this.future = future;
+        }
+
+        @Override
+        public void run() {
+            job.run();
+        }
+
+        public void done() {
+            future.complete(null);
+        }
+    }
+
+    private static class StateMachineJob extends Job {
+        public StateMachineJob(Runnable job, CompletableFuture<Void> future) {
+            super(job, future);
+        }
+
+        static StateMachineJob newApplySnapshotJob(StateMachine stateMachine, Snapshot snapshot, CompletableFuture<Void> future){
+            return new StateMachineJob(() -> stateMachine.snapshot(snapshot.toByteArray()), future);
+        }
+
+        static StateMachineJob newApplyLogsJob(StateMachine stateMachine, List<byte[]> logs, CompletableFuture<Void> future){
+            return new StateMachineJob(() -> stateMachine.apply(logs), future);
+        }
+    }
+
+    private static class ReplicatorClientInternalJob extends Job {
+        public ReplicatorClientInternalJob(Runnable job, CompletableFuture<Void> future) {
+            super(job, future);
         }
     }
 }

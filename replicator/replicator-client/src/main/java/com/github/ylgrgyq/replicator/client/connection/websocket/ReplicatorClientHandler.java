@@ -102,7 +102,7 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
                 .whenComplete((ret, t) -> {
                     if (t != null) {
                         assert (t instanceof ReplicatorException) : t;
-                        logger.warn("state machine is busy, apply snapshot latter", t);
+                        logger.warn("state machine is busy, apply logs latter", t);
                         suspend = true;
                         ctx.executor().schedule(() -> handleApplyLogs(ctx, logs), 10, TimeUnit.SECONDS);
                     } else {

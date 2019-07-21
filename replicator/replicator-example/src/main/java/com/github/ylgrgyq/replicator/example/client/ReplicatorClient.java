@@ -31,7 +31,7 @@ public class ReplicatorClient {
 
             @Override
             public void exceptionCaught(Throwable t) {
-
+                logger.error("state machine got unexpected exception", t);
             }
         }, options);
 
