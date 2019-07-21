@@ -26,8 +26,8 @@ public class StateMachineCaller {
     public CompletableFuture<Void> applySnapshot(Snapshot snapshot) {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
-        if (! jobQueue.offer(StateMachineJob.newApplySnapshotJob(stateMachine, snapshot, future))) {
-            future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINEQUEUEFULL));
+        if (!jobQueue.offer(StateMachineJob.newApplySnapshotJob(stateMachine, snapshot, future))) {
+            future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINE_QUEUE_FULL));
         }
 
         return future;
@@ -36,8 +36,8 @@ public class StateMachineCaller {
     public CompletableFuture<Void> applyLogs(List<byte[]> logs) {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
-        if (! jobQueue.offer(StateMachineJob.newApplyLogsJob(stateMachine, logs, future))) {
-            future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINEQUEUEFULL));
+        if (!jobQueue.offer(StateMachineJob.newApplyLogsJob(stateMachine, logs, future))) {
+            future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINE_QUEUE_FULL));
         }
 
 
@@ -45,7 +45,7 @@ public class StateMachineCaller {
     }
 
     public void start() {
-        new Thread(() -> {
+        Thread woker = new Thread(() -> {
             while (!stop) {
                 try {
                     Job job = jobQueue.take();
@@ -68,18 +68,46 @@ public class StateMachineCaller {
                     logger.error("got unexpected exception while running job");
                 }
             }
-        }).start();
+        });
+
+        woker.setName("StateMachine-Worker");
+        woker.start();
     }
 
-    public void shutdown() {
+    public CompletableFuture<Void> shutdown() {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
         stop = true;
+
+        Job shutdownJob = new ReplicatorClientInternalJob(() -> {
+            // do nothing. Because it is only used as a mark which
+            // indicate every job before is executed. So we can
+            // shutdown safely.
+        }, future);
+
+        if (!jobQueue.offer(shutdownJob)) {
+            Thread shutdownHelper = new Thread(() -> {
+                do {
+                    logger.warn("State machine queue is too busy. Try shutdown one second later.");
+                    try {
+                        Thread.sleep(1000);
+                    } catch (Exception ex) {
+                        // ignore
+                    }
+                } while (!jobQueue.offer(shutdownJob));
+            });
+            shutdownHelper.setName("StateMachine-Shutdown-Helper");
+            shutdownHelper.start();
+        }
+
+        return future;
     }
 
-    private static class Job implements Runnable{
+    private static class Job implements Runnable {
         private Runnable job;
         private CompletableFuture<Void> future;
 
-        public Job(Runnable job, CompletableFuture<Void> future) {
+        Job(Runnable job, CompletableFuture<Void> future) {
             this.job = job;
             this.future = future;
         }
@@ -89,27 +117,27 @@ public class StateMachineCaller {
             job.run();
         }
 
-        public void done() {
+        void done() {
             future.complete(null);
         }
     }
 
     private static class StateMachineJob extends Job {
-        public StateMachineJob(Runnable job, CompletableFuture<Void> future) {
+        StateMachineJob(Runnable job, CompletableFuture<Void> future) {
             super(job, future);
         }
 
-        static StateMachineJob newApplySnapshotJob(StateMachine stateMachine, Snapshot snapshot, CompletableFuture<Void> future){
+        static StateMachineJob newApplySnapshotJob(StateMachine stateMachine, Snapshot snapshot, CompletableFuture<Void> future) {
             return new StateMachineJob(() -> stateMachine.snapshot(snapshot.toByteArray()), future);
         }
 
-        static StateMachineJob newApplyLogsJob(StateMachine stateMachine, List<byte[]> logs, CompletableFuture<Void> future){
+        static StateMachineJob newApplyLogsJob(StateMachine stateMachine, List<byte[]> logs, CompletableFuture<Void> future) {
             return new StateMachineJob(() -> stateMachine.apply(logs), future);
         }
     }
 
     private static class ReplicatorClientInternalJob extends Job {
-        public ReplicatorClientInternalJob(Runnable job, CompletableFuture<Void> future) {
+        ReplicatorClientInternalJob(Runnable job, CompletableFuture<Void> future) {
             super(job, future);
         }
     }

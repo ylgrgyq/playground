@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 public class ReplicatorClient {
@@ -41,6 +42,16 @@ public class ReplicatorClient {
             logger.error("connect to server failed", t);
             return null;
         });
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                client.shutdown().get();
+            } catch (InterruptedException ex) {
+                logger.error("Client graceful shutdown was interrupted");
+            } catch (ExecutionException ex) {
+                logger.error("Client graceful shutdown got unexpected exception", ex);
+            }
+        }));
 
         Thread.sleep(10000);
     }

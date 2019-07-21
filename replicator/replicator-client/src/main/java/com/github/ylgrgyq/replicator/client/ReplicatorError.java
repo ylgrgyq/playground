@@ -3,13 +3,15 @@ package com.github.ylgrgyq.replicator.client;
 public enum ReplicatorError {
     UNKNOWN(-1, "Unknown error"),
 
-    ENEEDCATCHUP(10001, "Please fetch recent snapshot to catch up"),
+    ENEED_CATCHUP(10001, "Please fetch recent snapshot to catch up"),
 
-    EUNKNOWNPROTOCOL(10002, "Unknown protocol"),
+    EUNKNOWN_PROTOCOL(10002, "Unknown protocol"),
 
-    ENEEDHANDSHAKE(10003, "Need handshake first, then send other requests"),
+    ENEED_HANDSHAKE(10003, "Need handshake first, then send other requests"),
 
-    ESTATEMACHINEQUEUEFULL(10004, "State machine queue full")
+    ESTATEMACHINE_QUEUE_FULL(10004, "State machine queue full"),
+
+    ECLIENT_ALREADY_SHUTDOWN(10005, "Client already shutdown")
     ;
 
 

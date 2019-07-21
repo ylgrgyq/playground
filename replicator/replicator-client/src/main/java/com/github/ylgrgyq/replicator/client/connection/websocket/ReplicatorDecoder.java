@@ -26,7 +26,7 @@ public class ReplicatorDecoder extends MessageToMessageDecoder<WebSocketFrame> {
             cmd = ReplicatorCommand.parseFrom(stream);
             out.add(cmd);
         } catch (InvalidProtocolBufferException ex) {
-            throw new ReplicatorException(ReplicatorError.EUNKNOWNPROTOCOL);
+            throw new ReplicatorException(ReplicatorError.EUNKNOWN_PROTOCOL);
         }
     }
 }

@@ -1,8 +1,6 @@
 package com.github.ylgrgyq.replicator.client.connection.websocket;
 
-import com.github.ylgrgyq.replicator.client.ReplicatorClientOptions;
-import com.github.ylgrgyq.replicator.client.StateMachine;
-import com.github.ylgrgyq.replicator.client.StateMachineCaller;
+import com.github.ylgrgyq.replicator.client.*;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -44,6 +42,12 @@ public class NettyReplicatorClient {
     }
 
     public CompletableFuture<Void> start() {
+        if (stop) {
+            CompletableFuture<Void> f = new CompletableFuture<>();
+            f.completeExceptionally(new ReplicatorException(ReplicatorError.ECLIENT_ALREADY_SHUTDOWN));
+            return f;
+        }
+
         stateMachineCaller.start();
 
         return connect();
@@ -123,11 +127,29 @@ public class NettyReplicatorClient {
         }
     }
 
-    public void shutdown() {
+    public CompletableFuture<Void> shutdown() {
+        CompletableFuture<Void> terminateFuture = new CompletableFuture<>();
+
         stop = true;
         if (channel != null) {
             channel.close();
         }
         group.shutdownGracefully();
+        group.terminationFuture().addListener(f -> {
+            if (f.isSuccess()) {
+                stateMachineCaller.shutdown()
+                        .whenComplete((ret, ex) -> {
+                           if (ex != null) {
+                               terminateFuture.completeExceptionally(ex);
+                           } else {
+                               terminateFuture.complete(null);
+                           }
+                        });
+            } else {
+                terminateFuture.completeExceptionally(f.cause());
+            }
+        });
+
+        return terminateFuture;
     }
 }
