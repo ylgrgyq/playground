@@ -2,8 +2,6 @@ package com.github.ylgrgyq.replicator.example.client;
 
 import com.github.ylgrgyq.replicator.client.ReplicatorClientOptions;
 import com.github.ylgrgyq.replicator.client.StateMachine;
-import com.github.ylgrgyq.replicator.client.connection.websocket.NettyReplicatorClient;
-import com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicateChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,7 +16,7 @@ public class ReplicatorClient {
 
     public static void main(String[] args) throws Exception{
         ReplicatorClientOptions options = new ReplicatorClientOptions();
-        NettyReplicatorClient client = new NettyReplicatorClient("hahaha", new StateMachine() {
+        com.github.ylgrgyq.replicator.client.ReplicatorClient client = new com.github.ylgrgyq.replicator.client.ReplicatorClient("hahaha", new StateMachine() {
             @Override
             public void apply(List<byte[]> logs) {
                 List<String> logsInStr = logs.stream().map(bs -> new String(bs, StandardCharsets.UTF_8)).collect(Collectors.toList());

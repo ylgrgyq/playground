@@ -1,6 +1,8 @@
-package com.github.ylgrgyq.replicator.client.connection.websocket;
+package com.github.ylgrgyq.replicator.client;
 
-import com.github.ylgrgyq.replicator.client.*;
+import com.github.ylgrgyq.replicator.client.connection.websocket.ReplicatorClientHandler;
+import com.github.ylgrgyq.replicator.client.connection.websocket.ReplicatorDecoder;
+import com.github.ylgrgyq.replicator.client.connection.websocket.ReplicatorEncoder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -20,8 +22,8 @@ import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
-public class NettyReplicatorClient {
-    private static final Logger logger = LoggerFactory.getLogger(NettyReplicatorClient.class);
+public class ReplicatorClient {
+    private static final Logger logger = LoggerFactory.getLogger(ReplicatorClient.class);
 
     private ReplicatorClientOptions options;
     private EventLoopGroup group;
@@ -31,7 +33,7 @@ public class NettyReplicatorClient {
     private StateMachineCaller stateMachineCaller;
     private long lastIndex;
 
-    public NettyReplicatorClient(String topic, StateMachine stateMachine, ReplicatorClientOptions options) {
+    public ReplicatorClient(String topic, StateMachine stateMachine, ReplicatorClientOptions options) {
         super();
         this.topic = topic;
         this.options = options;
