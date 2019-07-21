@@ -13,11 +13,12 @@ public class ReplicatorException extends RuntimeException {
         this.error = error;
     }
 
-    public ReplicatorException(Throwable cause) {
-        super(cause);
-    }
-
     public ReplicatorError getError() {
         return error;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("Replicator client error: %s",  error);
     }
 }

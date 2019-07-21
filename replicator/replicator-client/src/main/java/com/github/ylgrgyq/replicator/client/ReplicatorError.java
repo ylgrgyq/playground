@@ -14,8 +14,7 @@ public enum ReplicatorError {
     ECLIENT_ALREADY_SHUTDOWN(10005, "Client already shutdown"),
 
     ESTATEMACHINE_ALREADY_SHUTDOWN(10006, "State machine already shutdown"),
-    ESTATEMACHINE_EXECUTION_ERROR(10007, "State machine execution error")
-    ;
+    ESTATEMACHINE_EXECUTION_ERROR(10007, "State machine execution error");
 
 
     private int errorCode;
@@ -32,5 +31,13 @@ public enum ReplicatorError {
 
     public String getMsg() {
         return msg;
+    }
+
+    @Override
+    public String toString() {
+        return "{" +
+                "errorCode=" + errorCode +
+                ", msg='" + msg + '\'' +
+                '}';
     }
 }

@@ -27,6 +27,11 @@ public class ReplicatorClient {
             public void snapshot(byte[] snapshot) {
                 logger.info("apply snapshot {}", new String(snapshot, StandardCharsets.UTF_8));
             }
+
+            @Override
+            public void reset() {
+                logger.info("reset called");
+            }
         }, options);
 
 

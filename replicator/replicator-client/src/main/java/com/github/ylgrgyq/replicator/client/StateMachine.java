@@ -6,4 +6,6 @@ public interface StateMachine {
     void apply(List<byte[]> logs);
 
     void snapshot(byte[] snapshot);
+
+    void reset();
 }

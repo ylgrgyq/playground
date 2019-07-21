@@ -26,10 +26,10 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     private int pendingApplyLogsRequestCount;
     private ReplicatorClientOptions options;
 
-    public ReplicatorClientHandler(String topic, StateMachineCaller stateMachineCaller, long lastIndex, ReplicatorClientOptions options) {
+    public ReplicatorClientHandler(String topic, StateMachineCaller stateMachineCaller, ReplicatorClientOptions options) {
         this.topic = topic;
         this.stateMachineCaller = stateMachineCaller;
-        this.lastIndex = lastIndex;
+        this.lastIndex = Long.MIN_VALUE;
         this.suspend = false;
         this.options = options;
     }

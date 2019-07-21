@@ -32,7 +32,6 @@ public class ReplicatorClient {
     private String topic;
     private StateMachineCaller stateMachineCaller;
     private CompletableFuture<Void> terminationFuture;
-    private long lastIndex;
 
     public ReplicatorClient(String topic, StateMachine stateMachine, ReplicatorClientOptions options) {
         super();
@@ -40,7 +39,6 @@ public class ReplicatorClient {
         this.options = options;
         this.group = new NioEventLoopGroup();
         this.stop = false;
-        this.lastIndex = Long.MIN_VALUE;
         this.stateMachineCaller = new StateMachineCaller(stateMachine, this);
     }
 
@@ -64,7 +62,7 @@ public class ReplicatorClient {
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.group(group);
 
-        ReplicatorClientHandler clientHandler = new ReplicatorClientHandler(topic, stateMachineCaller, lastIndex, options);
+        ReplicatorClientHandler clientHandler = new ReplicatorClientHandler(topic, stateMachineCaller, options);
         bootstrap.handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel channel) {
@@ -89,10 +87,7 @@ public class ReplicatorClient {
                 channel = f.channel();
                 channel.closeFuture().addListener(closeFuture -> {
                     logger.info("connection with {}:{} broken.", options.getHost(), options.getPort());
-                    long nextIndex = clientHandler.getLastIndex();
-                    if (nextIndex > lastIndex) {
-                        lastIndex = nextIndex;
-                    }
+
                     scheduleReconnect(channel.eventLoop());
                 });
                 logger.info("connection with {}:{} succeed.", options.getHost(), options.getPort());
@@ -113,7 +108,12 @@ public class ReplicatorClient {
                 if (!stop) {
                     CompletableFuture<Void> reconnectFuture;
                     try {
-                        reconnectFuture = connect();
+                        CompletableFuture<Void> resetFuture = stateMachineCaller.resetStateMachine();
+                        if (resetFuture.isCompletedExceptionally()) {
+                            reconnectFuture = resetFuture;
+                        } else {
+                            reconnectFuture = connect();
+                        }
                     } catch (Exception ex) {
                         reconnectFuture = new CompletableFuture<>();
                         reconnectFuture.completeExceptionally(ex);

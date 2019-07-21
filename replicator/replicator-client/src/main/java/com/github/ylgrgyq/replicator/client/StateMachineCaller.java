@@ -56,6 +56,20 @@ public class StateMachineCaller {
         return future;
     }
 
+    CompletableFuture<Void> resetStateMachine(){
+        CompletableFuture<Void> future = new CompletableFuture<>();
+
+        if (stop) {
+            future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINE_ALREADY_SHUTDOWN));
+        }
+
+        if (!jobQueue.offer(newResetStateMachinejob(future))) {
+            future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINE_QUEUE_FULL));
+        }
+
+        return future;
+    }
+
     void start() {
         Thread woker = new Thread(() -> {
             while (!stop) {
@@ -160,6 +174,10 @@ public class StateMachineCaller {
 
     private StateMachineJob newApplyLogsJob(List<byte[]> logs, CompletableFuture<Void> future) {
         return new StateMachineJob(() -> stateMachine.apply(logs), future);
+    }
+
+    private StateMachineJob newResetStateMachinejob(CompletableFuture<Void> future) {
+        return new StateMachineJob(stateMachine::reset, future);
     }
 
     private class ReplicatorClientInternalJob extends Job {
