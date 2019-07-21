@@ -12,9 +12,4 @@ public class AbstractStateMachine implements StateMachine {
     public void snapshot(byte[] snapshot) {
 
     }
-
-    @Override
-    public void exceptionCaught(Throwable t) {
-
-    }
 }

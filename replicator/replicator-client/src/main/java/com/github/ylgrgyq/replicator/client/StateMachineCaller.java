@@ -12,21 +12,29 @@ import java.util.concurrent.CompletableFuture;
 public class StateMachineCaller {
     private static final Logger logger = LoggerFactory.getLogger(StateMachineCaller.class);
 
-    private StateMachine stateMachine;
-    private BlockingQueue<Job> jobQueue;
+    private final StateMachine stateMachine;
+    private final BlockingQueue<Job> jobQueue;
+    private final ReplicatorClient client;
     private volatile boolean stop;
+    private CompletableFuture<Void> terminationFuture;
+    private Job shutdownJob;
 
-    public StateMachineCaller(StateMachine stateMachine) {
+
+    StateMachineCaller(StateMachine stateMachine, ReplicatorClient client) {
         this.stop = false;
         this.stateMachine = stateMachine;
+        this.client = client;
         this.jobQueue = new ArrayBlockingQueue<>(1000);
 
     }
 
     public CompletableFuture<Void> applySnapshot(Snapshot snapshot) {
         CompletableFuture<Void> future = new CompletableFuture<>();
+        if (stop) {
+            future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINE_ALREADY_SHUTDOWN));
+        }
 
-        if (!jobQueue.offer(StateMachineJob.newApplySnapshotJob(stateMachine, snapshot, future))) {
+        if (!jobQueue.offer(newApplySnapshotJob(snapshot, future))) {
             future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINE_QUEUE_FULL));
         }
 
@@ -36,7 +44,11 @@ public class StateMachineCaller {
     public CompletableFuture<Void> applyLogs(List<byte[]> logs) {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
-        if (!jobQueue.offer(StateMachineJob.newApplyLogsJob(stateMachine, logs, future))) {
+        if (stop) {
+            future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINE_ALREADY_SHUTDOWN));
+        }
+
+        if (!jobQueue.offer(newApplyLogsJob(logs, future))) {
             future.completeExceptionally(new ReplicatorException(ReplicatorError.ESTATEMACHINE_QUEUE_FULL));
         }
 
@@ -44,25 +56,16 @@ public class StateMachineCaller {
         return future;
     }
 
-    public void start() {
+    void start() {
         Thread woker = new Thread(() -> {
             while (!stop) {
                 try {
                     Job job = jobQueue.take();
                     try {
                         job.run();
+                        job.success();
                     } catch (Throwable ex) {
-                        if (job instanceof StateMachineJob) {
-                            try {
-                                stateMachine.exceptionCaught(ex);
-                            } catch (Exception ex2) {
-                                logger.error("got exception when handling state machine exception", ex2);
-                            }
-                        } else {
-                            throw ex;
-                        }
-                    } finally {
-                        job.done();
+                        handleExecuteJobFailed(job, ex);
                     }
                 } catch (Exception ex) {
                     logger.error("got unexpected exception while running job");
@@ -70,20 +73,39 @@ public class StateMachineCaller {
             }
         });
 
-        woker.setName("StateMachine-Worker");
+        woker.setName("State-Machine-Caller-Worker");
         woker.start();
     }
 
-    public CompletableFuture<Void> shutdown() {
-        CompletableFuture<Void> future = new CompletableFuture<>();
+    private void handleExecuteJobFailed(Job job, Throwable t) {
+        logger.error("process job failed", t);
+        shutdown();
+        job.fail(new ReplicatorException(ReplicatorError.ESTATEMACHINE_EXECUTION_ERROR, t));
+        while ((job = jobQueue.poll()) != null) {
+            if (job != shutdownJob) {
+                job.fail(new ReplicatorException(ReplicatorError.ECLIENT_ALREADY_SHUTDOWN));
+            } else {
+                job.success();
+                assert jobQueue.isEmpty();
+            }
+        }
+        client.shutdown();
+    }
+
+    synchronized CompletableFuture<Void> shutdown() {
+        if (stop) {
+            return terminationFuture;
+        }
+
+        terminationFuture = new CompletableFuture<>();
 
         stop = true;
 
-        Job shutdownJob = new ReplicatorClientInternalJob(() -> {
+        shutdownJob = new ReplicatorClientInternalJob(() -> {
             // do nothing. Because it is only used as a mark which
             // indicate every job before is executed. So we can
             // shutdown safely.
-        }, future);
+        }, terminationFuture);
 
         if (!jobQueue.offer(shutdownJob)) {
             Thread shutdownHelper = new Thread(() -> {
@@ -96,14 +118,14 @@ public class StateMachineCaller {
                     }
                 } while (!jobQueue.offer(shutdownJob));
             });
-            shutdownHelper.setName("StateMachine-Shutdown-Helper");
+            shutdownHelper.setName("State-Machine-Caller-Shutdown-Helper");
             shutdownHelper.start();
         }
 
-        return future;
+        return terminationFuture;
     }
 
-    private static class Job implements Runnable {
+    private class Job implements Runnable {
         private Runnable job;
         private CompletableFuture<Void> future;
 
@@ -117,26 +139,30 @@ public class StateMachineCaller {
             job.run();
         }
 
-        void done() {
+        void fail(ReplicatorException ex) {
+            future.completeExceptionally(ex);
+        }
+
+        void success() {
             future.complete(null);
         }
     }
 
-    private static class StateMachineJob extends Job {
+    private class StateMachineJob extends Job {
         StateMachineJob(Runnable job, CompletableFuture<Void> future) {
             super(job, future);
         }
-
-        static StateMachineJob newApplySnapshotJob(StateMachine stateMachine, Snapshot snapshot, CompletableFuture<Void> future) {
-            return new StateMachineJob(() -> stateMachine.snapshot(snapshot.toByteArray()), future);
-        }
-
-        static StateMachineJob newApplyLogsJob(StateMachine stateMachine, List<byte[]> logs, CompletableFuture<Void> future) {
-            return new StateMachineJob(() -> stateMachine.apply(logs), future);
-        }
     }
 
-    private static class ReplicatorClientInternalJob extends Job {
+    private StateMachineJob newApplySnapshotJob(Snapshot snapshot, CompletableFuture<Void> future) {
+        return new StateMachineJob(() -> stateMachine.snapshot(snapshot.toByteArray()), future);
+    }
+
+    private StateMachineJob newApplyLogsJob(List<byte[]> logs, CompletableFuture<Void> future) {
+        return new StateMachineJob(() -> stateMachine.apply(logs), future);
+    }
+
+    private class ReplicatorClientInternalJob extends Job {
         ReplicatorClientInternalJob(Runnable job, CompletableFuture<Void> future) {
             super(job, future);
         }

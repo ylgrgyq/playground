@@ -11,7 +11,10 @@ public enum ReplicatorError {
 
     ESTATEMACHINE_QUEUE_FULL(10004, "State machine queue full"),
 
-    ECLIENT_ALREADY_SHUTDOWN(10005, "Client already shutdown")
+    ECLIENT_ALREADY_SHUTDOWN(10005, "Client already shutdown"),
+
+    ESTATEMACHINE_ALREADY_SHUTDOWN(10006, "State machine already shutdown"),
+    ESTATEMACHINE_EXECUTION_ERROR(10007, "State machine execution error")
     ;
 
 

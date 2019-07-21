@@ -31,6 +31,7 @@ public class ReplicatorClient {
     private Channel channel;
     private String topic;
     private StateMachineCaller stateMachineCaller;
+    private CompletableFuture<Void> terminationFuture;
     private long lastIndex;
 
     public ReplicatorClient(String topic, StateMachine stateMachine, ReplicatorClientOptions options) {
@@ -40,7 +41,7 @@ public class ReplicatorClient {
         this.group = new NioEventLoopGroup();
         this.stop = false;
         this.lastIndex = Long.MIN_VALUE;
-        this.stateMachineCaller = new StateMachineCaller(stateMachine);
+        this.stateMachineCaller = new StateMachineCaller(stateMachine, this);
     }
 
     public CompletableFuture<Void> start() {
@@ -129,10 +130,14 @@ public class ReplicatorClient {
         }
     }
 
-    public CompletableFuture<Void> shutdown() {
-        CompletableFuture<Void> terminateFuture = new CompletableFuture<>();
+    public synchronized CompletableFuture<Void> shutdown() {
+        if (stop) {
+            return terminationFuture;
+        }
 
         stop = true;
+        terminationFuture = new CompletableFuture<>();
+
         if (channel != null) {
             channel.close();
         }
@@ -142,16 +147,16 @@ public class ReplicatorClient {
                 stateMachineCaller.shutdown()
                         .whenComplete((ret, ex) -> {
                            if (ex != null) {
-                               terminateFuture.completeExceptionally(ex);
+                               terminationFuture.completeExceptionally(ex);
                            } else {
-                               terminateFuture.complete(null);
+                               terminationFuture.complete(null);
                            }
                         });
             } else {
-                terminateFuture.completeExceptionally(f.cause());
+                terminationFuture.completeExceptionally(f.cause());
             }
         });
 
-        return terminateFuture;
+        return terminationFuture;
     }
 }

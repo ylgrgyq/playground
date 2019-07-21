@@ -8,8 +8,9 @@ public class ReplicatorException extends RuntimeException {
         this.error = error;
     }
 
-    public ReplicatorException(String message, Throwable cause) {
-        super(message, cause);
+    public ReplicatorException(ReplicatorError error, Throwable cause) {
+        super(cause);
+        this.error = error;
     }
 
     public ReplicatorException(Throwable cause) {
