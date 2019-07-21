@@ -76,18 +76,19 @@ public class NettyReplicatorClient {
         });
 
         bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000);
+        logger.info("start connecting to {}:{}...", options.getHost(), options.getPort());
         bootstrap.connect(options.getHost(), options.getPort()).addListener((ChannelFuture f) -> {
             if (f.isSuccess()) {
                 channel = f.channel();
                 channel.closeFuture().addListener(closeFuture -> {
-                    logger.info("connection broken");
+                    logger.info("connection with {}:{} broken.", options.getHost(), options.getPort());
                     long nextIndex = clientHandler.getLastIndex();
                     if (nextIndex > lastIndex) {
                         lastIndex = nextIndex;
                     }
                     scheduleReconnect(channel.eventLoop());
                 });
-                logger.info("connect succeed");
+                logger.info("connection with {}:{} succeed.", options.getHost(), options.getPort());
                 future.complete(null);
             } else {
                 future.completeExceptionally(f.cause());
@@ -99,12 +100,12 @@ public class NettyReplicatorClient {
 
     private void scheduleReconnect(EventLoop loop) {
         if (!stop) {
-            logger.info("reconnect in {} seconds", options.getReconnectDelaySeconds());
+            logger.info("reconnect to {}:{} in {} seconds.", options.getHost(),
+                    options.getPort(), options.getReconnectDelaySeconds());
             loop.schedule(() -> {
                 if (!stop) {
                     CompletableFuture<Void> reconnectFuture;
                     try {
-                        logger.info("start reconnecting...");
                         reconnectFuture = connect();
                     } catch (Exception ex) {
                         reconnectFuture = new CompletableFuture<>();
@@ -113,7 +114,7 @@ public class NettyReplicatorClient {
 
                     reconnectFuture.whenComplete((ret, t) -> {
                         if (t != null) {
-                            logger.error("reconnect failed", t);
+                            logger.error("reconnect to {}:{} failed.", options.getHost(), options.getPort(), t);
                             scheduleReconnect(loop);
                         }
                     });
