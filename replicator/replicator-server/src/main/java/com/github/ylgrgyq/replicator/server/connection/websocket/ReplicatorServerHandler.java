@@ -34,7 +34,7 @@ public class ReplicatorServerHandler extends SimpleChannelInboundHandler<Replica
 
                     Sequence seq = groups.getSequence(topic);
                     if (seq == null) {
-                        seq = groups.createSequence(topic, new SequenceOptions());
+                        channel.writeError(ReplicatorError.ETOPIC_NOT_FOUND);
                     }
 
                     replica.onStart(topic, seq);

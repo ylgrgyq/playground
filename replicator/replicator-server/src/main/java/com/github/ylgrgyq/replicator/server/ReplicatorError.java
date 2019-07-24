@@ -3,12 +3,20 @@ package com.github.ylgrgyq.replicator.server;
 public enum ReplicatorError {
     UNKNOWN(-1, "Unknown error"),
 
-    ENEEDCATCHUP(10001, "Please fetch recent snapshot to catch up"),
+    ENEED_CATCHUP(10001, "Please fetch recent snapshot to catch up"),
+    EUNKNOWN_PROTOCOL(10002, "Unknown protocol"),
 
-    EUNKNOWNPROTOCOL(10002, "Unknown protocol"),
+    ENEEDHAND_SHAKE(10003, "Need handshake first, then send other requests"),
 
-    ENEEDHANDSHAKE(10003, "Need handshake first, then send other requests"),
-    ;
+    ESTATEMACHINE_QUEUE_FULL(10004, "State machine queue full"),
+
+    ECLIENT_ALREADY_SHUTDOWN(10005, "Client already shutdown"),
+
+    ESTATEMACHINE_ALREADY_SHUTDOWN(10006, "State machine already shutdown"),
+    ESTATEMACHINE_EXECUTION_ERROR(10007, "State machine execution error"),
+
+    ETOPIC_NOT_FOUND(10008, "Topic not found, please create it first");
+
 
 
     private int errorCode;

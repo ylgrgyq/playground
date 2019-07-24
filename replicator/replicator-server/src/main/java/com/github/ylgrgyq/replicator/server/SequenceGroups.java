@@ -21,8 +21,8 @@ public class SequenceGroups {
         return oldSequence;
     }
 
-    public synchronized void deleteSequence(String topic) {
-        topicToSource.remove(topic);
+    public synchronized boolean deleteSequence(String topic) {
+        return topicToSource.remove(topic) != null;
     }
 
     public synchronized Sequence replaceSnapshotGenerator(String topic, SequenceOptions options) {

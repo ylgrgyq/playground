@@ -18,7 +18,6 @@ public class RocksDbStorageTest {
 
     @Before
     public void setUp() throws Exception {
-
         String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
                 File.separator + "replicator_server_test_" + System.nanoTime();
         testingDir = new File(tempDir);

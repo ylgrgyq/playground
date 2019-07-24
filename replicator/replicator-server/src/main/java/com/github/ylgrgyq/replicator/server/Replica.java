@@ -59,7 +59,7 @@ public class Replica implements ReplicateRequestHandler {
         if (handshaked.get()) {
             return true;
         } else {
-            channel.writeError(ReplicatorError.ENEEDHANDSHAKE);
+            channel.writeError(ReplicatorError.ENEEDHAND_SHAKE);
             return false;
         }
     }

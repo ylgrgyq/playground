@@ -43,12 +43,12 @@ public class RocksDbStorage implements Storage {
     }
 
     @Override
-    public void init() {
+    public boolean init() {
         writeLock.lock();
         try {
-            if (this.db != null) {
+            if (db != null) {
                 logger.warn("RocksDbStorage already init.");
-                return;
+                return true;
             }
 
             dbOptions = new DBOptions();
@@ -76,18 +76,21 @@ public class RocksDbStorage implements Storage {
 
             final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
 
-            final File dir = new File(this.path);
+            final File dir = new File(path);
             if (dir.exists() && !dir.isDirectory()) {
-                throw new IllegalStateException("Invalid log path, it's a regular file: " + this.path);
+                throw new IllegalStateException("Invalid log path, it's a regular file: " + path);
             }
-            this.db = RocksDB.open(this.dbOptions, this.path, columnFamilyDescriptors, columnFamilyHandles);
+            db = RocksDB.open(dbOptions, path, columnFamilyDescriptors, columnFamilyHandles);
 
-            this.defaultHandle = columnFamilyHandles.get(0);
-        } catch (final RocksDBException e) {
-            logger.error("Fail to init RocksDBLogStorage, path={}", this.path, e);
+            defaultHandle = columnFamilyHandles.get(0);
+            return true;
+        } catch (final RocksDBException ex) {
+            logger.error("Init RocksDb on path {} failed", path, ex);
         } finally {
             writeLock.unlock();
         }
+
+        return false;
     }
 
     @Override

@@ -13,12 +13,12 @@ public class MemoryStorageTest {
     @Test
     public void append() {
         MemoryStorage storage = new MemoryStorage("topic");
-        assertEquals(-1, storage.getFirstIndex());
-        assertEquals(-1, storage.getLastIndex());
+        assertEquals(-1, storage.getFirstLogId());
+        assertEquals(-1, storage.getLastLogId());
 
         storage.append(0, "1".getBytes(StandardCharsets.UTF_8));
-        assertEquals(0, storage.getFirstIndex());
-        assertEquals(0, storage.getLastIndex());
+        assertEquals(0, storage.getFirstLogId());
+        assertEquals(0, storage.getLastLogId());
         List<LogEntry> entries = storage.getEntries(-1, 100);
         assertEquals(1, entries.size());
         LogEntry entry = entries.get(0);
@@ -27,16 +27,16 @@ public class MemoryStorageTest {
         assertEquals("1", entry.getData().toStringUtf8());
 
         storage.append(1, "2".getBytes(StandardCharsets.UTF_8));
-        assertEquals(0, storage.getFirstIndex());
-        assertEquals(1, storage.getLastIndex());
+        assertEquals(0, storage.getFirstLogId());
+        assertEquals(1, storage.getLastLogId());
 
         storage.append(2, "3".getBytes(StandardCharsets.UTF_8));
-        assertEquals(0, storage.getFirstIndex());
-        assertEquals(2, storage.getLastIndex());
+        assertEquals(0, storage.getFirstLogId());
+        assertEquals(2, storage.getLastLogId());
 
         storage.append(3, "4".getBytes(StandardCharsets.UTF_8));
-        assertEquals(0, storage.getFirstIndex());
-        assertEquals(3, storage.getLastIndex());
+        assertEquals(0, storage.getFirstLogId());
+        assertEquals(3, storage.getLastLogId());
     }
 
     @Test
@@ -70,17 +70,17 @@ public class MemoryStorageTest {
             storage.append(10, "4".getBytes(StandardCharsets.UTF_8));
             storage.trimToId(i);
             if (i < 0) {
-                assertEquals(0, storage.getFirstIndex());
-                assertEquals(3, storage.getLastIndex());
+                assertEquals(0, storage.getFirstLogId());
+                assertEquals(3, storage.getLastLogId());
             } else if (i < 5) {
-                assertEquals(1, storage.getFirstIndex());
-                assertEquals(3, storage.getLastIndex());
+                assertEquals(1, storage.getFirstLogId());
+                assertEquals(3, storage.getLastLogId());
             } else if (i < 7) {
-                assertEquals(2, storage.getFirstIndex());
-                assertEquals(3, storage.getLastIndex());
+                assertEquals(2, storage.getFirstLogId());
+                assertEquals(3, storage.getLastLogId());
             } else {
-                assertEquals(3, storage.getFirstIndex());
-                assertEquals(3, storage.getLastIndex());
+                assertEquals(3, storage.getFirstLogId());
+                assertEquals(3, storage.getLastLogId());
             }
         }
     }

@@ -4,12 +4,15 @@ import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.proto.SyncLogEntries;
 import com.github.ylgrgyq.replicator.server.storage.MemoryStorage;
+import com.github.ylgrgyq.replicator.server.storage.RocksDbStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -18,15 +21,20 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class Sequence {
     private static final Logger logger = LoggerFactory.getLogger(Sequence.class);
 
-    private final Snapshot emptySnapshot;
+    private static final Snapshot emptySnapshot;
+
+    static {
+        Snapshot.Builder builder = Snapshot.newBuilder();
+        builder.setId(0);
+        emptySnapshot = builder.build();
+    }
+
     private String topic;
     private Storage storage;
-    private SnapshotGenerator snapshotGenerator;
+    private final SnapshotGenerator snapshotGenerator;
     private Snapshot lastSnapshot;
-    private long maxPendingLogSize;
-    private long lastGenerateSnapshotNanos;
     private SequenceOptions options;
-    private ExecutorService executor;
+    private ScheduledExecutorService executor;
     private Lock readLock;
     private Lock writeLock;
     private AtomicBoolean generateSnapshotJobScheduled;
@@ -34,14 +42,8 @@ public class Sequence {
     public Sequence(String topic, SequenceOptions options) {
         this.topic = topic;
         this.options = options;
-        Snapshot.Builder builder = Snapshot.newBuilder();
-        builder.setTopic(topic);
-        builder.setId(-1);
-        this.emptySnapshot = builder.build();
-
         this.snapshotGenerator = options.getSnapshotGenerator();
-        this.storage = new MemoryStorage(topic);
-        this.maxPendingLogSize = options.getMaxPendingLogSize();
+        this.storage = new RocksDbStorage(options.getStoragePath());
         this.executor = options.getSequenceExecutor();
         this.generateSnapshotJobScheduled = new AtomicBoolean(false);
 
@@ -51,20 +53,22 @@ public class Sequence {
     }
 
     public void init() {
-        storage.init();
-    }
-
-    public void append(long id, byte[] data) {
-        writeLock.lock();
-        try {
-            storage.append(id, data);
-        } finally {
-            writeLock.unlock();
+        if (executor != null && snapshotGenerator != null) {
+            scheduleGenerateSnapshot();
         }
     }
 
-    public SyncLogEntries syncLogs(long fromIndex, int limit) {
-        List<LogEntry> entries = storage.getEntries(fromIndex, limit);
+    public void append(long id, byte[] data) {
+        readLock.lock();
+        try {
+            storage.append(id, data);
+        } finally {
+            readLock.unlock();
+        }
+    }
+
+    public SyncLogEntries syncLogs(long fromId, int limit) {
+        List<LogEntry> entries = storage.getEntries(fromId, limit);
 
         SyncLogEntries.Builder builder = SyncLogEntries.newBuilder();
         builder.addAllEntries(entries);
@@ -80,25 +84,26 @@ public class Sequence {
         } finally {
             readLock.unlock();
         }
-        
+
         return emptySnapshot;
     }
 
-//    private void scheduleGenerateSnapshot() {
-//        if (generateSnapshotJobScheduled.compareAndSet(false, true)) {
-//            executor.submit(() -> {
-//                Snapshot snapshot = snapshotGenerator.generateSnapshot();
-//                writeLock.lock();
-//                lastGenerateSnapshotNanos = System.nanoTime();
-//                try {
-//                    storage.trimToId(lastSnapshot.getId());
-//                    lastSnapshot = snapshot;
-//                    pendingSize = storage.pendingLogSize();
-//                    generateSnapshotJobScheduled.set(false);
-//                } finally {
-//                    writeLock.unlock();
-//                }
-//            });
-//        }
-//    }
+    private void scheduleGenerateSnapshot() {
+        executor.scheduleWithFixedDelay(() -> {
+            if (generateSnapshotJobScheduled.compareAndSet(false, true)) {
+                Snapshot snapshot = snapshotGenerator.generateSnapshot();
+                writeLock.lock();
+                try {
+                    storage.trimToId(lastSnapshot.getId());
+                    lastSnapshot = snapshot;
+                    generateSnapshotJobScheduled.set(false);
+                } finally {
+                    writeLock.unlock();
+                    generateSnapshotJobScheduled.set(false);
+                }
+            } else {
+                logger.warn("");
+            }
+        }, options.getGenerateSnapshotIntervalSecs(), options.getGenerateSnapshotIntervalSecs(), TimeUnit.SECONDS);
+    }
 }
