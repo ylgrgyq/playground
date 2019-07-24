@@ -21,7 +21,6 @@ public class Sequence {
     private final Snapshot emptySnapshot;
     private String topic;
     private Storage storage;
-    private long pendingSize;
     private SnapshotGenerator snapshotGenerator;
     private Snapshot lastSnapshot;
     private long maxPendingLogSize;
@@ -59,19 +58,9 @@ public class Sequence {
         writeLock.lock();
         try {
             storage.append(id, data);
-            pendingSize = pendingSize + data.length;
-
-            if (isNeedGenerateNewSnapshot()) {
-                scheduleGenerateSnapshot();
-            }
         } finally {
             writeLock.unlock();
         }
-    }
-
-    private boolean isNeedGenerateNewSnapshot() {
-        return pendingSize >= maxPendingLogSize ||
-                (System.nanoTime() - lastGenerateSnapshotNanos) >= options.getMaxSnapshotInterval();
     }
 
     public SyncLogEntries syncLogs(long fromIndex, int limit) {
@@ -95,21 +84,21 @@ public class Sequence {
         return emptySnapshot;
     }
 
-    private void scheduleGenerateSnapshot() {
-        if (generateSnapshotJobScheduled.compareAndSet(false, true)) {
-            executor.submit(() -> {
-                Snapshot snapshot = snapshotGenerator.generateSnapshot();
-                writeLock.lock();
-                lastGenerateSnapshotNanos = System.nanoTime();
-                try {
-                    storage.trimToId(lastSnapshot.getId());
-                    lastSnapshot = snapshot;
-                    pendingSize = storage.pendingLogSize();
-                    generateSnapshotJobScheduled.set(false);
-                } finally {
-                    writeLock.unlock();
-                }
-            });
-        }
-    }
+//    private void scheduleGenerateSnapshot() {
+//        if (generateSnapshotJobScheduled.compareAndSet(false, true)) {
+//            executor.submit(() -> {
+//                Snapshot snapshot = snapshotGenerator.generateSnapshot();
+//                writeLock.lock();
+//                lastGenerateSnapshotNanos = System.nanoTime();
+//                try {
+//                    storage.trimToId(lastSnapshot.getId());
+//                    lastSnapshot = snapshot;
+//                    pendingSize = storage.pendingLogSize();
+//                    generateSnapshotJobScheduled.set(false);
+//                } finally {
+//                    writeLock.unlock();
+//                }
+//            });
+//        }
+//    }
 }

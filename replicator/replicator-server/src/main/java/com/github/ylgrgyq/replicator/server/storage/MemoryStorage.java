@@ -1,7 +1,6 @@
 package com.github.ylgrgyq.replicator.server.storage;
 
 import com.github.ylgrgyq.replicator.proto.LogEntry;
-import com.github.ylgrgyq.replicator.server.Sequence;
 import com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +34,7 @@ public class MemoryStorage implements Storage {
     }
 
     @Override
-    public long getFirstIndex() {
+    public long getFirstLogId() {
         readLock.lock();
         try {
             if (datas.isEmpty()) {
@@ -49,20 +48,10 @@ public class MemoryStorage implements Storage {
     }
 
     @Override
-    public long getLastIndex() {
+    public long getLastLogId() {
         readLock.lock();
         try {
             return offsetIndex + datas.size();
-        } finally {
-            readLock.unlock();
-        }
-    }
-
-    @Override
-    public long pendingLogSize() {
-        readLock.lock();
-        try {
-            return datas.stream().mapToInt(d -> d.getData().size()).sum();
         } finally {
             readLock.unlock();
         }
@@ -133,5 +122,10 @@ public class MemoryStorage implements Storage {
         } finally {
             writeLock.unlock();
         }
+    }
+
+    @Override
+    public void shutdown() {
+
     }
 }

@@ -7,10 +7,10 @@ import java.util.List;
 
 public interface Storage {
     void init();
-    long getFirstIndex();
-    long getLastIndex();
+    long getFirstLogId();
+    long getLastLogId();
     void append(long id, byte[] data);
-    List<LogEntry> getEntries(long fromIndex, int limit);
-    long pendingLogSize();
-    void trimToId(long index);
+    List<LogEntry> getEntries(long fromId, int limit);
+    void trimToId(long id);
+    void shutdown();
 }
