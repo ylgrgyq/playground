@@ -1,6 +1,7 @@
 package com.github.ylgrgyq.replicator.server.storage;
 
 import com.github.ylgrgyq.replicator.proto.LogEntry;
+import com.github.ylgrgyq.replicator.server.storage.rocksdb.RocksDbStorage;
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;

@@ -3,14 +3,11 @@ package com.github.ylgrgyq.replicator.server;
 import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.proto.SyncLogEntries;
-import com.github.ylgrgyq.replicator.server.storage.MemoryStorage;
-import com.github.ylgrgyq.replicator.server.storage.RocksDbStorage;
-import com.github.ylgrgyq.replicator.server.storage.Storage;
+import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,7 +27,7 @@ public class Sequence {
     }
 
     private String topic;
-    private Storage storage;
+    private SequenceStorage storage;
     private final SnapshotGenerator snapshotGenerator;
     private Snapshot lastSnapshot;
     private SequenceOptions options;
@@ -39,11 +36,11 @@ public class Sequence {
     private Lock writeLock;
     private AtomicBoolean generateSnapshotJobScheduled;
 
-    public Sequence(String topic, SequenceOptions options) {
+    public Sequence(String topic, SequenceStorage sequenceStorage, SequenceOptions options) {
         this.topic = topic;
         this.options = options;
         this.snapshotGenerator = options.getSnapshotGenerator();
-        this.storage = new RocksDbStorage(options.getStoragePath());
+        this.storage = sequenceStorage;
         this.executor = options.getSequenceExecutor();
         this.generateSnapshotJobScheduled = new AtomicBoolean(false);
 
@@ -105,5 +102,9 @@ public class Sequence {
                 logger.warn("");
             }
         }, options.getGenerateSnapshotIntervalSecs(), options.getGenerateSnapshotIntervalSecs(), TimeUnit.SECONDS);
+    }
+
+    public void shutdown(){
+        storage.shutdown();
     }
 }

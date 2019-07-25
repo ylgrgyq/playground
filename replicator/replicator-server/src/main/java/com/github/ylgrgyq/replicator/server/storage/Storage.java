@@ -2,16 +2,18 @@ package com.github.ylgrgyq.replicator.server.storage;
 
 
 import com.github.ylgrgyq.replicator.proto.LogEntry;
+import com.github.ylgrgyq.replicator.server.SequenceOptions;
 
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
-public interface Storage {
+public interface Storage<T extends StorageHandle> {
     boolean init();
-    long getFirstLogId();
-    long getLastLogId();
-    void append(long id, byte[] data);
-    List<LogEntry> getEntries(long fromId, int limit);
-    void trimToId(long id);
+    SequenceStorage createSequenceStorage(String topic, SequenceOptions options);
+    void append(T handle, long id, byte[] data);
+    List<LogEntry> getEntries(T handle, long fromId, int limit);
+    long trimToId(T handle, long id);
     void shutdown();
+
+    long getFirstLogId(T handle);
+    long getLastLogId(T handle);
 }

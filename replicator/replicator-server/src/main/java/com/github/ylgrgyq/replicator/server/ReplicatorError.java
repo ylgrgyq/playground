@@ -15,7 +15,11 @@ public enum ReplicatorError {
     ESTATEMACHINE_ALREADY_SHUTDOWN(10006, "State machine already shutdown"),
     ESTATEMACHINE_EXECUTION_ERROR(10007, "State machine execution error"),
 
-    ETOPIC_NOT_FOUND(10008, "Topic not found, please create it first");
+    ETOPIC_NOT_FOUND(10008, "Topic not found, please create it first"),
+
+    EINTERNAL_ERROR(10009, "Internal error"),
+
+    ;
 
 
 

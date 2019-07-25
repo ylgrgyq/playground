@@ -3,7 +3,6 @@ package com.github.ylgrgyq.replicator.example.server;
 import com.github.ylgrgyq.replicator.server.*;
 import com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicateChannel;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
-import com.github.ylgrgyq.replicator.server.storage.RocksDbStorage;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,18 +31,22 @@ public class ReplicatorServer {
         }
 
         new Thread(() -> {
-            SequenceAppender appender = server.createSequence("hahaha", new SequenceOptions());
-            for (int i = 0; i < 10000; ++i) {
-                String msg = "wahaha-" + i;
-                appender.append(i, msg.getBytes(StandardCharsets.UTF_8));
-                try {
+            try {
+                SequenceAppender appender = server.createSequence("hahaha", new SequenceOptions());
+                for (int i = 0; i < 10000; ++i) {
+                    String msg = "wahaha-" + i;
+                    appender.append(i, msg.getBytes(StandardCharsets.UTF_8));
+                    try {
 //                        Thread.sleep(1000);
-                } catch (Exception ex) {
-                    logger.error("exception", ex);
+                    } catch (Exception ex) {
+                        logger.error("exception", ex);
+                    }
                 }
-            }
 
-            logger.info("generate log done {}");
+                logger.info("generate log done {}");
+            } catch (Exception ex) {
+                logger.error("Replicator server append logs failed", ex);
+            }
         }).start();
 
     }

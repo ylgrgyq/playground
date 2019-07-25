@@ -1,8 +1,11 @@
-package com.github.ylgrgyq.replicator.server.storage;
+package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
 import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.server.Preconditions;
-import com.google.protobuf.ByteString;
+import com.github.ylgrgyq.replicator.server.SequenceOptions;
+import com.github.ylgrgyq.replicator.server.storage.Bits;
+import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
+import com.github.ylgrgyq.replicator.server.storage.Storage;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.rocksdb.*;
 import org.rocksdb.util.SizeUnit;
@@ -10,29 +13,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class RocksDbStorage implements Storage {
+public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbStorage.class);
 
     private RocksDB db;
     private WriteOptions writeOptions;
     private ReadOptions totalOrderReadOptions;
     private DBOptions dbOptions;
-    private final List<ColumnFamilyOptions> cfOptions = new ArrayList<>();
+    private final List<ColumnFamilyOptions> cfOptions;
     private ColumnFamilyHandle defaultHandle;
     private String path;
 
     private final ReadWriteLock lock = new ReentrantReadWriteLock(false);
     private final Lock readLock = lock.readLock();
     private final Lock writeLock = lock.writeLock();
-    private volatile long firstLogId = 1;
-
-    private volatile boolean hasLoadFirstLogId;
 
     static {
         RocksDB.loadLibrary();
@@ -40,6 +41,7 @@ public class RocksDbStorage implements Storage {
 
     public RocksDbStorage(String path) {
         this.path = path;
+        this.cfOptions = new ArrayList<>();
     }
 
     @Override
@@ -82,10 +84,12 @@ public class RocksDbStorage implements Storage {
             }
             db = RocksDB.open(dbOptions, path, columnFamilyDescriptors, columnFamilyHandles);
 
+            assert columnFamilyHandles.size() > 0;
             defaultHandle = columnFamilyHandles.get(0);
             return true;
         } catch (final RocksDBException ex) {
             logger.error("Init RocksDb on path {} failed", path, ex);
+            shutdown();
         } finally {
             writeLock.unlock();
         }
@@ -98,21 +102,10 @@ public class RocksDbStorage implements Storage {
         writeLock.lock();
         try {
             // The shutdown order is matter.
-            // 1. close column family handles
+            // 1. close db and column family handles
             closeDB();
-            // 2. close column family options.
-            for (final ColumnFamilyOptions opt : this.cfOptions) {
-                opt.close();
-            }
-            // 3. close options
-            this.writeOptions.close();
-            this.totalOrderReadOptions.close();
-            // 4. help gc.
-            this.cfOptions.clear();
-            this.db = null;
-            this.totalOrderReadOptions = null;
-            this.writeOptions = null;
-            this.defaultHandle = null;
+            // 2. close internal options.
+            closeOptions();
         } finally {
             writeLock.unlock();
         }
@@ -120,61 +113,92 @@ public class RocksDbStorage implements Storage {
     }
 
     private void closeDB() {
-        this.defaultHandle.close();
-        this.db.close();
+        if (defaultHandle != null) {
+            defaultHandle.close();
+            defaultHandle = null;
+        }
+
+        if (db != null) {
+            db.close();
+            db = null;
+        }
+    }
+
+    private void closeOptions() {
+        // 1. close column family options.
+        for (final ColumnFamilyOptions opt : cfOptions) {
+            opt.close();
+        }
+        cfOptions.clear();
+
+        // 2. close write/read options
+        if (writeOptions != null) {
+            writeOptions.close();
+            writeOptions = null;
+        }
+
+        if (totalOrderReadOptions != null) {
+            totalOrderReadOptions.close();
+            totalOrderReadOptions = null;
+        }
     }
 
     @Override
-    public long getFirstLogId() {
-        readLock.lock();
+    public SequenceStorage createSequenceStorage(String topic, SequenceOptions options) {
+        writeLock.lock();
+        ColumnFamilyOptions columnOptions = new ColumnFamilyOptions();
         try {
-            if (hasLoadFirstLogId) {
-                return firstLogId;
-            }
+            cfOptions.add(columnOptions);
 
-            try (final RocksIterator it = db.newIterator(defaultHandle, totalOrderReadOptions)) {
-                it.seekToFirst();
-                if (it.isValid()) {
-                    final long ret = Bits.getLong(it.key(), 0);
-                    setFirstLogId(ret);
-                    return ret;
-                }
-                return 0L;
+            ColumnFamilyDescriptor desp = new ColumnFamilyDescriptor(topic.getBytes(StandardCharsets.UTF_8), columnOptions);
+            ColumnFamilyHandle handle = db.createColumnFamily(desp);
+            RocksDbStorageHandle storageHandle = new RocksDbStorageHandle(handle);
+            return new RocksDbSequenceStorage(this, storageHandle);
+        } catch (RocksDBException ex) {
+            logger.error("create sequence storage on topic {} failed", topic, ex);
+            columnOptions.close();
+        } finally {
+            writeLock.unlock();
+        }
+
+        return null;
+    }
+
+    @Override
+    public long getFirstLogId(RocksDbStorageHandle handle) {
+        readLock.lock();
+        try (final RocksIterator it = db.newIterator(handle.getColumnFailyHandle(), totalOrderReadOptions)) {
+            it.seekToFirst();
+            if (it.isValid()) {
+                return Bits.getLong(it.key(), 0);
             }
+            return 0L;
         } finally {
             readLock.unlock();
         }
     }
 
-    private void setFirstLogId(long id) {
-        this.firstLogId = id;
-        this.hasLoadFirstLogId = true;
-    }
-
     @Override
-    public long getLastLogId() {
+    public long getLastLogId(RocksDbStorageHandle handle) {
         readLock.lock();
-        try (final RocksIterator it = db.newIterator(defaultHandle, totalOrderReadOptions)) {
+        try (final RocksIterator it = db.newIterator(handle.getColumnFailyHandle(), totalOrderReadOptions)) {
             it.seekToLast();
             if (it.isValid()) {
                 return Bits.getLong(it.key(), 0);
             }
-            return getFirstLogId();
+            return 0;
         } finally {
             readLock.unlock();
         }
     }
 
     @Override
-    public void append(long id, byte[] data) {
+    public void append(RocksDbStorageHandle handle, long id, byte[] data) {
         Preconditions.checkArgument(id > 0);
 
         readLock.lock();
         try {
-            LogEntry.Builder builder = LogEntry.newBuilder();
-            builder.setData(ByteString.copyFrom(data));
-            builder.setId(id);
-            db.put(defaultHandle, getKeyBytes(id), builder.build().toByteArray());
+            db.put(handle.getColumnFailyHandle(), getKeyBytes(id), data);
         } catch (final RocksDBException e) {
             logger.error("Fail to append entry", e);
         } finally {
@@ -189,14 +213,14 @@ public class RocksDbStorage implements Storage {
     }
 
     @Override
-    public List<LogEntry> getEntries(long fromId, int limit) {
+    public List<LogEntry> getEntries(RocksDbStorageHandle handle, long fromId, int limit) {
         readLock.lock();
 
         try {
             fromId = Math.max(fromId, 0);
 
             List<LogEntry> entries = new ArrayList<>(limit);
-            RocksIterator it = db.newIterator(defaultHandle, totalOrderReadOptions);
+            RocksIterator it = db.newIterator(handle.getColumnFailyHandle(), totalOrderReadOptions);
             for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
                 try {
                     LogEntry entry = LogEntry.parseFrom(it.value());
@@ -212,19 +236,20 @@ public class RocksDbStorage implements Storage {
     }
 
     @Override
-    public void trimToId(long firstIdToKeep) {
+    public long trimToId(RocksDbStorageHandle handle, long firstIdToKeep) {
         readLock.lock();
         try {
-            final long startId = getFirstLogId();
+            final long startId = getFirstLogId(handle);
             if (firstIdToKeep > startId) {
-                RocksIterator it = db.newIterator(defaultHandle, totalOrderReadOptions);
+                RocksIterator it = db.newIterator(handle.getColumnFailyHandle(), totalOrderReadOptions);
                 it.seek(getKeyBytes(firstIdToKeep));
                 if (it.isValid()) {
                     firstIdToKeep = Bits.getLong(it.key(), 0);
                 }
-                setFirstLogId(firstIdToKeep);
                 truncatePrefixInBackground(startId, firstIdToKeep);
+                return firstIdToKeep;
             }
+            return startId;
         } finally {
             readLock.unlock();
         }

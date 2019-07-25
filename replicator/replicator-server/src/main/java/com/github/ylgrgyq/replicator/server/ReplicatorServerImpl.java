@@ -6,7 +6,6 @@ import com.github.ylgrgyq.replicator.server.connection.websocket.ReplicatorServe
 import com.github.ylgrgyq.replicator.server.storage.Storage;
 import com.github.ylgrgyq.replicator.server.storage.StorageFactory;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
@@ -20,9 +19,6 @@ import io.netty.handler.timeout.IdleStateHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-
 public class ReplicatorServerImpl implements ReplicatorServer{
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorServer.class);
 
@@ -30,7 +26,7 @@ public class ReplicatorServerImpl implements ReplicatorServer{
     private ReplicatorServerOptions options;
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
-    private Storage storage;
+    private Storage<?> storage;
 
     public ReplicatorServerImpl(ReplicatorServerOptions options) {
         this.groups = new SequenceGroups();
@@ -62,7 +58,7 @@ public class ReplicatorServerImpl implements ReplicatorServer{
             bootstrap.group(bossGroup, workerGroup);
             bootstrap.childHandler(new ChannelInitializer<SocketChannel>() {
                 @Override
-                protected void initChannel(SocketChannel serverChannel) throws Exception {
+                protected void initChannel(SocketChannel serverChannel) {
                     ChannelPipeline pipeline = serverChannel.pipeline();
 
                     pipeline.addLast(new IdleStateHandler(30, 0, 0));
@@ -87,7 +83,7 @@ public class ReplicatorServerImpl implements ReplicatorServer{
 
     @Override
     public SequenceAppender createSequence(String topic, SequenceOptions options) {
-        Sequence seq = groups.createSequence(topic, options);
+        Sequence seq = groups.getOrCreateSequence(topic, storage, options);
         return new SequenceAppender(seq);
     }
 
@@ -105,5 +101,9 @@ public class ReplicatorServerImpl implements ReplicatorServer{
         if (options.isShouldShutdownWorkerEventLoopGroup()) {
             workerGroup.shutdownGracefully();
         }
+
+        groups.shutdown();
+
+        storage.shutdown();
     }
 }
