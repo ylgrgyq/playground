@@ -2,7 +2,7 @@ package com.github.ylgrgyq.replicator.server.storage;
 
 import static com.github.ylgrgyq.replicator.server.Preconditions.checkArgument;
 
-public class StorageOptions {
+public final class StorageOptions {
     private final String storagePath;
 
     private StorageOptions(StorageOptionsBuilder builder) {

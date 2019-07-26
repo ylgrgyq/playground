@@ -1,7 +1,6 @@
 package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
 import com.github.ylgrgyq.replicator.proto.LogEntry;
-import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
@@ -15,7 +14,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class RocksDbSequenceStorageTest {
     private Storage storage;
@@ -33,7 +32,7 @@ public class RocksDbSequenceStorageTest {
                 .build();
         storage = new RocksDbStorage(options);
 
-        sequenceStorage = storage.createSequenceStorage("testing_topic", new SequenceOptions());
+        sequenceStorage = storage.createSequenceStorage("testing_topic", SequenceOptions.builder().build());
     }
 
     @After

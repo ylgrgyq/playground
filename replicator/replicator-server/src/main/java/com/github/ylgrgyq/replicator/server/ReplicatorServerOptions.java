@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.github.ylgrgyq.replicator.server.Preconditions.checkArgument;
 
-public class ReplicatorServerOptions {
+public final class ReplicatorServerOptions {
     private final int port;
     private final String host;
     private final EventLoopGroup bossEventLoopGroup;

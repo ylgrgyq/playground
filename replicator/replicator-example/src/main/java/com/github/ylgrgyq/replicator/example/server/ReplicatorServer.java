@@ -36,7 +36,8 @@ public class ReplicatorServer {
 
         new Thread(() -> {
             try {
-                SequenceAppender appender = server.createSequence("hahaha", new SequenceOptions());
+                SequenceOptions sequenceOptions = SequenceOptions.builder().build();
+                SequenceAppender appender = server.createSequence("hahaha", sequenceOptions);
                 for (int i = 1; i < 10000; ++i) {
                     String msg = "wahaha-" + i;
                     logger.info("append {} {}", i, msg);

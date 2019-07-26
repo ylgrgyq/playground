@@ -2,60 +2,67 @@ package com.github.ylgrgyq.replicator.server.sequence;
 
 import com.github.ylgrgyq.replicator.server.SnapshotGenerator;
 
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
+import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-public class SequenceOptions {
-    private SnapshotGenerator snapshotGenerator;
-    private long maxSnapshotInterval = Long.MAX_VALUE;
-    private long maxPendingLogSize;
-    private ScheduledExecutorService sequenceExecutor = Executors.newSingleThreadScheduledExecutor();
-    private String storagePath;
-    private long generateSnapshotIntervalSecs = 10;
+public final class SequenceOptions {
+    private final SnapshotGenerator snapshotGenerator;
+    private final long generateSnapshotIntervalSecs;
+    private final ScheduledExecutorService sequenceExecutor;
 
-    public long getMaxSnapshotInterval() {
-        return maxSnapshotInterval;
+    private SequenceOptions(SequenceOptionsBuilder builder) {
+        this.sequenceExecutor = builder.sequenceExecutor;
+        this.generateSnapshotIntervalSecs = builder.generateSnapshotIntervalSecs;
+        this.snapshotGenerator = builder.snapshotGenerator;
     }
 
     public SnapshotGenerator getSnapshotGenerator() {
         return snapshotGenerator;
     }
 
-    public void setStoragePath(String storagePath) {
-        this.storagePath = storagePath;
-    }
-
-    public String getStoragePath() {
-        return storagePath;
-    }
 
     public long getGenerateSnapshotIntervalSecs() {
         return generateSnapshotIntervalSecs;
     }
 
-    public long getMaxPendingLogSize() {
-        return maxPendingLogSize;
-    }
 
     public ScheduledExecutorService getSequenceExecutor() {
         return sequenceExecutor;
     }
 
-    public void setSnapshotGenerator(SnapshotGenerator snapshotGenerator) {
-        this.snapshotGenerator = snapshotGenerator;
+    public static SequenceOptionsBuilder builder() {
+        return new SequenceOptionsBuilder();
     }
 
-    public void setMaxSnapshotInterval(long maxSnapshotInterval) {
-        this.maxSnapshotInterval = maxSnapshotInterval;
-    }
+    public static class SequenceOptionsBuilder {
+        private long generateSnapshotIntervalSecs = 10;
+        private SnapshotGenerator snapshotGenerator;
+        private ScheduledExecutorService sequenceExecutor = Executors.newSingleThreadScheduledExecutor();
 
-    public void setMaxPendingLogSize(long maxPendingLogSize) {
-        this.maxPendingLogSize = maxPendingLogSize;
-    }
+        public SequenceOptionsBuilder setGenerateSnapshotInterval(long generateSnapshotInterval, TimeUnit unit) {
+            this.generateSnapshotIntervalSecs = unit.toSeconds(generateSnapshotInterval);
+            return this;
+        }
 
-    public void setSequenceExecutor(ScheduledExecutorService sequenceExecutor) {
-        this.sequenceExecutor = sequenceExecutor;
+        public SequenceOptionsBuilder setSnapshotGenerator(SnapshotGenerator snapshotGenerator) {
+            Objects.requireNonNull(snapshotGenerator);
+
+            this.snapshotGenerator = snapshotGenerator;
+            return this;
+        }
+
+        public SequenceOptionsBuilder setSequenceExecutor(ScheduledExecutorService sequenceExecutor) {
+            Objects.requireNonNull(sequenceExecutor);
+
+            this.sequenceExecutor = sequenceExecutor;
+
+            return this;
+        }
+
+        public SequenceOptions build() {
+            return new SequenceOptions(this);
+        }
     }
 }
