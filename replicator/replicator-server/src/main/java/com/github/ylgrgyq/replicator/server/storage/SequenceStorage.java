@@ -5,10 +5,6 @@ import com.github.ylgrgyq.replicator.proto.LogEntry;
 import java.util.List;
 
 public interface SequenceStorage {
-    default boolean init() {
-        return true;
-    }
-
     long getFirstLogId();
 
     long getLastLogId();

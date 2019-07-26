@@ -1,5 +1,6 @@
 package com.github.ylgrgyq.replicator.server;
 
+import com.github.ylgrgyq.replicator.server.storage.StorageOptions;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -12,17 +13,17 @@ import static com.github.ylgrgyq.replicator.server.Preconditions.checkArgument;
 public class ReplicatorServerOptions {
     private final int port;
     private final String host;
-    private final String storagePath;
     private final EventLoopGroup bossEventLoopGroup;
     private final EventLoopGroup workerEventLoopGroup;
     private final boolean shouldShutdownBossEventLoopGroup;
     private final boolean shouldShutdownWorkerEventLoopGroup;
     private final int connectionReadTimeoutSecs;
+    private final StorageOptions storageOptions;
 
     private ReplicatorServerOptions(ReplicatorServerOptionsBuilder builder) {
         this.port = builder.port;
         this.host = builder.host;
-        this.storagePath = builder.storagePath;
+        this.storageOptions = builder.storageOptions;
 
         if (builder.bossEventLoopGroup == null) {
             this.bossEventLoopGroup = createEventLoopGroup(1, builder.preferEpoll);
@@ -57,10 +58,6 @@ public class ReplicatorServerOptions {
         return host;
     }
 
-    public String getStoragePath() {
-        return storagePath;
-    }
-
     public EventLoopGroup getBossEventLoopGroup() {
         return bossEventLoopGroup;
     }
@@ -81,6 +78,10 @@ public class ReplicatorServerOptions {
         return connectionReadTimeoutSecs;
     }
 
+    public StorageOptions getStorageOptions() {
+        return storageOptions;
+    }
+
     public static ReplicatorServerOptionsBuilder builder() {
         return new ReplicatorServerOptionsBuilder();
     }
@@ -88,7 +89,7 @@ public class ReplicatorServerOptions {
     public static class ReplicatorServerOptionsBuilder {
         private int port;
         private String host = "localhost";
-        private String storagePath;
+        private StorageOptions storageOptions;
         private EventLoopGroup bossEventLoopGroup;
         private boolean shouldShutdownBossEventLoopGroup = true;
         private EventLoopGroup workerEventLoopGroup;
@@ -110,34 +111,26 @@ public class ReplicatorServerOptions {
             return this;
         }
 
-        public ReplicatorServerOptionsBuilder setStoragePath(String path) {
-            Objects.requireNonNull(path);
+        public ReplicatorServerOptionsBuilder setStorageOptions(StorageOptions options) {
+            Objects.requireNonNull(options);
 
-            this.storagePath = path;
+            this.storageOptions = options;
             return this;
         }
 
-        public ReplicatorServerOptionsBuilder setBossEventLoopGroup(EventLoopGroup bossEventLoopGroup) {
-            Objects.requireNonNull(bossEventLoopGroup);
+        public ReplicatorServerOptionsBuilder setBossEventLoopGroup(EventLoopGroup eventLoopGroup, boolean shouldShutdownEventLoopGroup) {
+            Objects.requireNonNull(eventLoopGroup);
 
-            this.bossEventLoopGroup = bossEventLoopGroup;
+            this.bossEventLoopGroup = eventLoopGroup;
+            this.shouldShutdownBossEventLoopGroup = shouldShutdownEventLoopGroup;
             return this;
         }
 
-        public ReplicatorServerOptionsBuilder setShouldShutdownBossEventLoopGroup(boolean shouldShutdownBossEventLoopGroup) {
-            this.shouldShutdownBossEventLoopGroup = shouldShutdownBossEventLoopGroup;
-            return this;
-        }
+        public ReplicatorServerOptionsBuilder setWorkerEventLoopGroup(EventLoopGroup eventLoopGroup, boolean shouldShutdownEventLoopGroup) {
+            Objects.requireNonNull(eventLoopGroup);
 
-        public ReplicatorServerOptionsBuilder setWorkerEventLoopGroup(EventLoopGroup workerEventLoopGroup) {
-            Objects.requireNonNull(workerEventLoopGroup);
-
-            this.workerEventLoopGroup = workerEventLoopGroup;
-            return this;
-        }
-
-        public ReplicatorServerOptionsBuilder setShouldShutdownWorkerEventLoopGroup(boolean shouldShutdownWorkerEventLoopGroup) {
-            this.shouldShutdownWorkerEventLoopGroup = shouldShutdownWorkerEventLoopGroup;
+            this.workerEventLoopGroup = eventLoopGroup;
+            this.shouldShutdownWorkerEventLoopGroup = shouldShutdownEventLoopGroup;
             return this;
         }
 
@@ -146,14 +139,15 @@ public class ReplicatorServerOptions {
             return this;
         }
 
-        public void setConnectionReadTimeoutSecs(long connectionReadTimeout, TimeUnit unit) {
+        public ReplicatorServerOptionsBuilder setConnectionReadTimeoutSecs(long connectionReadTimeout, TimeUnit unit) {
             Preconditions.checkArgument(connectionReadTimeout > 0);
 
             this.connectionReadTimeoutSecs = (int)unit.toSeconds(connectionReadTimeout);
+            return this;
         }
 
         public ReplicatorServerOptions build() {
-            checkArgument(storagePath != null, "Please provide storage path");
+            checkArgument(storageOptions != null, "Please provide storage options");
             checkArgument(port > 0, "Please provide port for Replicator Server to bind");
             checkArgument(host != null, "Please provide host for Replicator Server to bind");
 

@@ -11,7 +11,7 @@ public interface Storage<T extends StorageHandle> {
     void append(T handle, long id, byte[] data);
     List<LogEntry> getEntries(T handle, long fromId, int limit);
     long trimToId(T handle, long id);
-    void shutdown();
+    void shutdown() throws InterruptedException;
 
     long getFirstLogId(T handle);
     long getLastLogId(T handle);

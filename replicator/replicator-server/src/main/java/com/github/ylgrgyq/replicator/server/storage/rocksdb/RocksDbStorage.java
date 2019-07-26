@@ -3,9 +3,11 @@ package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.server.Preconditions;
 import com.github.ylgrgyq.replicator.server.ReplicatorException;
+import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
+import com.github.ylgrgyq.replicator.server.storage.StorageOptions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import org.rocksdb.*;
 import org.rocksdb.util.SizeUnit;
@@ -16,6 +18,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -23,29 +26,36 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbStorage.class);
 
-    private RocksDB db;
-    private WriteOptions writeOptions;
-    private ReadOptions totalOrderReadOptions;
-    private DBOptions dbOptions;
-    private final List<ColumnFamilyOptions> cfOptions;
-    private ColumnFamilyHandle defaultHandle;
-    private String path;
+    private final BlockingQueue<TruncateQueueEntry> truncateJobsQueue;
+    private final String path;
+    private final BackgroundTruncateHandler backgroundTruncateHandler;
 
     private final ReadWriteLock lock = new ReentrantReadWriteLock(false);
     private final Lock readLock = lock.readLock();
     private final Lock writeLock = lock.writeLock();
+    private final List<ColumnFamilyOptions> cfOptions;
+
+    private RocksDB db;
+    private WriteOptions writeOptions;
+    private ReadOptions totalOrderReadOptions;
+    private DBOptions dbOptions;
+    private ColumnFamilyHandle defaultHandle;
 
     static {
         RocksDB.loadLibrary();
     }
 
-    public RocksDbStorage(String path) {
-        this.path = path;
+    public RocksDbStorage(StorageOptions options) throws InterruptedException{
+        this.path = options.getStoragePath();
         this.cfOptions = new ArrayList<>();
-        init();
+        this.truncateJobsQueue = new LinkedBlockingQueue<>();
+        this.backgroundTruncateHandler = new BackgroundTruncateHandler("StorageBackgroundTruncateHandler");
+        backgroundTruncateHandler.start();
+
+        initDB();
     }
 
-    private void init() {
+    private void initDB() throws InterruptedException{
         writeLock.lock();
         try {
             dbOptions = new DBOptions();
@@ -91,9 +101,13 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
     }
 
     @Override
-    public void shutdown() {
+    public void shutdown() throws InterruptedException{
         writeLock.lock();
         try {
+            backgroundTruncateHandler.shutdown();
+            wakeupTruncateHandler();
+            backgroundTruncateHandler.join();
+
             // The shutdown order is matter.
             // 1. close db and column family handles
             closeDB();
@@ -239,7 +253,7 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
                 if (it.isValid()) {
                     firstIdToKeep = Bits.getLong(it.key(), 0);
                 }
-                truncatePrefixInBackground(startId, firstIdToKeep);
+                truncatePrefixInBackground(handle, startId, firstIdToKeep);
                 return firstIdToKeep;
             }
             return startId;
@@ -248,20 +262,81 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
         }
     }
 
-    private void truncatePrefixInBackground(final long startId, final long firstIdToKeep) {
-        // delete logs in background.
-        new Thread(() -> {
-            readLock.lock();
-            try {
-                if (db == null) {
-                    return;
+    interface TruncateQueueEntry {}
+
+    private static class WakeUpJob implements TruncateQueueEntry{}
+
+    private static class TruncateJob implements TruncateQueueEntry{
+        private long startId;
+        private long firstIdToKeep;
+        private ColumnFamilyHandle handle;
+
+        public TruncateJob(ColumnFamilyHandle handle, long startId, long firstIdToKeep) {
+            this.startId = startId;
+            this.firstIdToKeep = firstIdToKeep;
+            this.handle = handle;
+        }
+
+        long getStartId() {
+            return startId;
+        }
+
+        long getFirstIdToKeep() {
+            return firstIdToKeep;
+        }
+
+        ColumnFamilyHandle getHandle() {
+            return handle;
+        }
+    }
+
+    private class BackgroundTruncateHandler extends Thread {
+        private volatile boolean shutdown = false;
+        BackgroundTruncateHandler(String name) {
+            super(name);
+        }
+
+        @Override
+        public void run() {
+            while (!shutdown) {
+                TruncateQueueEntry entry = null;
+                try {
+                    entry = truncateJobsQueue.take();
+                    if (entry instanceof TruncateJob) {
+                        TruncateJob job = (TruncateJob) entry;
+                        readLock.lock();
+                        try {
+                            if (db == null) {
+                                break;
+                            }
+                            db.deleteRange(job.getHandle(), getKeyBytes(job.getStartId()), getKeyBytes(job.getFirstIdToKeep()));
+                        } catch (final RocksDBException e) {
+                            logger.error("Fail to truncatePrefix {}", job, e);
+                        } finally {
+                            readLock.unlock();
+                        }
+                    }
+                } catch (InterruptedException ex) {
+                    // continue
+                } catch (Exception ex) {
+                    logger.error("Truncate handler failed for entry {}", entry, ex);
+                    break;
                 }
-                db.deleteRange(defaultHandle, getKeyBytes(startId), getKeyBytes(firstIdToKeep));
-            } catch (final RocksDBException e) {
-                logger.error("Fail to truncatePrefix {}", firstIdToKeep, e);
-            } finally {
-                readLock.unlock();
             }
-        }).start();
+
+            logger.info(getName() + " exit.");
+        }
+
+        void shutdown() {
+            shutdown = true;
+        }
+    }
+
+    private void wakeupTruncateHandler() {
+        truncateJobsQueue.offer(new WakeUpJob());
+    }
+
+    private void truncatePrefixInBackground(RocksDbStorageHandle handle, final long startId, final long firstIdToKeep) {
+        truncateJobsQueue.offer(new TruncateJob(handle.getColumnFailyHandle(), startId, firstIdToKeep));
     }
 }

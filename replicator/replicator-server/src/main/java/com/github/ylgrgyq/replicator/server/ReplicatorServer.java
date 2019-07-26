@@ -7,5 +7,5 @@ public interface ReplicatorServer {
     SequenceAppender createSequence(String topic, SequenceOptions options);
     SequenceAppender replcaeSequence(String topic, SequenceOptions options);
     boolean removeSequence(String topic);
-    void shutdown();
+    void shutdown() throws InterruptedException;
 }

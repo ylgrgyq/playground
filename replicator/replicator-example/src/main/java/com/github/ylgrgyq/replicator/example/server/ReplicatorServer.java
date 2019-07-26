@@ -5,6 +5,7 @@ import com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicateC
 import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
+import com.github.ylgrgyq.replicator.server.storage.StorageOptions;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,9 +23,13 @@ public class ReplicatorServer {
         File tempFile = new File(tempDir);
         FileUtils.forceMkdir(tempFile);
 
+        StorageOptions storageOptions = StorageOptions.builder()
+                .setStoragePath(tempFile.getPath())
+                .build();
+
         ReplicatorServerOptions options = ReplicatorServerOptions.builder()
                 .setPort(8888)
-                .setStoragePath(tempFile.getPath())
+                .setStorageOptions(storageOptions)
                 .build();
 
         ReplicatorServerImpl server = new ReplicatorServerImpl(options);

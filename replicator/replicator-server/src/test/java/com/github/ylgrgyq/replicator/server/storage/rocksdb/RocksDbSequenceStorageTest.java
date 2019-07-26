@@ -1,9 +1,11 @@
 package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
 import com.github.ylgrgyq.replicator.proto.LogEntry;
+import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
+import com.github.ylgrgyq.replicator.server.storage.StorageOptions;
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -26,7 +28,10 @@ public class RocksDbSequenceStorageTest {
                 File.separator + "replicator_server_test_" + System.nanoTime();
         testingDir = new File(tempDir);
         FileUtils.forceMkdir(testingDir);
-        storage = new RocksDbStorage(testingDir.getPath());
+        StorageOptions options = StorageOptions.builder()
+                .setStoragePath(testingDir.getPath())
+                .build();
+        storage = new RocksDbStorage(options);
 
         sequenceStorage = storage.createSequenceStorage("testing_topic", new SequenceOptions());
     }

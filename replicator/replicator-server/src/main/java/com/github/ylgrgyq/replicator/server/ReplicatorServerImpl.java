@@ -38,7 +38,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
         this.options = options;
         this.bossGroup = options.getBossEventLoopGroup();
         this.workerGroup = options.getWorkerEventLoopGroup();
-        this.storage = StorageFactory.createStorage(options);
+        this.storage = StorageFactory.createStorage(options.getStorageOptions());
 
         initServer();
     }
@@ -84,7 +84,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
     }
 
     @Override
-    public void shutdown() {
+    public void shutdown() throws InterruptedException{
         if (options.isShouldShutdownBossEventLoopGroup()) {
             bossGroup.shutdownGracefully();
         }
@@ -93,7 +93,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
             workerGroup.shutdownGracefully();
         }
 
-        groups.shutdown();
+        groups.shutdownAllSequences();
 
         storage.shutdown();
     }

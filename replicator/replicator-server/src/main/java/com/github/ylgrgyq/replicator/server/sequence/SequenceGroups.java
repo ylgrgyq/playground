@@ -67,7 +67,7 @@ public class SequenceGroups {
         return topicToSource.get(topic);
     }
 
-    public void shutdown(){
+    public void shutdownAllSequences(){
         for (Map.Entry<String, Sequence> entry : topicToSource.entrySet()){
             Sequence seq = entry.getValue();
             seq.shutdown();
