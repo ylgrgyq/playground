@@ -20,7 +20,7 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorClientHandler.class);
 
     private String topic;
-    private long lastIndex;
+    private long lastId;
     private StateMachineCaller stateMachineCaller;
     private volatile boolean suspend;
     private int pendingApplyLogsRequestCount;
@@ -29,7 +29,7 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     public ReplicatorClientHandler(String topic, StateMachineCaller stateMachineCaller, ReplicatorClientOptions options) {
         this.topic = topic;
         this.stateMachineCaller = stateMachineCaller;
-        this.lastIndex = Long.MIN_VALUE;
+        this.lastId = Long.MIN_VALUE;
         this.suspend = false;
         this.options = options;
     }
@@ -73,19 +73,19 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
         if (!entryList.isEmpty()) {
             LogEntry firstEntry = entryList.get(0);
             LogEntry lastEntry = entryList.get(entryList.size() - 1);
-            if (firstEntry.getIndex() > lastIndex + 1) {
-                logger.warn("lastIndex:{} is too far behind sync logs {}", lastIndex, firstEntry.getIndex());
+            if (firstEntry.getId() > lastId + 1) {
+                logger.warn("lastId:{} is too far behind sync logs {}", lastId, firstEntry.getId());
                 requestSnapshot(ctx.channel(), topic);
-            } else if (lastEntry.getIndex() > lastIndex) {
+            } else if (lastEntry.getId() > lastId) {
                 int i = 0;
                 for (; i < entryList.size(); ++i) {
                     LogEntry entry = entryList.get(i);
-                    if (entry.getIndex() == lastIndex + 1) {
+                    if (entry.getId() == lastId + 1) {
                         break;
                     }
                 }
 
-                lastIndex = lastEntry.getIndex();
+                lastId = lastEntry.getId();
                 List<byte[]> logDataList = entryList.subList(i, entryList.size())
                         .stream()
                         .map(e -> e.getData().toByteArray())
@@ -111,7 +111,7 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
                                 suspend = false;
                             }
                             assert pendingApplyLogsRequestCount >= 0 : pendingApplyLogsRequestCount;
-                            requestLogs(ctx.channel(), topic, lastIndex);
+                            requestLogs(ctx.channel(), topic, lastId);
                         });
                     }
                 });
@@ -133,7 +133,7 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
 
     private void handleApplySnapshot(ChannelHandlerContext ctx, Snapshot snapshot) {
         long snapshotId = snapshot.getId();
-        if (snapshotId > lastIndex) {
+        if (snapshotId > lastId) {
             stateMachineCaller.applySnapshot(snapshot)
                     .whenComplete((ret, t) -> {
                         if (t != null) {
@@ -144,11 +144,11 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
                                     handleApplySnapshot(ctx, snapshot), 10, TimeUnit.SECONDS);
                         } else {
                             ctx.executor().submit(() -> {
-                                assert lastIndex > snapshotId;
+                                assert lastId > snapshotId;
                                 if (pendingApplyLogsRequestCount < options.getPendingFlushLogsLowWaterMark()) {
                                     suspend = false;
                                 }
-                                lastIndex = snapshotId;
+                                lastId = snapshotId;
                                 requestLogs(ctx.channel(), topic, snapshotId);
                             });
                         }
@@ -168,14 +168,14 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
         if (evt instanceof IdleStateEvent) {
-            requestLogs(ctx.channel(), topic, lastIndex);
+            requestLogs(ctx.channel(), topic, lastId);
         } else if (evt == WebSocketClientProtocolHandler.ClientHandshakeStateEvent.HANDSHAKE_COMPLETE) {
             handshake(ctx.channel(), topic);
         }
     }
 
-    public long getLastIndex() {
-        return lastIndex;
+    public long getLastId() {
+        return lastId;
     }
 
     public void handshake(Channel ch, String topic) {

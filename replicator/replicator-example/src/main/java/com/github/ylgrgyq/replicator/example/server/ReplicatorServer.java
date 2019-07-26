@@ -34,6 +34,7 @@ public class ReplicatorServer {
                 SequenceAppender appender = server.createSequence("hahaha", new SequenceOptions());
                 for (int i = 1; i < 10000; ++i) {
                     String msg = "wahaha-" + i;
+                    logger.info("append {} {}", i, msg);
                     appender.append(i, msg.getBytes(StandardCharsets.UTF_8));
                     try {
 //                        Thread.sleep(1000);
