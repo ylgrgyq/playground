@@ -1,8 +1,9 @@
-package com.github.ylgrgyq.replicator.server;
+package com.github.ylgrgyq.replicator.server.sequence;
 
 import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.proto.SyncLogEntries;
+import com.github.ylgrgyq.replicator.server.SnapshotGenerator;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,16 +27,20 @@ public class Sequence {
         emptySnapshot = builder.build();
     }
 
-    private String topic;
-    private SequenceStorage storage;
+    private final String topic;
+    private final SequenceStorage storage;
     private final SnapshotGenerator snapshotGenerator;
+    private final SequenceOptions options;
+    private final ScheduledExecutorService executor;
+    private final Lock readLock;
+    private final Lock writeLock;
+    private final AtomicBoolean generateSnapshotJobScheduled;
     private Snapshot lastSnapshot;
-    private SequenceOptions options;
-    private ScheduledExecutorService executor;
-    private Lock readLock;
-    private Lock writeLock;
-    private AtomicBoolean generateSnapshotJobScheduled;
 
+    /**
+     *
+     * @throws java.util.concurrent.RejectedExecutionException if the executor for generating snapshot is full
+     */
     public Sequence(String topic, SequenceStorage sequenceStorage, SequenceOptions options) {
         this.topic = topic;
         this.options = options;
@@ -47,9 +52,7 @@ public class Sequence {
         ReadWriteLock lock = new ReentrantReadWriteLock();
         this.readLock = lock.readLock();
         this.writeLock = lock.writeLock();
-    }
 
-    public void init() {
         if (executor != null && snapshotGenerator != null) {
             scheduleGenerateSnapshot();
         }
@@ -99,12 +102,12 @@ public class Sequence {
                     generateSnapshotJobScheduled.set(false);
                 }
             } else {
-                logger.warn("");
+                logger.warn("Failed to schedule task to generate snapshot because last generating snapshot task is still running.");
             }
         }, options.getGenerateSnapshotIntervalSecs(), options.getGenerateSnapshotIntervalSecs(), TimeUnit.SECONDS);
     }
 
-    public void shutdown(){
+    public void shutdown() {
         storage.shutdown();
     }
 }

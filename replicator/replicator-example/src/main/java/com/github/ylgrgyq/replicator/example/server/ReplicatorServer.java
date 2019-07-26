@@ -3,6 +3,8 @@ package com.github.ylgrgyq.replicator.example.server;
 import com.github.ylgrgyq.replicator.server.*;
 import com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicateChannel;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
+import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
+import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 public class ReplicatorServer {
     private static final Logger logger = LoggerFactory.getLogger(NettyReplicateChannel.class);
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
                 File.separator + "replicator_server_test_" + System.nanoTime();
         File tempFile = new File(tempDir);
@@ -26,14 +28,11 @@ public class ReplicatorServer {
                 .build();
 
         ReplicatorServerImpl server = new ReplicatorServerImpl(options);
-        if (!server.start()) {
-            return;
-        }
 
         new Thread(() -> {
             try {
                 SequenceAppender appender = server.createSequence("hahaha", new SequenceOptions());
-                for (int i = 0; i < 10000; ++i) {
+                for (int i = 1; i < 10000; ++i) {
                     String msg = "wahaha-" + i;
                     appender.append(i, msg.getBytes(StandardCharsets.UTF_8));
                     try {

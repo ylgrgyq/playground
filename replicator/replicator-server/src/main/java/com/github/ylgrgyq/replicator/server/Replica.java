@@ -2,6 +2,7 @@ package com.github.ylgrgyq.replicator.server;
 
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.proto.SyncLogEntries;
+import com.github.ylgrgyq.replicator.server.sequence.Sequence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

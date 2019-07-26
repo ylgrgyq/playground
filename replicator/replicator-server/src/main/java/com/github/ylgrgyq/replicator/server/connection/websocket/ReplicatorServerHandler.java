@@ -2,6 +2,8 @@ package com.github.ylgrgyq.replicator.server.connection.websocket;
 
 import com.github.ylgrgyq.replicator.proto.ReplicatorCommand;
 import com.github.ylgrgyq.replicator.server.*;
+import com.github.ylgrgyq.replicator.server.sequence.Sequence;
+import com.github.ylgrgyq.replicator.server.sequence.SequenceGroups;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.timeout.IdleStateEvent;

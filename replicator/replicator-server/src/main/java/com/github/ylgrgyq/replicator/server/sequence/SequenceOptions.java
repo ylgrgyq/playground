@@ -1,4 +1,6 @@
-package com.github.ylgrgyq.replicator.server;
+package com.github.ylgrgyq.replicator.server.sequence;
+
+import com.github.ylgrgyq.replicator.server.SnapshotGenerator;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;

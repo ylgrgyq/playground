@@ -1,10 +1,11 @@
 package com.github.ylgrgyq.replicator.server;
 
-import java.util.concurrent.CompletableFuture;
+import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
+import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 
 public interface ReplicatorServer {
-    boolean start();
     SequenceAppender createSequence(String topic, SequenceOptions options);
+    SequenceAppender replcaeSequence(String topic, SequenceOptions options);
     boolean removeSequence(String topic);
     void shutdown();
 }

@@ -22,7 +22,7 @@
  *
  *
  */
-package com.github.ylgrgyq.replicator.server.storage;
+package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
 public class Bits {
     public static int getInt(byte[] b, int off) {

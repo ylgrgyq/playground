@@ -6,6 +6,7 @@ import com.github.ylgrgyq.replicator.server.storage.Storage;
 import com.google.protobuf.ByteString;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -15,12 +16,15 @@ public class RocksDbSequenceStorage implements SequenceStorage {
     private final ReadWriteLock lock = new ReentrantReadWriteLock(false);
     private final Lock readLock = lock.readLock();
     private final Lock writeLock = lock.writeLock();
-    private volatile long firstLogId = 1;
+    private volatile long firstLogId;
 
     private volatile boolean hasLoadFirstLogId;
     private RocksDbStorageHandle handle;
 
     public RocksDbSequenceStorage(Storage<RocksDbStorageHandle> storage, RocksDbStorageHandle storageHandle) {
+        Objects.requireNonNull(storage);
+        Objects.requireNonNull(storageHandle);
+
         this.storage = storage;
         this.handle = storageHandle;
     }
@@ -33,9 +37,11 @@ public class RocksDbSequenceStorage implements SequenceStorage {
                 return firstLogId;
             }
 
-            long firstLogId = storage.getFirstLogId(handle);
-            setFirstLogId(firstLogId);
-            return firstLogId;
+            long fid = storage.getFirstLogId(handle);
+            if (fid != 0) {
+                setFirstLogId(fid);
+            }
+            return fid;
         } finally {
             readLock.unlock();
         }
@@ -45,7 +51,9 @@ public class RocksDbSequenceStorage implements SequenceStorage {
     public long getLastLogId() {
         readLock.lock();
         try {
-            long lastId = storage.getFirstLogId(handle);
+            long lastId = storage.getLastLogId(handle);
+            // lastId = 0 means internal storage don't have any logs in it.
+            // maybe we haven't append any log or old logs have been trimmed.
             if (lastId == 0) {
                 lastId = getFirstLogId();
             }
@@ -59,7 +67,10 @@ public class RocksDbSequenceStorage implements SequenceStorage {
     public void append(long id, byte[] data) {
         readLock.lock();
         try {
-            LogEntry entry = LogEntry.newBuilder().setData(ByteString.copyFrom(data)).build();
+            LogEntry entry = LogEntry.newBuilder()
+                    .setId(id)
+                    .setData(ByteString.copyFrom(data))
+                    .build();
             storage.append(handle, id, entry.toByteArray());
         } finally {
             readLock.unlock();
@@ -83,15 +94,25 @@ public class RocksDbSequenceStorage implements SequenceStorage {
 
     @Override
     public void trimToId(long id) {
-        long idToKeep = storage.trimToId(handle, id);
-        setFirstLogId(idToKeep);
+        readLock.lock();
+        try {
+            long idToKeep = storage.trimToId(handle, id);
+            if (idToKeep > firstLogId) {
+                setFirstLogId(idToKeep);
+            }
+        } finally {
+            readLock.unlock();
+        }
     }
 
     @Override
     public void shutdown() {
         writeLock.lock();
         try {
-            handle.getColumnFailyHandle().close();
+            if (handle != null) {
+                handle.getColumnFailyHandle().close();
+                handle = null;
+            }
         } finally {
             writeLock.unlock();
         }

@@ -2,8 +2,8 @@ package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
 import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.server.Preconditions;
-import com.github.ylgrgyq.replicator.server.SequenceOptions;
-import com.github.ylgrgyq.replicator.server.storage.Bits;
+import com.github.ylgrgyq.replicator.server.ReplicatorException;
+import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -42,17 +42,12 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
     public RocksDbStorage(String path) {
         this.path = path;
         this.cfOptions = new ArrayList<>();
+        init();
     }
 
-    @Override
-    public boolean init() {
+    private void init() {
         writeLock.lock();
         try {
-            if (db != null) {
-                logger.warn("RocksDbStorage already init.");
-                return true;
-            }
-
             dbOptions = new DBOptions();
             dbOptions.setCreateIfMissing(true);
             dbOptions.setCreateMissingColumnFamilies(true);
@@ -86,15 +81,13 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
 
             assert columnFamilyHandles.size() > 0;
             defaultHandle = columnFamilyHandles.get(0);
-            return true;
         } catch (final RocksDBException ex) {
-            logger.error("Init RocksDb on path {} failed", path, ex);
+            String msg = String.format("Init RocksDb on path %s failed", path);
             shutdown();
+            throw new ReplicatorException(msg, ex);
         } finally {
             writeLock.unlock();
         }
-
-        return false;
     }
 
     @Override

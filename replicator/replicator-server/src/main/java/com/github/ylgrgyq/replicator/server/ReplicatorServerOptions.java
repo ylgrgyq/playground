@@ -5,6 +5,7 @@ import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import static com.github.ylgrgyq.replicator.server.Preconditions.checkArgument;
 
@@ -16,6 +17,7 @@ public class ReplicatorServerOptions {
     private final EventLoopGroup workerEventLoopGroup;
     private final boolean shouldShutdownBossEventLoopGroup;
     private final boolean shouldShutdownWorkerEventLoopGroup;
+    private final int connectionReadTimeoutSecs;
 
     private ReplicatorServerOptions(ReplicatorServerOptionsBuilder builder) {
         this.port = builder.port;
@@ -36,6 +38,7 @@ public class ReplicatorServerOptions {
 
         this.shouldShutdownBossEventLoopGroup = builder.shouldShutdownBossEventLoopGroup;
         this.shouldShutdownWorkerEventLoopGroup = builder.shouldShutdownWorkerEventLoopGroup;
+        this.connectionReadTimeoutSecs = builder.connectionReadTimeoutSecs;
     }
 
     private EventLoopGroup createEventLoopGroup(int nThreads, boolean preferEpoll) {
@@ -74,19 +77,24 @@ public class ReplicatorServerOptions {
         return shouldShutdownWorkerEventLoopGroup;
     }
 
+    public int getConnectionReadTimeoutSecs() {
+        return connectionReadTimeoutSecs;
+    }
+
     public static ReplicatorServerOptionsBuilder builder() {
         return new ReplicatorServerOptionsBuilder();
     }
 
     public static class ReplicatorServerOptionsBuilder {
         private int port;
-        private String host;
+        private String host = "localhost";
         private String storagePath;
         private EventLoopGroup bossEventLoopGroup;
         private boolean shouldShutdownBossEventLoopGroup = true;
         private EventLoopGroup workerEventLoopGroup;
         private boolean shouldShutdownWorkerEventLoopGroup = true;
         private boolean preferEpoll;
+        private int connectionReadTimeoutSecs = 30;
 
         public ReplicatorServerOptionsBuilder setPort(int port) {
             checkArgument(port > 0);
@@ -136,6 +144,12 @@ public class ReplicatorServerOptions {
         public ReplicatorServerOptionsBuilder setPreferEpoll(boolean preferEpoll) {
             this.preferEpoll = preferEpoll;
             return this;
+        }
+
+        public void setConnectionReadTimeoutSecs(long connectionReadTimeout, TimeUnit unit) {
+            Preconditions.checkArgument(connectionReadTimeout > 0);
+
+            this.connectionReadTimeoutSecs = (int)unit.toSeconds(connectionReadTimeout);
         }
 
         public ReplicatorServerOptions build() {
