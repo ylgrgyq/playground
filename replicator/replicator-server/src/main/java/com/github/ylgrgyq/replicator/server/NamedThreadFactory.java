@@ -3,7 +3,7 @@ package com.github.ylgrgyq.replicator.server;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class NamedThreadFactory implements ThreadFactory {
+final class NamedThreadFactory implements ThreadFactory {
     private final AtomicLong threadIndex = new AtomicLong(0);
     private final String threadNamePrefix;
 

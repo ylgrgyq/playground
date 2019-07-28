@@ -1,9 +1,9 @@
 package com.github.ylgrgyq.replicator.example.server;
 
 import com.github.ylgrgyq.replicator.proto.Snapshot;
-import com.github.ylgrgyq.replicator.server.*;
-import com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicateChannel;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
+import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
+import com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicateChannel;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.StorageOptions;
@@ -11,14 +11,10 @@ import com.google.protobuf.ByteString;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.misc.Signal;
-import sun.misc.SignalHandler;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
