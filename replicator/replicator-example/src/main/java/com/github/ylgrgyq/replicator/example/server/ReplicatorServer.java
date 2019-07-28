@@ -38,16 +38,16 @@ public class ReplicatorServer {
             try {
                 SequenceOptions sequenceOptions = SequenceOptions.builder().build();
                 SequenceAppender appender = server.createSequence("hahaha", sequenceOptions);
-                for (int i = 1; i < 10000; ++i) {
-                    String msg = "wahaha-" + i;
-                    logger.info("append {} {}", i, msg);
-                    appender.append(i, msg.getBytes(StandardCharsets.UTF_8));
-                    try {
-//                        Thread.sleep(1000);
-                    } catch (Exception ex) {
-                        logger.error("exception", ex);
-                    }
-                }
+//                for (int i = 1; i < 10000; ++i) {
+//                    String msg = "wahaha-" + i;
+//                    logger.info("append {} {}", i, msg);
+//                    appender.append(i, msg.getBytes(StandardCharsets.UTF_8));
+//                    try {
+////                        Thread.sleep(1000);
+//                    } catch (Exception ex) {
+//                        logger.error("exception", ex);
+//                    }
+//                }
 
                 logger.info("generate log done {}");
             } catch (Exception ex) {

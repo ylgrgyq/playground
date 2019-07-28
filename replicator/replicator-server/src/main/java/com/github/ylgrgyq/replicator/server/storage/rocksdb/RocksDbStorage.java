@@ -3,7 +3,6 @@ package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.server.Preconditions;
 import com.github.ylgrgyq.replicator.server.ReplicatorException;
-import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
@@ -16,8 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -25,6 +23,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbStorage.class);
+    private static final String DEFAULT_PREFIX_FOR_DB_NAME = "replicator_topic";
 
     private final BlockingQueue<TruncateQueueEntry> truncateJobsQueue;
     private final String path;
@@ -34,39 +33,40 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
     private final Lock readLock = lock.readLock();
     private final Lock writeLock = lock.writeLock();
     private final List<ColumnFamilyOptions> cfOptions;
+    private final StorageOptions storageOptions;
+    private final Map<String, ColumnFamilyHandle> columnFamilyHandleMap;
 
     private RocksDB db;
     private WriteOptions writeOptions;
     private ReadOptions totalOrderReadOptions;
     private DBOptions dbOptions;
-    private ColumnFamilyHandle defaultHandle;
 
     static {
         RocksDB.loadLibrary();
     }
 
-    public RocksDbStorage(StorageOptions options) throws InterruptedException{
+    public RocksDbStorage(StorageOptions options) throws InterruptedException {
+        this.storageOptions = options;
         this.path = options.getStoragePath();
         this.cfOptions = new ArrayList<>();
         this.truncateJobsQueue = new LinkedBlockingQueue<>();
         this.backgroundTruncateHandler = new BackgroundTruncateHandler("StorageBackgroundTruncateHandler");
+        this.columnFamilyHandleMap = new HashMap<>();
         backgroundTruncateHandler.start();
 
         initDB();
     }
 
-    private void initDB() throws InterruptedException{
+    private void initDB() throws InterruptedException {
         writeLock.lock();
         try {
-            dbOptions = new DBOptions();
+            dbOptions = getDefaultRocksDBOptions();
             dbOptions.setCreateIfMissing(true);
             dbOptions.setCreateMissingColumnFamilies(true);
             writeOptions = new WriteOptions();
             writeOptions.setSync(false);
             totalOrderReadOptions = new ReadOptions();
             totalOrderReadOptions.setTotalOrderSeek(true);
-
-            final List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
 
             BlockBasedTableConfig tableConfig = new BlockBasedTableConfig(). //
                     setIndexType(IndexType.kHashSearch). // use hash search(btree) for prefix scan.
@@ -75,22 +75,39 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
                     setCacheIndexAndFilterBlocks(true). //
                     setBlockCacheSize(512 * SizeUnit.MB). //
                     setCacheNumShardBits(8);
-            final ColumnFamilyOptions options = new ColumnFamilyOptions();
-            cfOptions.add(options);
-
-            // default column family
-            columnFamilyDescriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, options));
-
-            final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
 
             final File dir = new File(path);
             if (dir.exists() && !dir.isDirectory()) {
                 throw new IllegalStateException("Invalid log path, it's a regular file: " + path);
             }
+
+            final ColumnFamilyOptions columnFamilyOptions = getDefaultColumnFamilyOptions();
+            if (storageOptions.isDestroyPreviousDbFiles()) {
+                try (Options destroyOptions = new Options(dbOptions, columnFamilyOptions)) {
+                    RocksDB.destroyDB(path, destroyOptions);
+                }
+            }
+
+            final List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
+            List<byte[]> columnFamilyNames = listColumnFamilyNames(dbOptions, columnFamilyOptions);
+            if (columnFamilyNames.isEmpty()) {
+                // only default column family
+                columnFamilyDescriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, columnFamilyOptions));
+            } else {
+                columnFamilyNames.forEach(name -> {
+                            ColumnFamilyOptions options = getDefaultColumnFamilyOptions();
+                            columnFamilyDescriptors.add(new ColumnFamilyDescriptor(name, options));
+                        }
+                );
+            }
+
+            final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
             db = RocksDB.open(dbOptions, path, columnFamilyDescriptors, columnFamilyHandles);
 
-            assert columnFamilyHandles.size() > 0;
-            defaultHandle = columnFamilyHandles.get(0);
+            for (ColumnFamilyHandle handle : columnFamilyHandles) {
+                String name = new String(handle.getName(), StandardCharsets.UTF_8);
+                columnFamilyHandleMap.put(name, handle);
+            }
         } catch (final RocksDBException ex) {
             String msg = String.format("Init RocksDb on path %s failed", path);
             shutdown();
@@ -100,8 +117,52 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
         }
     }
 
+    private DBOptions getDefaultRocksDBOptions() {
+        // Turn based on https://github.com/facebook/rocksdb/wiki/RocksDB-Tuning-Guide
+        final DBOptions opts = new DBOptions();
+
+        // If this value is set to true, then the database will be created if it is
+        // missing during {@code RocksDB.open()}.
+        opts.setCreateIfMissing(true);
+
+        // If true, missing column families will be automatically created.
+        opts.setCreateMissingColumnFamilies(true);
+
+        // Number of open files that can be used by the DB.  You may need to increase
+        // this if your database has a large working set. Value -1 means files opened
+        // are always kept open.
+        opts.setMaxOpenFiles(-1);
+
+        // The maximum number of concurrent background compactions. The default is 1,
+        // but to fully utilize your CPU and storage you might want to increase this
+        // to approximately number of cores in the system.
+        int cpus = Runtime.getRuntime().availableProcessors();
+        opts.setMaxBackgroundCompactions(Math.min(cpus, 4));
+
+        // The maximum number of concurrent flush operations. It is usually good enough
+        // to set this to 1.
+        opts.setMaxBackgroundFlushes(1);
+
+        return opts;
+    }
+
+    private ColumnFamilyOptions getDefaultColumnFamilyOptions() {
+        ColumnFamilyOptions options = new ColumnFamilyOptions();
+
+        cfOptions.add(options);
+
+        return options;
+    }
+
+    private List<byte[]> listColumnFamilyNames(DBOptions dbOptions, ColumnFamilyOptions columnFamilyOptions)
+            throws RocksDBException {
+        try (Options options = new Options(dbOptions, columnFamilyOptions)) {
+            return RocksDB.listColumnFamilies(options, path);
+        }
+    }
+
     @Override
-    public void shutdown() throws InterruptedException{
+    public void shutdown() throws InterruptedException {
         writeLock.lock();
         try {
             backgroundTruncateHandler.shutdown();
@@ -120,10 +181,12 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
     }
 
     private void closeDB() {
-        if (defaultHandle != null) {
-            defaultHandle.close();
-            defaultHandle = null;
+        for (Map.Entry<String, ColumnFamilyHandle> entry : columnFamilyHandleMap.entrySet()) {
+            ColumnFamilyHandle handle = entry.getValue();
+            handle.close();
         }
+
+        columnFamilyHandleMap.clear();
 
         if (db != null) {
             db.close();
@@ -153,22 +216,32 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
     @Override
     public SequenceStorage createSequenceStorage(String topic, SequenceOptions options) {
         writeLock.lock();
-        ColumnFamilyOptions columnOptions = new ColumnFamilyOptions();
         try {
-            cfOptions.add(columnOptions);
+            String name = nameInDb(topic);
+            ColumnFamilyHandle handle = columnFamilyHandleMap.get(name);
+            if (handle == null) {
+                ColumnFamilyOptions columnOptions = new ColumnFamilyOptions();
+                try {
+                    cfOptions.add(columnOptions);
 
-            ColumnFamilyDescriptor desp = new ColumnFamilyDescriptor(topic.getBytes(StandardCharsets.UTF_8), columnOptions);
-            ColumnFamilyHandle handle = db.createColumnFamily(desp);
+                    ColumnFamilyDescriptor desp = new ColumnFamilyDescriptor(name.getBytes(StandardCharsets.UTF_8), columnOptions);
+                    handle = db.createColumnFamily(desp);
+                } catch (RocksDBException ex) {
+                    columnOptions.close();
+                    String msg = String.format("create sequence storage on topic %s failed", topic);
+                    throw new ReplicatorException(msg, ex);
+                }
+            }
+
             RocksDbStorageHandle storageHandle = new RocksDbStorageHandle(handle);
             return new RocksDbSequenceStorage(this, storageHandle);
-        } catch (RocksDBException ex) {
-            logger.error("create sequence storage on topic {} failed", topic, ex);
-            columnOptions.close();
         } finally {
             writeLock.unlock();
         }
+    }
 
-        return null;
+    private String nameInDb(String topic) {
+        return DEFAULT_PREFIX_FOR_DB_NAME + "_" + topic;
     }
 
     @Override
@@ -262,11 +335,13 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
         }
     }
 
-    interface TruncateQueueEntry {}
+    interface TruncateQueueEntry {
+    }
 
-    private static class WakeUpJob implements TruncateQueueEntry{}
+    private static class WakeUpJob implements TruncateQueueEntry {
+    }
 
-    private static class TruncateJob implements TruncateQueueEntry{
+    private static class TruncateJob implements TruncateQueueEntry {
         private long startId;
         private long firstIdToKeep;
         private ColumnFamilyHandle handle;
@@ -292,6 +367,7 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
 
     private class BackgroundTruncateHandler extends Thread {
         private volatile boolean shutdown = false;
+
         BackgroundTruncateHandler(String name) {
             super(name);
         }

@@ -35,9 +35,6 @@ public class SequenceGroups {
 
     private Sequence createSequence(String topic, Storage<? extends StorageHandle> storage, SequenceOptions options){
         SequenceStorage sequenceStorage = storage.createSequenceStorage(topic, options);
-        if (sequenceStorage == null) {
-            throw new ReplicatorException(ReplicatorError.EINTERNAL_ERROR);
-        }
 
         return new Sequence(topic, sequenceStorage, options);
     }

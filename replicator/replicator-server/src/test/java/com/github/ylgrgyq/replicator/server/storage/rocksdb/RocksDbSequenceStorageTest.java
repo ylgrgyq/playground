@@ -24,10 +24,11 @@ public class RocksDbSequenceStorageTest {
     @Before
     public void setUp() throws Exception {
         String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
-                File.separator + "replicator_server_test_" + System.nanoTime();
+                File.separator + "rocks_db_sequence_storage_test";
         testingDir = new File(tempDir);
         FileUtils.forceMkdir(testingDir);
         StorageOptions options = StorageOptions.builder()
+                .setDestroyPreviousDbFiles(true)
                 .setStoragePath(testingDir.getPath())
                 .build();
         storage = new RocksDbStorage(options);
@@ -67,6 +68,31 @@ public class RocksDbSequenceStorageTest {
         sequenceStorage.append(4, "4".getBytes(StandardCharsets.UTF_8));
         assertEquals(1, sequenceStorage.getFirstLogId());
         assertEquals(4, sequenceStorage.getLastLogId());
+    }
+
+    @Test
+    public void testDbRestart() throws InterruptedException {
+        sequenceStorage.append(1, "1".getBytes(StandardCharsets.UTF_8));
+        sequenceStorage.append(2, "2".getBytes(StandardCharsets.UTF_8));
+        sequenceStorage.append(3, "3".getBytes(StandardCharsets.UTF_8));
+        sequenceStorage.append(4, "4".getBytes(StandardCharsets.UTF_8));
+
+        sequenceStorage.shutdown();
+        storage.shutdown();
+
+        StorageOptions options = StorageOptions.builder()
+                .setStoragePath(testingDir.getPath())
+                .build();
+        storage = new RocksDbStorage(options);
+
+        sequenceStorage = storage.createSequenceStorage("testing_topic", SequenceOptions.builder().build());
+        assertEquals(1, sequenceStorage.getFirstLogId());
+        assertEquals(4, sequenceStorage.getLastLogId());
+        List<LogEntry> entries = sequenceStorage.getEntries(1, 100);
+        for (int i = 1; i <= 4; i++) {
+            assertEquals(i, entries.get(i - 1).getId());
+            assertEquals("" + i, entries.get(i - 1).getData().toStringUtf8());
+        }
     }
 
     @Test
