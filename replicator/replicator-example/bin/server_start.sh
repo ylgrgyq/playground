@@ -5,4 +5,11 @@ CLASSPATH=$(echo $BASE_DIR/target/*.jar | tr ' ' ':')
 
 echo $CLASSPATH
 
-java -cp $CLASSPATH com.github.ylgrgyq.replicator.example.server.ReplicatorServer
+java \
+    -Xmx256m -Xms256m \
+    -server \
+    -XX:+UseG1GC \
+    -XX:+ParallelRefProcEnabled \
+    -XX:MaxGCPauseMillis=2000 \
+    -cp $CLASSPATH \
+    com.github.ylgrgyq.replicator.example.server.ReplicatorServer

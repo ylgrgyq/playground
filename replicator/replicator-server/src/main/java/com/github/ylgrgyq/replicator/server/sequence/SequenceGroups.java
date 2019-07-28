@@ -1,5 +1,6 @@
 package com.github.ylgrgyq.replicator.server.sequence;
 
+import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
 import com.github.ylgrgyq.replicator.server.storage.StorageHandle;
@@ -7,16 +8,18 @@ import com.github.ylgrgyq.replicator.server.storage.StorageHandle;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class SequenceGroups {
     private final ConcurrentMap<String, Sequence> topicToSource;
+    private final ReplicatorServerOptions replicatorServerOptions;
 
-    public SequenceGroups() {
+    public SequenceGroups(ReplicatorServerOptions replicatorServerOptions) {
         this.topicToSource = new ConcurrentHashMap<>();
+        this.replicatorServerOptions = replicatorServerOptions;
     }
 
     public Sequence getOrCreateSequence(String topic, Storage<? extends StorageHandle> storage, SequenceOptions options) {
-
         Sequence sequence = topicToSource.get(topic);
         if (sequence == null) {
             synchronized (this) {
@@ -33,8 +36,8 @@ public class SequenceGroups {
 
     private Sequence createSequence(String topic, Storage<? extends StorageHandle> storage, SequenceOptions options){
         SequenceStorage sequenceStorage = storage.createSequenceStorage(topic, options);
-
-        return new Sequence(topic, sequenceStorage, options);
+        ScheduledExecutorService executor = replicatorServerOptions.getWorkerScheduledExecutor();
+        return new Sequence(topic, executor, sequenceStorage, options);
     }
 
     public synchronized void dropSequence(String topic) {
@@ -49,7 +52,7 @@ public class SequenceGroups {
         return topicToSource.get(topic);
     }
 
-    public void shutdownAllSequences(){
+    public void shutdownAllSequences() throws InterruptedException {
         for (Map.Entry<String, Sequence> entry : topicToSource.entrySet()){
             Sequence seq = entry.getValue();
             seq.shutdown();

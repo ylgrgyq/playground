@@ -8,7 +8,7 @@ public final class StorageOptions {
 
     private StorageOptions(StorageOptionsBuilder builder) {
         this.storagePath = builder.storagePath;
-        this.destroyPreviousDbFiles = builder.destroyPreviousDbFiles;
+        this.destroyPreviousDbFiles = builder.destroyPreviousDbFiles == null ? false : builder.destroyPreviousDbFiles;
     }
 
     public String getStoragePath() {
@@ -25,7 +25,7 @@ public final class StorageOptions {
 
     public static class StorageOptionsBuilder {
         private String storagePath;
-        private boolean destroyPreviousDbFiles = false;
+        private Boolean destroyPreviousDbFiles;
 
         public StorageOptionsBuilder setStoragePath(String storagePath) {
             this.storagePath = storagePath;
@@ -38,7 +38,7 @@ public final class StorageOptions {
             return this;
         }
 
-        public StorageOptions build(){
+        public StorageOptions build() {
             checkArgument(storagePath != null, "Please provide storage path");
 
             return new StorageOptions(this);

@@ -10,11 +10,9 @@ import java.util.concurrent.TimeUnit;
 public final class SequenceOptions {
     private final SnapshotGenerator snapshotGenerator;
     private final long generateSnapshotIntervalSecs;
-    private final ScheduledExecutorService sequenceExecutor;
 
     private SequenceOptions(SequenceOptionsBuilder builder) {
-        this.sequenceExecutor = builder.sequenceExecutor;
-        this.generateSnapshotIntervalSecs = builder.generateSnapshotIntervalSecs;
+        this.generateSnapshotIntervalSecs = builder.generateSnapshotIntervalSecs == null ? 10 : builder.generateSnapshotIntervalSecs;
         this.snapshotGenerator = builder.snapshotGenerator;
     }
 
@@ -27,19 +25,13 @@ public final class SequenceOptions {
         return generateSnapshotIntervalSecs;
     }
 
-
-    public ScheduledExecutorService getSequenceExecutor() {
-        return sequenceExecutor;
-    }
-
     public static SequenceOptionsBuilder builder() {
         return new SequenceOptionsBuilder();
     }
 
     public static class SequenceOptionsBuilder {
-        private long generateSnapshotIntervalSecs = 10;
+        private Long generateSnapshotIntervalSecs;
         private SnapshotGenerator snapshotGenerator;
-        private ScheduledExecutorService sequenceExecutor = Executors.newSingleThreadScheduledExecutor();
 
         public SequenceOptionsBuilder setGenerateSnapshotInterval(long generateSnapshotInterval, TimeUnit unit) {
             this.generateSnapshotIntervalSecs = unit.toSeconds(generateSnapshotInterval);
@@ -50,14 +42,6 @@ public final class SequenceOptions {
             Objects.requireNonNull(snapshotGenerator);
 
             this.snapshotGenerator = snapshotGenerator;
-            return this;
-        }
-
-        public SequenceOptionsBuilder setSequenceExecutor(ScheduledExecutorService sequenceExecutor) {
-            Objects.requireNonNull(sequenceExecutor);
-
-            this.sequenceExecutor = sequenceExecutor;
-
             return this;
         }
 

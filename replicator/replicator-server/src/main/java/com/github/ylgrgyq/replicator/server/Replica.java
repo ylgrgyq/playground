@@ -47,7 +47,7 @@ public class Replica implements ReplicateRequestHandler {
             return;
         }
 
-        Snapshot snapshot = seq.getSnapshot();
+        Snapshot snapshot = seq.getLastSnapshot();
         channel.writeSnapshot(snapshot);
     }
 

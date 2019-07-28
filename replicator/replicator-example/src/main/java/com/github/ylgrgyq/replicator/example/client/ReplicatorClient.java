@@ -44,6 +44,7 @@ public class ReplicatorClient {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
                 client.shutdown().get();
+                logger.info("client shutdown");
             } catch (InterruptedException ex) {
                 logger.error("Client graceful shutdown was interrupted");
             } catch (ExecutionException ex) {

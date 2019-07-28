@@ -1,23 +1,31 @@
 package com.github.ylgrgyq.replicator.example.server;
 
+import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.server.*;
 import com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicateChannel;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.StorageOptions;
+import com.google.protobuf.ByteString;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class ReplicatorServer {
     private static final Logger logger = LoggerFactory.getLogger(NettyReplicateChannel.class);
 
-    public static void main(String[] args) throws IOException, InterruptedException {
+    public static void main(String[] args) throws Exception {
         String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
                 File.separator + "replicator_server_test_" + System.nanoTime();
         File tempFile = new File(tempDir);
@@ -37,14 +45,25 @@ public class ReplicatorServer {
 
         new Thread(() -> {
             try {
-                SequenceOptions sequenceOptions = SequenceOptions.builder().build();
+                AtomicLong nexId = new AtomicLong(1);
+                SequenceOptions sequenceOptions = SequenceOptions.builder()
+                        .setSnapshotGenerator(() -> {
+                            long id = nexId.get();
+                            return Snapshot.newBuilder()
+                                    .setId(id)
+                                    .setData(ByteString.copyFrom(String.format("snapshot before %s", id)
+                                            , StandardCharsets.UTF_8))
+                                    .build();
+                        })
+                        .setGenerateSnapshotInterval(3, TimeUnit.SECONDS)
+                        .build();
                 SequenceAppender appender = server.createSequence("hahaha", sequenceOptions);
-                for (int i = 1; i < 10000; ++i) {
-                    String msg = "wahaha-" + i;
-                    logger.info("append {} {}", i, msg);
-                    appender.append(i, msg.getBytes(StandardCharsets.UTF_8));
+                for (; nexId.get() < 1000L; nexId.incrementAndGet()) {
+                    String msg = "wahaha-" + nexId;
+                    logger.info("append {} {}", nexId, msg);
+                    appender.append(nexId.get(), msg.getBytes(StandardCharsets.UTF_8));
                     try {
-//                        Thread.sleep(1000);
+                        Thread.sleep(100);
                     } catch (Exception ex) {
                         logger.error("exception", ex);
                     }
@@ -56,5 +75,18 @@ public class ReplicatorServer {
             }
         }).start();
 
+        final CompletableFuture<Void> shutdown = new CompletableFuture<>();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            try {
+                server.shutdown();
+                shutdown.complete(null);
+            } catch (InterruptedException ex) {
+                logger.error("Server graceful shutdown was interrupted");
+            } catch (Throwable t) {
+                logger.error("shutdown got exception", t);
+            }
+        }));
+
+        shutdown.get();
     }
 }

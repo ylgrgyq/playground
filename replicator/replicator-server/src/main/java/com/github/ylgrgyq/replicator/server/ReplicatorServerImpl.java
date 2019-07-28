@@ -3,10 +3,10 @@ package com.github.ylgrgyq.replicator.server;
 import com.github.ylgrgyq.replicator.server.connection.websocket.ReplicatorDecoder;
 import com.github.ylgrgyq.replicator.server.connection.websocket.ReplicatorEncoder;
 import com.github.ylgrgyq.replicator.server.connection.websocket.ReplicatorServerHandler;
-import com.github.ylgrgyq.replicator.server.sequence.Sequence;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceGroups;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
+import com.github.ylgrgyq.replicator.server.sequence.SequenceReader;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
 import com.github.ylgrgyq.replicator.server.storage.StorageFactory;
 import com.github.ylgrgyq.replicator.server.storage.StorageHandle;
@@ -34,7 +34,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
     private Storage<? extends StorageHandle> storage;
 
     public ReplicatorServerImpl(ReplicatorServerOptions options) throws InterruptedException {
-        this.groups = new SequenceGroups();
+        this.groups = new SequenceGroups(options);
         this.options = options;
         this.bossGroup = options.getBossEventLoopGroup();
         this.workerGroup = options.getWorkerEventLoopGroup();
@@ -63,13 +63,17 @@ public class ReplicatorServerImpl implements ReplicatorServer {
             }
         });
 
-        bootstrap.bind(options.getPort()).sync();
+        bootstrap.bind(options.getHost(), options.getPort()).sync();
     }
 
     @Override
     public SequenceAppender createSequence(String topic, SequenceOptions options) {
-        Sequence seq = groups.getOrCreateSequence(topic, storage, options);
-        return seq::append;
+        return groups.getOrCreateSequence(topic, storage, options);
+    }
+
+    @Override
+    public SequenceReader getSequenceReader(String topic) {
+        return groups.getSequence(topic);
     }
 
     @Override
@@ -79,15 +83,19 @@ public class ReplicatorServerImpl implements ReplicatorServer {
 
     @Override
     public void shutdown() throws InterruptedException{
-        if (options.isShouldShutdownBossEventLoopGroup()) {
+        if (options.shouldShutdownBossEventLoopGroup()) {
             bossGroup.shutdownGracefully();
         }
 
-        if (options.isShouldShutdownWorkerEventLoopGroup()) {
+        if (options.shouldShutdownWorkerEventLoopGroup()) {
             workerGroup.shutdownGracefully();
         }
 
         groups.shutdownAllSequences();
+
+        if (options.shouldShutdownWorkerScheduledExecutor()) {
+            options.getWorkerScheduledExecutor().shutdown();
+        }
 
         storage.shutdown();
     }

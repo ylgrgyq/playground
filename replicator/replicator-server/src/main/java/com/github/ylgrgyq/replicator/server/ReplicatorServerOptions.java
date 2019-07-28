@@ -6,6 +6,8 @@ import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 
 import java.util.Objects;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import static com.github.ylgrgyq.replicator.server.Preconditions.checkArgument;
@@ -19,27 +21,46 @@ public final class ReplicatorServerOptions {
     private final boolean shouldShutdownWorkerEventLoopGroup;
     private final int connectionReadTimeoutSecs;
     private final StorageOptions storageOptions;
+    private final ScheduledExecutorService workerScheduledExecutor;
+    private final boolean shouldShutdownWorkerScheduledExecutor;
 
     private ReplicatorServerOptions(ReplicatorServerOptionsBuilder builder) {
         this.port = builder.port;
-        this.host = builder.host;
+        this.host = builder.host == null ? "0.0.0.0" : builder.host;
         this.storageOptions = builder.storageOptions;
 
         if (builder.bossEventLoopGroup == null) {
-            this.bossEventLoopGroup = createEventLoopGroup(1, builder.preferEpoll);
+            this.bossEventLoopGroup = createEventLoopGroup(1, false);
+            this.shouldShutdownBossEventLoopGroup = true;
         } else {
             this.bossEventLoopGroup = builder.bossEventLoopGroup;
+            this.shouldShutdownBossEventLoopGroup = builder.shouldShutdownBossEventLoopGroup;
         }
 
         if (builder.workerEventLoopGroup == null) {
-            this.workerEventLoopGroup = createEventLoopGroup(0, builder.preferEpoll);
+            this.workerEventLoopGroup = createEventLoopGroup(0, false);
+            this.shouldShutdownWorkerEventLoopGroup = true;
         } else {
             this.workerEventLoopGroup = builder.workerEventLoopGroup;
+            this.shouldShutdownWorkerEventLoopGroup = builder.shouldShutdownWorkerEventLoopGroup;
         }
 
-        this.shouldShutdownBossEventLoopGroup = builder.shouldShutdownBossEventLoopGroup;
-        this.shouldShutdownWorkerEventLoopGroup = builder.shouldShutdownWorkerEventLoopGroup;
-        this.connectionReadTimeoutSecs = builder.connectionReadTimeoutSecs;
+        if (builder.connectionReadTimeoutSecs != null) {
+            this.connectionReadTimeoutSecs = builder.connectionReadTimeoutSecs;
+        } else {
+            this.connectionReadTimeoutSecs = 30;
+        }
+
+        if (builder.workerScheduledExecutor != null) {
+            this.workerScheduledExecutor = builder.workerScheduledExecutor;
+            this.shouldShutdownWorkerScheduledExecutor = builder.shouldShutdownWorkerScheduledExecutor;
+        } else {
+            int cpus = Runtime.getRuntime().availableProcessors();
+            int size = cpus * 2 - 1;
+            NamedThreadFactory factory = new NamedThreadFactory("ReplicatorServerWorker");
+            this.workerScheduledExecutor = new ScheduledThreadPoolExecutor(size, factory);
+            this.shouldShutdownWorkerScheduledExecutor = true;
+        }
     }
 
     private EventLoopGroup createEventLoopGroup(int nThreads, boolean preferEpoll) {
@@ -62,7 +83,7 @@ public final class ReplicatorServerOptions {
         return bossEventLoopGroup;
     }
 
-    public boolean isShouldShutdownBossEventLoopGroup() {
+    public boolean shouldShutdownBossEventLoopGroup() {
         return shouldShutdownBossEventLoopGroup;
     }
 
@@ -70,7 +91,7 @@ public final class ReplicatorServerOptions {
         return workerEventLoopGroup;
     }
 
-    public boolean isShouldShutdownWorkerEventLoopGroup() {
+    public boolean shouldShutdownWorkerEventLoopGroup() {
         return shouldShutdownWorkerEventLoopGroup;
     }
 
@@ -82,20 +103,30 @@ public final class ReplicatorServerOptions {
         return storageOptions;
     }
 
+    public ScheduledExecutorService getWorkerScheduledExecutor() {
+        return workerScheduledExecutor;
+    }
+
+    public boolean shouldShutdownWorkerScheduledExecutor() {
+        return shouldShutdownWorkerScheduledExecutor;
+    }
+
     public static ReplicatorServerOptionsBuilder builder() {
         return new ReplicatorServerOptionsBuilder();
     }
 
     public static class ReplicatorServerOptionsBuilder {
-        private int port;
-        private String host = "localhost";
+        private Integer port;
+        private String host;
         private StorageOptions storageOptions;
         private EventLoopGroup bossEventLoopGroup;
-        private boolean shouldShutdownBossEventLoopGroup = true;
+        private Boolean shouldShutdownBossEventLoopGroup;
         private EventLoopGroup workerEventLoopGroup;
-        private boolean shouldShutdownWorkerEventLoopGroup = true;
-        private boolean preferEpoll;
-        private int connectionReadTimeoutSecs = 30;
+        private Boolean shouldShutdownWorkerEventLoopGroup;
+        private Boolean preferEpoll;
+        private Integer connectionReadTimeoutSecs;
+        private ScheduledExecutorService workerScheduledExecutor;
+        private Boolean shouldShutdownWorkerScheduledExecutor;
 
         public ReplicatorServerOptionsBuilder setPort(int port) {
             checkArgument(port > 0);
@@ -126,7 +157,9 @@ public final class ReplicatorServerOptions {
             return this;
         }
 
-        public ReplicatorServerOptionsBuilder setWorkerEventLoopGroup(EventLoopGroup eventLoopGroup, boolean shouldShutdownEventLoopGroup) {
+        public ReplicatorServerOptionsBuilder setWorkerEventLoopGroup(
+                EventLoopGroup eventLoopGroup,
+                boolean shouldShutdownEventLoopGroup) {
             Objects.requireNonNull(eventLoopGroup);
 
             this.workerEventLoopGroup = eventLoopGroup;
@@ -142,14 +175,23 @@ public final class ReplicatorServerOptions {
         public ReplicatorServerOptionsBuilder setConnectionReadTimeoutSecs(long connectionReadTimeout, TimeUnit unit) {
             Preconditions.checkArgument(connectionReadTimeout > 0);
 
-            this.connectionReadTimeoutSecs = (int)unit.toSeconds(connectionReadTimeout);
+            this.connectionReadTimeoutSecs = (int) unit.toSeconds(connectionReadTimeout);
+            return this;
+        }
+
+        public ReplicatorServerOptionsBuilder setWorkerScheduledExecutor(
+                ScheduledExecutorService workerScheduledExecutor,
+                boolean shouldShutdownWorkerScheduledExecutor) {
+            Objects.requireNonNull(workerScheduledExecutor);
+
+            this.workerScheduledExecutor = workerScheduledExecutor;
+            this.shouldShutdownWorkerScheduledExecutor = shouldShutdownWorkerScheduledExecutor;
             return this;
         }
 
         public ReplicatorServerOptions build() {
             checkArgument(storageOptions != null, "Please provide storage options");
             checkArgument(port > 0, "Please provide port for Replicator Server to bind");
-            checkArgument(host != null, "Please provide host for Replicator Server to bind");
 
             return new ReplicatorServerOptions(this);
         }
