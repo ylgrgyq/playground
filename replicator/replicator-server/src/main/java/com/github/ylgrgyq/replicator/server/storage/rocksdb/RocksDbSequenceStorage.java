@@ -12,14 +12,14 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class RocksDbSequenceStorage implements SequenceStorage {
-    private Storage<RocksDbStorageHandle> storage;
+    private final Storage<RocksDbStorageHandle> storage;
     private final ReadWriteLock lock = new ReentrantReadWriteLock(false);
     private final Lock readLock = lock.readLock();
     private final Lock writeLock = lock.writeLock();
-    private volatile long firstLogId;
+    private final RocksDbStorageHandle handle;
 
+    private volatile long firstLogId;
     private volatile boolean hasLoadFirstLogId;
-    private RocksDbStorageHandle handle;
 
     public RocksDbSequenceStorage(Storage<RocksDbStorageHandle> storage, RocksDbStorageHandle storageHandle) {
         Objects.requireNonNull(storage);
@@ -106,13 +106,10 @@ public class RocksDbSequenceStorage implements SequenceStorage {
     }
 
     @Override
-    public void shutdown() {
+    public void drop() {
         writeLock.lock();
         try {
-            if (handle != null) {
-                handle.getColumnFailyHandle().close();
-                handle = null;
-            }
+            storage.dropSequenceStorage(handle);
         } finally {
             writeLock.unlock();
         }

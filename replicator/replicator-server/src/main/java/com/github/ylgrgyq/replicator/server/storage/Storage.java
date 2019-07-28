@@ -12,6 +12,8 @@ import java.util.regex.Pattern;
 public interface Storage<T extends StorageHandle> {
     SequenceStorage createSequenceStorage(String topic, SequenceOptions options);
 
+    void dropSequenceStorage(T handle);
+
     void append(T handle, long id, byte[] data);
 
     List<LogEntry> getEntries(T handle, long fromId, int limit);

@@ -15,5 +15,5 @@ public interface SequenceStorage {
 
     void trimToId(long id);
 
-    void shutdown();
+    void drop();
 }

@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
@@ -35,6 +36,7 @@ public class Sequence {
     private final Lock readLock;
     private final Lock writeLock;
     private final AtomicBoolean generateSnapshotJobScheduled;
+    private final ScheduledFuture<?> generateSnapshotFuture;
     private Snapshot lastSnapshot;
 
     /**
@@ -54,7 +56,9 @@ public class Sequence {
         this.writeLock = lock.writeLock();
 
         if (executor != null && snapshotGenerator != null) {
-            scheduleGenerateSnapshot();
+            generateSnapshotFuture = scheduleGenerateSnapshot();
+        } else {
+            generateSnapshotFuture = null;
         }
     }
 
@@ -88,8 +92,8 @@ public class Sequence {
         return emptySnapshot;
     }
 
-    private void scheduleGenerateSnapshot() {
-        executor.scheduleWithFixedDelay(() -> {
+    private ScheduledFuture<?> scheduleGenerateSnapshot() {
+        return executor.scheduleWithFixedDelay(() -> {
             if (generateSnapshotJobScheduled.compareAndSet(false, true)) {
                 Snapshot snapshot = snapshotGenerator.generateSnapshot();
                 writeLock.lock();
@@ -108,6 +112,15 @@ public class Sequence {
     }
 
     public void shutdown() {
-        storage.shutdown();
+        if (generateSnapshotFuture != null) {
+            generateSnapshotFuture.cancel(false);
+        }
+
+
+
+    }
+
+    public void drop() {
+        storage.drop();
     }
 }

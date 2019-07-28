@@ -1,7 +1,5 @@
 package com.github.ylgrgyq.replicator.server.sequence;
 
-import com.github.ylgrgyq.replicator.server.ReplicatorError;
-import com.github.ylgrgyq.replicator.server.ReplicatorException;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
 import com.github.ylgrgyq.replicator.server.storage.StorageHandle;
@@ -39,25 +37,12 @@ public class SequenceGroups {
         return new Sequence(topic, sequenceStorage, options);
     }
 
-    public synchronized boolean deleteSequence(String topic) {
+    public synchronized void dropSequence(String topic) {
         Sequence seq = topicToSource.remove(topic);
         if (seq != null) {
-            seq.shutdown();
-            return true;
-        } else {
-            return false;
+            seq.drop();
+
         }
-    }
-
-    public synchronized Sequence replaceSequence(String topic, Storage<? extends StorageHandle> storage, SequenceOptions options) {
-        Sequence sequence = createSequence(topic, storage, options);
-
-        Sequence oldSeq = topicToSource.put(topic, sequence);
-        if (oldSeq != null) {
-            oldSeq.shutdown();
-        }
-
-        return sequence;
     }
 
     public Sequence getSequence(String topic) {

@@ -5,7 +5,6 @@ import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 
 public interface ReplicatorServer {
     SequenceAppender createSequence(String topic, SequenceOptions options);
-    SequenceAppender replcaeSequence(String topic, SequenceOptions options);
-    boolean removeSequence(String topic);
+    void dropSequence(String topic);
     void shutdown() throws InterruptedException;
 }

@@ -73,14 +73,8 @@ public class ReplicatorServerImpl implements ReplicatorServer {
     }
 
     @Override
-    public SequenceAppender replcaeSequence(String topic, SequenceOptions options) {
-        Sequence seq = groups.replaceSequence(topic, storage, options);
-        return seq::append;
-    }
-
-    @Override
-    public boolean removeSequence(String topic) {
-        return groups.deleteSequence(topic);
+    public void dropSequence(String topic) {
+        groups.dropSequence(topic);
     }
 
     @Override

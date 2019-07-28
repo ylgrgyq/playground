@@ -5,12 +5,18 @@ import org.rocksdb.ColumnFamilyHandle;
 
 public class RocksDbStorageHandle implements StorageHandle {
     private ColumnFamilyHandle handle;
+    private String topic;
 
-    public RocksDbStorageHandle(ColumnFamilyHandle handle) {
+    public RocksDbStorageHandle(String topic, ColumnFamilyHandle handle) {
+        this.topic = topic;
         this.handle = handle;
     }
 
-    public ColumnFamilyHandle getColumnFailyHandle() {
+    public ColumnFamilyHandle getColumnFamilyHandle() {
         return handle;
+    }
+
+    public String getTopic() {
+        return topic;
     }
 }
