@@ -16,7 +16,7 @@ public class ReplicatorBenchmarkClient {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorBenchmarkClient.class);
 
     public static void main(String[] args) throws Exception{
-        ReplicatorClientOptions options = new ReplicatorClientOptions();
+        ReplicatorClientOptions options = ReplicatorClientOptions.builder().build();
 
 
         logger.info("Start sync log test...");

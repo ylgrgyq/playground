@@ -15,7 +15,7 @@ public class ReplicatorClient {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorClient.class);
 
     public static void main(String[] args) throws Exception{
-        ReplicatorClientOptions options = new ReplicatorClientOptions();
+        ReplicatorClientOptions options = ReplicatorClientOptions.builder().build();
         com.github.ylgrgyq.replicator.client.ReplicatorClient client = new com.github.ylgrgyq.replicator.client.ReplicatorClient("hahaha", new StateMachine() {
             @Override
             public void apply(List<byte[]> logs) {

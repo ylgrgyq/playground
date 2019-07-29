@@ -149,7 +149,9 @@ public final class ReplicatorServerOptions {
             return this;
         }
 
-        public ReplicatorServerOptionsBuilder setBossEventLoopGroup(EventLoopGroup eventLoopGroup, boolean shouldShutdownEventLoopGroup) {
+        public ReplicatorServerOptionsBuilder setBossEventLoopGroup(
+                EventLoopGroup eventLoopGroup,
+                boolean shouldShutdownEventLoopGroup) {
             Objects.requireNonNull(eventLoopGroup);
 
             this.bossEventLoopGroup = eventLoopGroup;
@@ -174,6 +176,7 @@ public final class ReplicatorServerOptions {
 
         public ReplicatorServerOptionsBuilder setConnectionReadTimeoutSecs(long connectionReadTimeout, TimeUnit unit) {
             Preconditions.checkArgument(connectionReadTimeout > 0);
+            Objects.requireNonNull(unit);
 
             this.connectionReadTimeoutSecs = (int) unit.toSeconds(connectionReadTimeout);
             return this;
