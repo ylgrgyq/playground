@@ -23,7 +23,7 @@ public class NettyReplicateChannel implements ReplicateChannel {
         ReplicatorCommand.Builder resp = ReplicatorCommand.newBuilder();
         resp.setType(ReplicatorCommand.CommandType.HANDSHAKE_RESP);
 
-        logger.info("send handshake resp");
+        logger.debug("send handshake resp");
         socket.writeAndFlush(resp.build());
     }
 
@@ -32,7 +32,7 @@ public class NettyReplicateChannel implements ReplicateChannel {
         ReplicatorCommand.Builder resp = ReplicatorCommand.newBuilder();
         resp.setType(ReplicatorCommand.CommandType.SNAPSHOT_RESP);
         resp.setSnapshot(snapshot);
-        logger.info("send snapshot resp {}", resp);
+        logger.debug("send snapshot resp {}", resp);
         socket.writeAndFlush(resp.build());
     }
 
@@ -41,7 +41,7 @@ public class NettyReplicateChannel implements ReplicateChannel {
         ReplicatorCommand.Builder resp = ReplicatorCommand.newBuilder();
         resp.setType(ReplicatorCommand.CommandType.GET_RESP);
         resp.setLogs(log);
-        logger.info("send get resp {} {}", resp, resp.build().toByteArray().length);
+        logger.debug("send get resp {} {}", resp, resp.build().toByteArray().length);
         socket.writeAndFlush(resp.build());
     }
 
@@ -54,7 +54,7 @@ public class NettyReplicateChannel implements ReplicateChannel {
         errorInfo.setErrorCode(error.getErrorCode());
         errorInfo.setErrorMsg(error.getMsg());
         builder.setError(errorInfo);
-        logger.info("send error {}", errorInfo);
+        logger.debug("send error {}", errorInfo);
         socket.writeAndFlush(builder.build());
     }
 }

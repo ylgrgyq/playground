@@ -35,7 +35,6 @@ public class Replica implements ReplicateRequestHandler {
             return;
         }
 
-        logger.info("sync {} {} {} {}", topic, seq, fromIndex, limit);
         SyncLogEntries log = seq.syncLogs(fromIndex, limit);
 
         channel.writeSyncLog(log);

@@ -53,8 +53,6 @@ public class ReplicatorBenchmarkServer {
 
             logger.info("The {} round append log test succeed", i);
         }
-
-        server.shutdown();
     }
 
     private static long runTest(ReplicatorServer server, long nextId, long logsCount) {
