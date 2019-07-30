@@ -6,7 +6,6 @@ import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceReader;
 import com.github.ylgrgyq.replicator.server.storage.StorageOptions;
-import com.google.protobuf.ByteString;
 import org.apache.commons.io.FileUtils;
 import org.junit.After;
 import org.junit.Before;
@@ -14,9 +13,8 @@ import org.junit.Test;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class ReplicatorServerImplTest {
     private ReplicatorServerImpl server;

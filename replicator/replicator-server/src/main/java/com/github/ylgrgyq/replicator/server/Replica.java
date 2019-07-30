@@ -30,7 +30,7 @@ public class Replica implements ReplicateRequestHandler {
     }
 
     @Override
-    public void heandleSyncLogs(long fromIndex, int limit) {
+    public void handleSyncLogs(long fromIndex, int limit) {
         if (!checkHandshakeState()) {
             return;
         }

@@ -45,7 +45,7 @@ public class ReplicatorServerHandler extends SimpleChannelInboundHandler<Replica
                     long fromIndex = cmd.getFromIndex();
                     int limit = cmd.getLimit();
 
-                    replica.heandleSyncLogs(fromIndex, limit);
+                    replica.handleSyncLogs(fromIndex, limit);
                     break;
                 case SNAPSHOT:
                     replica.handleSyncSnapshot();

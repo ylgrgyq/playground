@@ -5,12 +5,15 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 public class ReplicatorClientOptions {
+    private final String snapshotStoragePath;
     private final int port;
     private final String host;
     private final long reconnectDelaySeconds;
     private final URI uri;
     private final int pendingFlushLogsLowWaterMark;
     private final int pingIntervalSec;
+    private final int connectionTimeoutMillis;
+    private final boolean saveSnapshotSynchronously;
 
     private ReplicatorClientOptions(ReplicatorClientOptionsBuilder builder) {
         this.uri = builder.uri;
@@ -19,6 +22,9 @@ public class ReplicatorClientOptions {
         this.pendingFlushLogsLowWaterMark = builder.pendingFlushLogsLowWaterMark == null ? 10 : builder.pendingFlushLogsLowWaterMark;
         this.reconnectDelaySeconds = builder.reconnectDelaySeconds == null ? 10 : builder.reconnectDelaySeconds;
         this.pingIntervalSec = builder.pingIntervalSec == null ? 10 : builder.pingIntervalSec;
+        this.connectionTimeoutMillis = builder.connectionTimeoutMillis == null ? 5000 : builder.connectionTimeoutMillis;
+        this.snapshotStoragePath = builder.snapshotStoragePath;
+        this.saveSnapshotSynchronously = builder.saveSnapshotSynchronously == null ? false : builder.saveSnapshotSynchronously;
     }
 
     public int getPort() {
@@ -45,6 +51,18 @@ public class ReplicatorClientOptions {
         return pingIntervalSec;
     }
 
+    public int getConnectionTimeoutMillis() {
+        return connectionTimeoutMillis;
+    }
+
+    public String getSnapshotStoragePath() {
+        return snapshotStoragePath;
+    }
+
+    public boolean isSaveSnapshotSynchronously() {
+        return saveSnapshotSynchronously;
+    }
+
     public static ReplicatorClientOptionsBuilder builder() {
         return new ReplicatorClientOptionsBuilder();
     }
@@ -54,8 +72,11 @@ public class ReplicatorClientOptions {
         private URI uri;
         private Integer pendingFlushLogsLowWaterMark;
         private Integer pingIntervalSec;
+        private Integer connectionTimeoutMillis;
+        private String snapshotStoragePath;
+        private Boolean saveSnapshotSynchronously;
 
-        public ReplicatorClientOptionsBuilder setReconnectDelaySeconds(long reconnectDelay, TimeUnit unit) {
+        public ReplicatorClientOptionsBuilder setReconnectDelay(long reconnectDelay, TimeUnit unit) {
             Preconditions.checkArgument(reconnectDelay > 0);
             Objects.requireNonNull(unit);
 
@@ -75,16 +96,36 @@ public class ReplicatorClientOptions {
             return this;
         }
 
-        public ReplicatorClientOptionsBuilder setPingIntervalSec(long pingInterval, TimeUnit unit) {
+        public ReplicatorClientOptionsBuilder setPingInterval(long pingInterval, TimeUnit unit) {
             Preconditions.checkArgument(pingInterval > 0);
             Objects.requireNonNull(unit);
 
-            this.pingIntervalSec = (int)unit.toSeconds(pingInterval);
+            this.pingIntervalSec = (int) unit.toSeconds(pingInterval);
+            return this;
+        }
+
+        public ReplicatorClientOptionsBuilder setConnectionTimeout(long connectionTimeout, TimeUnit unit) {
+            Preconditions.checkArgument(connectionTimeout > 0);
+            Objects.requireNonNull(unit);
+
+            this.connectionTimeoutMillis = (int) unit.toMillis(connectionTimeout);
+            return this;
+        }
+
+        public ReplicatorClientOptionsBuilder setSnapshotStoragePath(String snapshotStoragePath) {
+            Objects.requireNonNull(snapshotStoragePath);
+
+            this.snapshotStoragePath = snapshotStoragePath;
+            return this;
+        }
+
+        public ReplicatorClientOptionsBuilder setSaveSnapshotSynchronously(boolean saveSnapshotSynchronously) {
+            this.saveSnapshotSynchronously = saveSnapshotSynchronously;
             return this;
         }
 
         public ReplicatorClientOptions build() {
-            Preconditions.checkArgument(uri == null, "Please set target server URI");
+            Preconditions.checkArgument(uri != null, "Please set target server URI");
 
             return new ReplicatorClientOptions(this);
         }

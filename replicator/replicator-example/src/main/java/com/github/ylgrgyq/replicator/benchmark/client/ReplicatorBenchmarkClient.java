@@ -6,6 +6,7 @@ import com.github.ylgrgyq.replicator.client.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -16,7 +17,12 @@ public class ReplicatorBenchmarkClient {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorBenchmarkClient.class);
 
     public static void main(String[] args) throws Exception{
-        ReplicatorClientOptions options = ReplicatorClientOptions.builder().build();
+        URI uri = new URI("ws://localhost:8888");
+
+        ReplicatorClientOptions options = ReplicatorClientOptions
+                .builder()
+                .setUri(uri)
+                .build();
 
 
         logger.info("Start sync log test...");

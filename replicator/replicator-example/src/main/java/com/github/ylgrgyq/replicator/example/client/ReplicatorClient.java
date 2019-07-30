@@ -5,6 +5,7 @@ import com.github.ylgrgyq.replicator.client.StateMachine;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -14,8 +15,11 @@ import java.util.stream.Collectors;
 public class ReplicatorClient {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorClient.class);
 
-    public static void main(String[] args) throws Exception{
-        ReplicatorClientOptions options = ReplicatorClientOptions.builder().build();
+    public static void main(String[] args) throws Exception {
+        ReplicatorClientOptions options = ReplicatorClientOptions
+                .builder()
+                .setUri(new URI("ws://localhost:8888"))
+                .build();
         com.github.ylgrgyq.replicator.client.ReplicatorClient client = new com.github.ylgrgyq.replicator.client.ReplicatorClient("hahaha", new StateMachine() {
             @Override
             public void apply(List<byte[]> logs) {

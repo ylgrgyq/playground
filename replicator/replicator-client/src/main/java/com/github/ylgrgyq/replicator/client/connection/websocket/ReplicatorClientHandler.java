@@ -2,6 +2,7 @@ package com.github.ylgrgyq.replicator.client.connection.websocket;
 
 import com.github.ylgrgyq.replicator.client.ReplicatorClientOptions;
 import com.github.ylgrgyq.replicator.client.ReplicatorException;
+import com.github.ylgrgyq.replicator.client.SnapshotManager;
 import com.github.ylgrgyq.replicator.client.StateMachineCaller;
 import com.github.ylgrgyq.replicator.proto.*;
 import io.netty.channel.Channel;
@@ -12,6 +13,7 @@ import io.netty.handler.timeout.IdleStateEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -19,15 +21,19 @@ import java.util.stream.Collectors;
 public class ReplicatorClientHandler extends SimpleChannelInboundHandler<ReplicatorCommand> {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorClientHandler.class);
 
-    private String topic;
+    private final String topic;
+    private final StateMachineCaller stateMachineCaller;
+    private final ReplicatorClientOptions options;
+    private final SnapshotManager snapshotManager;
+
     private long lastId;
-    private StateMachineCaller stateMachineCaller;
     private volatile boolean suspend;
     private int pendingApplyLogsRequestCount;
-    private ReplicatorClientOptions options;
 
-    public ReplicatorClientHandler(String topic, StateMachineCaller stateMachineCaller, ReplicatorClientOptions options) {
+    public ReplicatorClientHandler(String topic, SnapshotManager snapshotManager,
+                                   StateMachineCaller stateMachineCaller, ReplicatorClientOptions options) {
         this.topic = topic;
+        this.snapshotManager = snapshotManager;
         this.stateMachineCaller = stateMachineCaller;
         this.lastId = Long.MIN_VALUE;
         this.suspend = false;
@@ -35,10 +41,10 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, ReplicatorCommand cmd) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, ReplicatorCommand cmd) {
         switch (cmd.getType()) {
             case HANDSHAKE_RESP:
-                requestSnapshot(ctx.channel(), topic);
+                handleHandshakeResp(ctx);
                 break;
             case GET_RESP:
                 SyncLogEntries logs = cmd.getLogs();
@@ -51,7 +57,7 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
             case ERROR:
                 ErrorInfo errorInfo = cmd.getError();
                 if (errorInfo.getErrorCode() == 10001) {
-                    requestSnapshot(ctx.channel(), topic);
+                    requestSnapshot(ctx.channel());
                 } else {
                     logger.error("got error", errorInfo);
                 }
@@ -59,7 +65,16 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
         }
     }
 
-    private void requestSnapshot(Channel ch, String topic) {
+    private void handleHandshakeResp(ChannelHandlerContext ctx) {
+        Snapshot lastSnapshot = snapshotManager.getLastSnapshot();
+        if (lastSnapshot != null && lastSnapshot.getId() > lastId) {
+            handleApplySnapshot(ctx, lastSnapshot);
+        } else {
+            requestSnapshot(ctx.channel());
+        }
+    }
+
+    private void requestSnapshot(Channel ch) {
         ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
         get.setType(ReplicatorCommand.CommandType.SNAPSHOT);
         get.setTopic(topic);
@@ -75,7 +90,7 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
             LogEntry lastEntry = entryList.get(entryList.size() - 1);
             if (firstEntry.getId() > lastId + 1) {
                 logger.warn("lastId:{} is too far behind sync logs {}", lastId, firstEntry.getId());
-                requestSnapshot(ctx.channel(), topic);
+                requestSnapshot(ctx.channel());
             } else if (lastEntry.getId() > lastId) {
                 int i = 0;
                 for (; i < entryList.size(); ++i) {
@@ -132,27 +147,33 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     }
 
     private void handleApplySnapshot(ChannelHandlerContext ctx, Snapshot snapshot) {
-        long snapshotId = snapshot.getId();
-        if (snapshotId > lastId) {
-            stateMachineCaller.applySnapshot(snapshot)
-                    .whenComplete((ret, t) -> {
-                        if (t != null) {
-                            assert (t instanceof ReplicatorException) : t;
-                            logger.warn("state machine is busy, apply snapshot latter", t);
-                            suspend = true;
-                            ctx.executor().schedule(() ->
-                                    handleApplySnapshot(ctx, snapshot), 10, TimeUnit.SECONDS);
-                        } else {
-                            ctx.executor().submit(() -> {
-                                assert lastId > snapshotId;
-                                if (pendingApplyLogsRequestCount < options.getPendingFlushLogsLowWaterMark()) {
-                                    suspend = false;
-                                }
-                                lastId = snapshotId;
-                                requestLogs(ctx.channel(), topic, snapshotId);
-                            });
-                        }
-                    });
+        try {
+            long snapshotId = snapshot.getId();
+            if (snapshotId > lastId) {
+                snapshotManager.storeSnapshot(snapshot);
+                stateMachineCaller.applySnapshot(snapshot)
+                        .whenComplete((ret, t) -> {
+                            if (t != null) {
+                                assert (t instanceof ReplicatorException) : t;
+                                logger.warn("state machine is busy, apply snapshot latter", t);
+                                suspend = true;
+                                ctx.executor().schedule(() ->
+                                                handleApplySnapshot(ctx, snapshot)
+                                        , 10, TimeUnit.SECONDS);
+                            } else {
+                                ctx.executor().submit(() -> {
+                                    assert lastId > snapshotId;
+                                    if (pendingApplyLogsRequestCount < options.getPendingFlushLogsLowWaterMark()) {
+                                        suspend = false;
+                                    }
+                                    lastId = snapshotId;
+                                    requestLogs(ctx.channel(), topic, snapshotId);
+                                });
+                            }
+                        });
+            }
+        } catch (IOException ex) {
+            logger.error("Apply snapshot with id: {} failed", snapshot.getId());
         }
     }
 
@@ -172,10 +193,6 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
         } else if (evt == WebSocketClientProtocolHandler.ClientHandshakeStateEvent.HANDSHAKE_COMPLETE) {
             handshake(ctx.channel(), topic);
         }
-    }
-
-    public long getLastId() {
-        return lastId;
     }
 
     public void handshake(Channel ch, String topic) {

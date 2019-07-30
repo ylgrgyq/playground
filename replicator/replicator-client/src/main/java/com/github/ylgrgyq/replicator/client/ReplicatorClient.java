@@ -18,6 +18,7 @@ import io.netty.handler.timeout.IdleStateHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -32,14 +33,18 @@ public class ReplicatorClient {
     private String topic;
     private StateMachineCaller stateMachineCaller;
     private CompletableFuture<Void> terminationFuture;
+    private SnapshotManager snapshotManager;
 
-    public ReplicatorClient(String topic, StateMachine stateMachine, ReplicatorClientOptions options) {
+    public ReplicatorClient(String topic, StateMachine stateMachine, ReplicatorClientOptions options) throws IOException {
         super();
         this.topic = topic;
         this.options = options;
         this.group = new NioEventLoopGroup();
         this.stop = false;
         this.stateMachineCaller = new StateMachineCaller(stateMachine, this);
+        this.snapshotManager = new SnapshotManager(options);
+
+        this.snapshotManager.loadLastSnapshot();
     }
 
     public CompletableFuture<Void> start() {
@@ -62,7 +67,6 @@ public class ReplicatorClient {
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.group(group);
 
-        ReplicatorClientHandler clientHandler = new ReplicatorClientHandler(topic, stateMachineCaller, options);
         bootstrap.handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel channel) {
@@ -76,11 +80,11 @@ public class ReplicatorClient {
                         new DefaultHttpHeaders(), 65536));
                 pipeline.addLast(ReplicatorEncoder.INSTANCE);
                 pipeline.addLast(ReplicatorDecoder.INSTANCE);
-                pipeline.addLast(clientHandler);
+                pipeline.addLast(new ReplicatorClientHandler(topic, snapshotManager, stateMachineCaller, options));
             }
         });
 
-        bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000);
+        bootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, options.getConnectionTimeoutMillis());
         logger.info("start connecting to {}:{}...", options.getHost(), options.getPort());
         bootstrap.connect(options.getHost(), options.getPort()).addListener((ChannelFuture f) -> {
             if (f.isSuccess()) {
