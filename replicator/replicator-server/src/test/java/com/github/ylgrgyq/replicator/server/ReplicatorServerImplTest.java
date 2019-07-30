@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.server;
 
+import com.github.ylgrgyq.replicator.proto.BatchLogEntries;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
-import com.github.ylgrgyq.replicator.proto.SyncLogEntries;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceReader;
@@ -61,7 +61,7 @@ public class ReplicatorServerImplTest {
         }
 
         SequenceReader reader = server.getSequenceReader(topic);
-        SyncLogEntries logs = reader.syncLogs(0, 100);
+        BatchLogEntries logs = reader.getLogs(0, 100);
         assertEquals(100, logs.getEntriesCount());
     }
 }

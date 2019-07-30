@@ -20,10 +20,10 @@ public final class Commands {
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_fieldAccessorTable;
   static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_com_github_ylgrgyq_replicator_proto_SyncLogEntries_descriptor;
+    internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_descriptor;
   static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_com_github_ylgrgyq_replicator_proto_SyncLogEntries_fieldAccessorTable;
+      internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_fieldAccessorTable;
   static final com.google.protobuf.Descriptors.Descriptor
     internal_static_com_github_ylgrgyq_replicator_proto_Snapshot_descriptor;
   static final 
@@ -34,6 +34,41 @@ public final class Commands {
   static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_com_github_ylgrgyq_replicator_proto_ErrorInfo_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_com_github_ylgrgyq_replicator_proto_HandshakeRequest_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_com_github_ylgrgyq_replicator_proto_HandshakeRequest_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_com_github_ylgrgyq_replicator_proto_HandshakeResponse_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_com_github_ylgrgyq_replicator_proto_HandshakeResponse_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsRequest_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsRequest_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsResponse_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsResponse_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotRequest_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotRequest_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotResponse_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotResponse_fieldAccessorTable;
+  static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_com_github_ylgrgyq_replicator_proto_Error_descriptor;
+  static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_com_github_ylgrgyq_replicator_proto_Error_fieldAccessorTable;
   static final com.google.protobuf.Descriptors.Descriptor
     internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_descriptor;
   static final 
@@ -49,25 +84,45 @@ public final class Commands {
   static {
     java.lang.String[] descriptorData = {
       "\n\016commands.proto\022#com.github.ylgrgyq.rep" +
-      "licator.proto\"3\n\010LogEntry\022\r\n\005index\030\001 \001(\003" +
-      "\022\n\n\002id\030\002 \001(\003\022\014\n\004data\030\003 \001(\014\"P\n\016SyncLogEnt" +
-      "ries\022>\n\007entries\030\001 \003(\0132-.com.github.ylgrg" +
-      "yq.replicator.proto.LogEntry\"3\n\010Snapshot" +
-      "\022\014\n\004data\030\001 \001(\014\022\n\n\002id\030\002 \001(\003\022\r\n\005topic\030\003 \001(" +
-      "\t\"2\n\tErrorInfo\022\022\n\nerror_code\030\001 \001(\005\022\021\n\ter" +
-      "ror_msg\030\002 \001(\t\"\334\003\n\021ReplicatorCommand\022P\n\004t" +
-      "ype\030\001 \001(\0162B.com.github.ylgrgyq.replicato" +
-      "r.proto.ReplicatorCommand.CommandType\022\r\n",
-      "\005topic\030\002 \001(\t\022\021\n\tfromIndex\030\003 \001(\003\022\r\n\005limit" +
-      "\030\004 \001(\005\022A\n\004logs\030\005 \001(\01323.com.github.ylgrgy" +
-      "q.replicator.proto.SyncLogEntries\022?\n\010sna" +
-      "pshot\030\006 \001(\0132-.com.github.ylgrgyq.replica" +
-      "tor.proto.Snapshot\022=\n\005error\030\007 \001(\0132..com." +
-      "github.ylgrgyq.replicator.proto.ErrorInf" +
-      "o\"\200\001\n\013CommandType\022\013\n\007UNKNOWN\020\000\022\007\n\003GET\020\001\022" +
-      "\014\n\010GET_RESP\020\002\022\014\n\010SNAPSHOT\020\003\022\021\n\rSNAPSHOT_" +
-      "RESP\020\004\022\r\n\tHANDSHAKE\020\005\022\022\n\016HANDSHAKE_RESP\020" +
-      "\006\022\t\n\005ERROR\020\007B\002P\001b\006proto3"
+      "licator.proto\"$\n\010LogEntry\022\n\n\002id\030\001 \001(\003\022\014\n" +
+      "\004data\030\003 \001(\014\"Q\n\017BatchLogEntries\022>\n\007entrie" +
+      "s\030\001 \003(\0132-.com.github.ylgrgyq.replicator." +
+      "proto.LogEntry\"$\n\010Snapshot\022\n\n\002id\030\001 \001(\003\022\014" +
+      "\n\004data\030\002 \001(\014\"2\n\tErrorInfo\022\022\n\nerror_code\030" +
+      "\001 \001(\005\022\021\n\terror_msg\030\002 \001(\t\"!\n\020HandshakeReq" +
+      "uest\022\r\n\005topic\030\001 \001(\t\"\023\n\021HandshakeResponse" +
+      "\"1\n\020FetchLogsRequest\022\016\n\006fromId\030\001 \001(\003\022\r\n\005" +
+      "limit\030\002 \001(\005\"W\n\021FetchLogsResponse\022B\n\004logs",
+      "\030\001 \001(\01324.com.github.ylgrgyq.replicator.p" +
+      "roto.BatchLogEntries\"\026\n\024FetchSnapshotReq" +
+      "uest\"X\n\025FetchSnapshotResponse\022?\n\010snapsho" +
+      "t\030\001 \001(\0132-.com.github.ylgrgyq.replicator." +
+      "proto.Snapshot\"F\n\005Error\022=\n\005error\030\001 \001(\0132." +
+      ".com.github.ylgrgyq.replicator.proto.Err" +
+      "orInfo\"\377\005\n\021ReplicatorCommand\022>\n\004type\030\001 \001" +
+      "(\01620.com.github.ylgrgyq.replicator.proto" +
+      ".CommandType\022B\n\010msg_type\030\002 \001(\01620.com.git" +
+      "hub.ylgrgyq.replicator.proto.MessageType",
+      "\022R\n\021handshake_request\030\003 \001(\01325.com.github" +
+      ".ylgrgyq.replicator.proto.HandshakeReque" +
+      "stH\000\022S\n\022fetch_logs_request\030\004 \001(\01325.com.g" +
+      "ithub.ylgrgyq.replicator.proto.FetchLogs" +
+      "RequestH\000\022[\n\026fetch_snapshot_request\030\005 \001(" +
+      "\01329.com.github.ylgrgyq.replicator.proto." +
+      "FetchSnapshotRequestH\000\022T\n\022handshake_resp" +
+      "onse\030\006 \001(\01326.com.github.ylgrgyq.replicat" +
+      "or.proto.HandshakeResponseH\001\022U\n\023fetch_lo" +
+      "gs_response\030\007 \001(\01326.com.github.ylgrgyq.r",
+      "eplicator.proto.FetchLogsResponseH\001\022]\n\027f" +
+      "etch_snapshot_response\030\010 \001(\0132:.com.githu" +
+      "b.ylgrgyq.replicator.proto.FetchSnapshot" +
+      "ResponseH\001\022=\n\005error\030\t \001(\0132..com.github.y" +
+      "lgrgyq.replicator.proto.ErrorInfoB\t\n\007req" +
+      "uestB\n\n\010response*X\n\013CommandType\022\013\n\007UNKNO" +
+      "WN\020\000\022\r\n\tHANDSHAKE\020\001\022\016\n\nFETCH_LOGS\020\002\022\022\n\016F" +
+      "ETCH_SNAPSHOT\020\003\022\t\n\005ERROR\020\004*5\n\013MessageTyp" +
+      "e\022\013\n\007ONE_WAY\020\000\022\013\n\007REQUEST\020\001\022\014\n\010RESPONSE\020" +
+      "\002B\002P\001b\006proto3"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
         new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
@@ -86,31 +141,73 @@ public final class Commands {
     internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_descriptor,
-        new java.lang.String[] { "Index", "Id", "Data", });
-    internal_static_com_github_ylgrgyq_replicator_proto_SyncLogEntries_descriptor =
+        new java.lang.String[] { "Id", "Data", });
+    internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_descriptor =
       getDescriptor().getMessageTypes().get(1);
-    internal_static_com_github_ylgrgyq_replicator_proto_SyncLogEntries_fieldAccessorTable = new
+    internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_com_github_ylgrgyq_replicator_proto_SyncLogEntries_descriptor,
+        internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_descriptor,
         new java.lang.String[] { "Entries", });
     internal_static_com_github_ylgrgyq_replicator_proto_Snapshot_descriptor =
       getDescriptor().getMessageTypes().get(2);
     internal_static_com_github_ylgrgyq_replicator_proto_Snapshot_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_com_github_ylgrgyq_replicator_proto_Snapshot_descriptor,
-        new java.lang.String[] { "Data", "Id", "Topic", });
+        new java.lang.String[] { "Id", "Data", });
     internal_static_com_github_ylgrgyq_replicator_proto_ErrorInfo_descriptor =
       getDescriptor().getMessageTypes().get(3);
     internal_static_com_github_ylgrgyq_replicator_proto_ErrorInfo_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_com_github_ylgrgyq_replicator_proto_ErrorInfo_descriptor,
         new java.lang.String[] { "ErrorCode", "ErrorMsg", });
-    internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_descriptor =
+    internal_static_com_github_ylgrgyq_replicator_proto_HandshakeRequest_descriptor =
       getDescriptor().getMessageTypes().get(4);
+    internal_static_com_github_ylgrgyq_replicator_proto_HandshakeRequest_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_com_github_ylgrgyq_replicator_proto_HandshakeRequest_descriptor,
+        new java.lang.String[] { "Topic", });
+    internal_static_com_github_ylgrgyq_replicator_proto_HandshakeResponse_descriptor =
+      getDescriptor().getMessageTypes().get(5);
+    internal_static_com_github_ylgrgyq_replicator_proto_HandshakeResponse_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_com_github_ylgrgyq_replicator_proto_HandshakeResponse_descriptor,
+        new java.lang.String[] { });
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsRequest_descriptor =
+      getDescriptor().getMessageTypes().get(6);
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsRequest_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsRequest_descriptor,
+        new java.lang.String[] { "FromId", "Limit", });
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsResponse_descriptor =
+      getDescriptor().getMessageTypes().get(7);
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsResponse_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsResponse_descriptor,
+        new java.lang.String[] { "Logs", });
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotRequest_descriptor =
+      getDescriptor().getMessageTypes().get(8);
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotRequest_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotRequest_descriptor,
+        new java.lang.String[] { });
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotResponse_descriptor =
+      getDescriptor().getMessageTypes().get(9);
+    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotResponse_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotResponse_descriptor,
+        new java.lang.String[] { "Snapshot", });
+    internal_static_com_github_ylgrgyq_replicator_proto_Error_descriptor =
+      getDescriptor().getMessageTypes().get(10);
+    internal_static_com_github_ylgrgyq_replicator_proto_Error_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_com_github_ylgrgyq_replicator_proto_Error_descriptor,
+        new java.lang.String[] { "Error", });
+    internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_descriptor =
+      getDescriptor().getMessageTypes().get(11);
     internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_descriptor,
-        new java.lang.String[] { "Type", "Topic", "FromIndex", "Limit", "Logs", "Snapshot", "Error", });
+        new java.lang.String[] { "Type", "MsgType", "HandshakeRequest", "FetchLogsRequest", "FetchSnapshotRequest", "HandshakeResponse", "FetchLogsResponse", "FetchSnapshotResponse", "Error", "Request", "Response", });
   }
 
   // @@protoc_insertion_point(outer_class_scope)

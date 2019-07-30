@@ -16,9 +16,7 @@ public  final class ReplicatorCommand extends
   }
   private ReplicatorCommand() {
     type_ = 0;
-    topic_ = "";
-    fromIndex_ = 0L;
-    limit_ = 0;
+    msgType_ = 0;
   }
 
   @java.lang.Override
@@ -52,49 +50,97 @@ public  final class ReplicatorCommand extends
             type_ = rawValue;
             break;
           }
-          case 18: {
-            java.lang.String s = input.readStringRequireUtf8();
+          case 16: {
+            int rawValue = input.readEnum();
 
-            topic_ = s;
+            msgType_ = rawValue;
             break;
           }
-          case 24: {
-
-            fromIndex_ = input.readInt64();
+          case 26: {
+            com.github.ylgrgyq.replicator.proto.HandshakeRequest.Builder subBuilder = null;
+            if (requestCase_ == 3) {
+              subBuilder = ((com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_).toBuilder();
+            }
+            request_ =
+                input.readMessage(com.github.ylgrgyq.replicator.proto.HandshakeRequest.parser(), extensionRegistry);
+            if (subBuilder != null) {
+              subBuilder.mergeFrom((com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_);
+              request_ = subBuilder.buildPartial();
+            }
+            requestCase_ = 3;
             break;
           }
-          case 32: {
-
-            limit_ = input.readInt32();
+          case 34: {
+            com.github.ylgrgyq.replicator.proto.FetchLogsRequest.Builder subBuilder = null;
+            if (requestCase_ == 4) {
+              subBuilder = ((com.github.ylgrgyq.replicator.proto.FetchLogsRequest) request_).toBuilder();
+            }
+            request_ =
+                input.readMessage(com.github.ylgrgyq.replicator.proto.FetchLogsRequest.parser(), extensionRegistry);
+            if (subBuilder != null) {
+              subBuilder.mergeFrom((com.github.ylgrgyq.replicator.proto.FetchLogsRequest) request_);
+              request_ = subBuilder.buildPartial();
+            }
+            requestCase_ = 4;
             break;
           }
           case 42: {
-            com.github.ylgrgyq.replicator.proto.SyncLogEntries.Builder subBuilder = null;
-            if (logs_ != null) {
-              subBuilder = logs_.toBuilder();
+            com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.Builder subBuilder = null;
+            if (requestCase_ == 5) {
+              subBuilder = ((com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest) request_).toBuilder();
             }
-            logs_ = input.readMessage(com.github.ylgrgyq.replicator.proto.SyncLogEntries.parser(), extensionRegistry);
+            request_ =
+                input.readMessage(com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.parser(), extensionRegistry);
             if (subBuilder != null) {
-              subBuilder.mergeFrom(logs_);
-              logs_ = subBuilder.buildPartial();
+              subBuilder.mergeFrom((com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest) request_);
+              request_ = subBuilder.buildPartial();
             }
-
+            requestCase_ = 5;
             break;
           }
           case 50: {
-            com.github.ylgrgyq.replicator.proto.Snapshot.Builder subBuilder = null;
-            if (snapshot_ != null) {
-              subBuilder = snapshot_.toBuilder();
+            com.github.ylgrgyq.replicator.proto.HandshakeResponse.Builder subBuilder = null;
+            if (responseCase_ == 6) {
+              subBuilder = ((com.github.ylgrgyq.replicator.proto.HandshakeResponse) response_).toBuilder();
             }
-            snapshot_ = input.readMessage(com.github.ylgrgyq.replicator.proto.Snapshot.parser(), extensionRegistry);
+            response_ =
+                input.readMessage(com.github.ylgrgyq.replicator.proto.HandshakeResponse.parser(), extensionRegistry);
             if (subBuilder != null) {
-              subBuilder.mergeFrom(snapshot_);
-              snapshot_ = subBuilder.buildPartial();
+              subBuilder.mergeFrom((com.github.ylgrgyq.replicator.proto.HandshakeResponse) response_);
+              response_ = subBuilder.buildPartial();
             }
-
+            responseCase_ = 6;
             break;
           }
           case 58: {
+            com.github.ylgrgyq.replicator.proto.FetchLogsResponse.Builder subBuilder = null;
+            if (responseCase_ == 7) {
+              subBuilder = ((com.github.ylgrgyq.replicator.proto.FetchLogsResponse) response_).toBuilder();
+            }
+            response_ =
+                input.readMessage(com.github.ylgrgyq.replicator.proto.FetchLogsResponse.parser(), extensionRegistry);
+            if (subBuilder != null) {
+              subBuilder.mergeFrom((com.github.ylgrgyq.replicator.proto.FetchLogsResponse) response_);
+              response_ = subBuilder.buildPartial();
+            }
+            responseCase_ = 7;
+            break;
+          }
+          case 66: {
+            com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.Builder subBuilder = null;
+            if (responseCase_ == 8) {
+              subBuilder = ((com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse) response_).toBuilder();
+            }
+            response_ =
+                input.readMessage(com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.parser(), extensionRegistry);
+            if (subBuilder != null) {
+              subBuilder.mergeFrom((com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse) response_);
+              response_ = subBuilder.buildPartial();
+            }
+            responseCase_ = 8;
+            break;
+          }
+          case 74: {
             com.github.ylgrgyq.replicator.proto.ErrorInfo.Builder subBuilder = null;
             if (error_ != null) {
               subBuilder = error_.toBuilder();
@@ -130,284 +176,254 @@ public  final class ReplicatorCommand extends
             com.github.ylgrgyq.replicator.proto.ReplicatorCommand.class, com.github.ylgrgyq.replicator.proto.ReplicatorCommand.Builder.class);
   }
 
-  /**
-   * Protobuf enum {@code com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType}
-   */
-  public enum CommandType
-      implements com.google.protobuf.ProtocolMessageEnum {
-    /**
-     * <code>UNKNOWN = 0;</code>
-     */
-    UNKNOWN(0),
-    /**
-     * <code>GET = 1;</code>
-     */
-    GET(1),
-    /**
-     * <code>GET_RESP = 2;</code>
-     */
-    GET_RESP(2),
-    /**
-     * <code>SNAPSHOT = 3;</code>
-     */
-    SNAPSHOT(3),
-    /**
-     * <code>SNAPSHOT_RESP = 4;</code>
-     */
-    SNAPSHOT_RESP(4),
-    /**
-     * <code>HANDSHAKE = 5;</code>
-     */
-    HANDSHAKE(5),
-    /**
-     * <code>HANDSHAKE_RESP = 6;</code>
-     */
-    HANDSHAKE_RESP(6),
-    /**
-     * <code>ERROR = 7;</code>
-     */
-    ERROR(7),
-    UNRECOGNIZED(-1),
-    ;
-
-    /**
-     * <code>UNKNOWN = 0;</code>
-     */
-    public static final int UNKNOWN_VALUE = 0;
-    /**
-     * <code>GET = 1;</code>
-     */
-    public static final int GET_VALUE = 1;
-    /**
-     * <code>GET_RESP = 2;</code>
-     */
-    public static final int GET_RESP_VALUE = 2;
-    /**
-     * <code>SNAPSHOT = 3;</code>
-     */
-    public static final int SNAPSHOT_VALUE = 3;
-    /**
-     * <code>SNAPSHOT_RESP = 4;</code>
-     */
-    public static final int SNAPSHOT_RESP_VALUE = 4;
-    /**
-     * <code>HANDSHAKE = 5;</code>
-     */
-    public static final int HANDSHAKE_VALUE = 5;
-    /**
-     * <code>HANDSHAKE_RESP = 6;</code>
-     */
-    public static final int HANDSHAKE_RESP_VALUE = 6;
-    /**
-     * <code>ERROR = 7;</code>
-     */
-    public static final int ERROR_VALUE = 7;
-
-
-    public final int getNumber() {
-      if (this == UNRECOGNIZED) {
-        throw new java.lang.IllegalArgumentException(
-            "Can't get the number of an unknown enum value.");
-      }
-      return value;
+  private int requestCase_ = 0;
+  private java.lang.Object request_;
+  public enum RequestCase
+      implements com.google.protobuf.Internal.EnumLite {
+    HANDSHAKE_REQUEST(3),
+    FETCH_LOGS_REQUEST(4),
+    FETCH_SNAPSHOT_REQUEST(5),
+    REQUEST_NOT_SET(0);
+    private final int value;
+    private RequestCase(int value) {
+      this.value = value;
     }
-
     /**
      * @deprecated Use {@link #forNumber(int)} instead.
      */
     @java.lang.Deprecated
-    public static CommandType valueOf(int value) {
+    public static RequestCase valueOf(int value) {
       return forNumber(value);
     }
 
-    public static CommandType forNumber(int value) {
+    public static RequestCase forNumber(int value) {
       switch (value) {
-        case 0: return UNKNOWN;
-        case 1: return GET;
-        case 2: return GET_RESP;
-        case 3: return SNAPSHOT;
-        case 4: return SNAPSHOT_RESP;
-        case 5: return HANDSHAKE;
-        case 6: return HANDSHAKE_RESP;
-        case 7: return ERROR;
+        case 3: return HANDSHAKE_REQUEST;
+        case 4: return FETCH_LOGS_REQUEST;
+        case 5: return FETCH_SNAPSHOT_REQUEST;
+        case 0: return REQUEST_NOT_SET;
         default: return null;
       }
     }
-
-    public static com.google.protobuf.Internal.EnumLiteMap<CommandType>
-        internalGetValueMap() {
-      return internalValueMap;
+    public int getNumber() {
+      return this.value;
     }
-    private static final com.google.protobuf.Internal.EnumLiteMap<
-        CommandType> internalValueMap =
-          new com.google.protobuf.Internal.EnumLiteMap<CommandType>() {
-            public CommandType findValueByNumber(int number) {
-              return CommandType.forNumber(number);
-            }
-          };
+  };
 
-    public final com.google.protobuf.Descriptors.EnumValueDescriptor
-        getValueDescriptor() {
-      return getDescriptor().getValues().get(ordinal());
-    }
-    public final com.google.protobuf.Descriptors.EnumDescriptor
-        getDescriptorForType() {
-      return getDescriptor();
-    }
-    public static final com.google.protobuf.Descriptors.EnumDescriptor
-        getDescriptor() {
-      return com.github.ylgrgyq.replicator.proto.ReplicatorCommand.getDescriptor().getEnumTypes().get(0);
-    }
+  public RequestCase
+  getRequestCase() {
+    return RequestCase.forNumber(
+        requestCase_);
+  }
 
-    private static final CommandType[] VALUES = values();
-
-    public static CommandType valueOf(
-        com.google.protobuf.Descriptors.EnumValueDescriptor desc) {
-      if (desc.getType() != getDescriptor()) {
-        throw new java.lang.IllegalArgumentException(
-          "EnumValueDescriptor is not for this type.");
-      }
-      if (desc.getIndex() == -1) {
-        return UNRECOGNIZED;
-      }
-      return VALUES[desc.getIndex()];
-    }
-
+  private int responseCase_ = 0;
+  private java.lang.Object response_;
+  public enum ResponseCase
+      implements com.google.protobuf.Internal.EnumLite {
+    HANDSHAKE_RESPONSE(6),
+    FETCH_LOGS_RESPONSE(7),
+    FETCH_SNAPSHOT_RESPONSE(8),
+    RESPONSE_NOT_SET(0);
     private final int value;
-
-    private CommandType(int value) {
+    private ResponseCase(int value) {
       this.value = value;
     }
+    /**
+     * @deprecated Use {@link #forNumber(int)} instead.
+     */
+    @java.lang.Deprecated
+    public static ResponseCase valueOf(int value) {
+      return forNumber(value);
+    }
 
-    // @@protoc_insertion_point(enum_scope:com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType)
+    public static ResponseCase forNumber(int value) {
+      switch (value) {
+        case 6: return HANDSHAKE_RESPONSE;
+        case 7: return FETCH_LOGS_RESPONSE;
+        case 8: return FETCH_SNAPSHOT_RESPONSE;
+        case 0: return RESPONSE_NOT_SET;
+        default: return null;
+      }
+    }
+    public int getNumber() {
+      return this.value;
+    }
+  };
+
+  public ResponseCase
+  getResponseCase() {
+    return ResponseCase.forNumber(
+        responseCase_);
   }
 
   public static final int TYPE_FIELD_NUMBER = 1;
   private int type_;
   /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType type = 1;</code>
+   * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
    */
   public int getTypeValue() {
     return type_;
   }
   /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType type = 1;</code>
+   * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
    */
-  public com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType getType() {
-    com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType result = com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType.valueOf(type_);
-    return result == null ? com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType.UNRECOGNIZED : result;
+  public com.github.ylgrgyq.replicator.proto.CommandType getType() {
+    com.github.ylgrgyq.replicator.proto.CommandType result = com.github.ylgrgyq.replicator.proto.CommandType.valueOf(type_);
+    return result == null ? com.github.ylgrgyq.replicator.proto.CommandType.UNRECOGNIZED : result;
   }
 
-  public static final int TOPIC_FIELD_NUMBER = 2;
-  private volatile java.lang.Object topic_;
+  public static final int MSG_TYPE_FIELD_NUMBER = 2;
+  private int msgType_;
   /**
-   * <code>optional string topic = 2;</code>
+   * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
    */
-  public java.lang.String getTopic() {
-    java.lang.Object ref = topic_;
-    if (ref instanceof java.lang.String) {
-      return (java.lang.String) ref;
-    } else {
-      com.google.protobuf.ByteString bs = 
-          (com.google.protobuf.ByteString) ref;
-      java.lang.String s = bs.toStringUtf8();
-      topic_ = s;
-      return s;
+  public int getMsgTypeValue() {
+    return msgType_;
+  }
+  /**
+   * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
+   */
+  public com.github.ylgrgyq.replicator.proto.MessageType getMsgType() {
+    com.github.ylgrgyq.replicator.proto.MessageType result = com.github.ylgrgyq.replicator.proto.MessageType.valueOf(msgType_);
+    return result == null ? com.github.ylgrgyq.replicator.proto.MessageType.UNRECOGNIZED : result;
+  }
+
+  public static final int HANDSHAKE_REQUEST_FIELD_NUMBER = 3;
+  /**
+   * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
+   */
+  public com.github.ylgrgyq.replicator.proto.HandshakeRequest getHandshakeRequest() {
+    if (requestCase_ == 3) {
+       return (com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_;
     }
+    return com.github.ylgrgyq.replicator.proto.HandshakeRequest.getDefaultInstance();
   }
   /**
-   * <code>optional string topic = 2;</code>
+   * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
    */
-  public com.google.protobuf.ByteString
-      getTopicBytes() {
-    java.lang.Object ref = topic_;
-    if (ref instanceof java.lang.String) {
-      com.google.protobuf.ByteString b = 
-          com.google.protobuf.ByteString.copyFromUtf8(
-              (java.lang.String) ref);
-      topic_ = b;
-      return b;
-    } else {
-      return (com.google.protobuf.ByteString) ref;
+  public com.github.ylgrgyq.replicator.proto.HandshakeRequestOrBuilder getHandshakeRequestOrBuilder() {
+    if (requestCase_ == 3) {
+       return (com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_;
     }
+    return com.github.ylgrgyq.replicator.proto.HandshakeRequest.getDefaultInstance();
   }
 
-  public static final int FROMINDEX_FIELD_NUMBER = 3;
-  private long fromIndex_;
+  public static final int FETCH_LOGS_REQUEST_FIELD_NUMBER = 4;
   /**
-   * <code>optional int64 fromIndex = 3;</code>
+   * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsRequest fetch_logs_request = 4;</code>
    */
-  public long getFromIndex() {
-    return fromIndex_;
+  public com.github.ylgrgyq.replicator.proto.FetchLogsRequest getFetchLogsRequest() {
+    if (requestCase_ == 4) {
+       return (com.github.ylgrgyq.replicator.proto.FetchLogsRequest) request_;
+    }
+    return com.github.ylgrgyq.replicator.proto.FetchLogsRequest.getDefaultInstance();
+  }
+  /**
+   * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsRequest fetch_logs_request = 4;</code>
+   */
+  public com.github.ylgrgyq.replicator.proto.FetchLogsRequestOrBuilder getFetchLogsRequestOrBuilder() {
+    if (requestCase_ == 4) {
+       return (com.github.ylgrgyq.replicator.proto.FetchLogsRequest) request_;
+    }
+    return com.github.ylgrgyq.replicator.proto.FetchLogsRequest.getDefaultInstance();
   }
 
-  public static final int LIMIT_FIELD_NUMBER = 4;
-  private int limit_;
+  public static final int FETCH_SNAPSHOT_REQUEST_FIELD_NUMBER = 5;
   /**
-   * <code>optional int32 limit = 4;</code>
+   * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest fetch_snapshot_request = 5;</code>
    */
-  public int getLimit() {
-    return limit_;
+  public com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest getFetchSnapshotRequest() {
+    if (requestCase_ == 5) {
+       return (com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest) request_;
+    }
+    return com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.getDefaultInstance();
+  }
+  /**
+   * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest fetch_snapshot_request = 5;</code>
+   */
+  public com.github.ylgrgyq.replicator.proto.FetchSnapshotRequestOrBuilder getFetchSnapshotRequestOrBuilder() {
+    if (requestCase_ == 5) {
+       return (com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest) request_;
+    }
+    return com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.getDefaultInstance();
   }
 
-  public static final int LOGS_FIELD_NUMBER = 5;
-  private com.github.ylgrgyq.replicator.proto.SyncLogEntries logs_;
+  public static final int HANDSHAKE_RESPONSE_FIELD_NUMBER = 6;
   /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
+   * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeResponse handshake_response = 6;</code>
    */
-  public boolean hasLogs() {
-    return logs_ != null;
+  public com.github.ylgrgyq.replicator.proto.HandshakeResponse getHandshakeResponse() {
+    if (responseCase_ == 6) {
+       return (com.github.ylgrgyq.replicator.proto.HandshakeResponse) response_;
+    }
+    return com.github.ylgrgyq.replicator.proto.HandshakeResponse.getDefaultInstance();
   }
   /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
+   * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeResponse handshake_response = 6;</code>
    */
-  public com.github.ylgrgyq.replicator.proto.SyncLogEntries getLogs() {
-    return logs_ == null ? com.github.ylgrgyq.replicator.proto.SyncLogEntries.getDefaultInstance() : logs_;
-  }
-  /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
-   */
-  public com.github.ylgrgyq.replicator.proto.SyncLogEntriesOrBuilder getLogsOrBuilder() {
-    return getLogs();
-  }
-
-  public static final int SNAPSHOT_FIELD_NUMBER = 6;
-  private com.github.ylgrgyq.replicator.proto.Snapshot snapshot_;
-  /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
-   */
-  public boolean hasSnapshot() {
-    return snapshot_ != null;
-  }
-  /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
-   */
-  public com.github.ylgrgyq.replicator.proto.Snapshot getSnapshot() {
-    return snapshot_ == null ? com.github.ylgrgyq.replicator.proto.Snapshot.getDefaultInstance() : snapshot_;
-  }
-  /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
-   */
-  public com.github.ylgrgyq.replicator.proto.SnapshotOrBuilder getSnapshotOrBuilder() {
-    return getSnapshot();
+  public com.github.ylgrgyq.replicator.proto.HandshakeResponseOrBuilder getHandshakeResponseOrBuilder() {
+    if (responseCase_ == 6) {
+       return (com.github.ylgrgyq.replicator.proto.HandshakeResponse) response_;
+    }
+    return com.github.ylgrgyq.replicator.proto.HandshakeResponse.getDefaultInstance();
   }
 
-  public static final int ERROR_FIELD_NUMBER = 7;
+  public static final int FETCH_LOGS_RESPONSE_FIELD_NUMBER = 7;
+  /**
+   * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsResponse fetch_logs_response = 7;</code>
+   */
+  public com.github.ylgrgyq.replicator.proto.FetchLogsResponse getFetchLogsResponse() {
+    if (responseCase_ == 7) {
+       return (com.github.ylgrgyq.replicator.proto.FetchLogsResponse) response_;
+    }
+    return com.github.ylgrgyq.replicator.proto.FetchLogsResponse.getDefaultInstance();
+  }
+  /**
+   * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsResponse fetch_logs_response = 7;</code>
+   */
+  public com.github.ylgrgyq.replicator.proto.FetchLogsResponseOrBuilder getFetchLogsResponseOrBuilder() {
+    if (responseCase_ == 7) {
+       return (com.github.ylgrgyq.replicator.proto.FetchLogsResponse) response_;
+    }
+    return com.github.ylgrgyq.replicator.proto.FetchLogsResponse.getDefaultInstance();
+  }
+
+  public static final int FETCH_SNAPSHOT_RESPONSE_FIELD_NUMBER = 8;
+  /**
+   * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse fetch_snapshot_response = 8;</code>
+   */
+  public com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse getFetchSnapshotResponse() {
+    if (responseCase_ == 8) {
+       return (com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse) response_;
+    }
+    return com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.getDefaultInstance();
+  }
+  /**
+   * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse fetch_snapshot_response = 8;</code>
+   */
+  public com.github.ylgrgyq.replicator.proto.FetchSnapshotResponseOrBuilder getFetchSnapshotResponseOrBuilder() {
+    if (responseCase_ == 8) {
+       return (com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse) response_;
+    }
+    return com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.getDefaultInstance();
+  }
+
+  public static final int ERROR_FIELD_NUMBER = 9;
   private com.github.ylgrgyq.replicator.proto.ErrorInfo error_;
   /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+   * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
    */
   public boolean hasError() {
     return error_ != null;
   }
   /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+   * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
    */
   public com.github.ylgrgyq.replicator.proto.ErrorInfo getError() {
     return error_ == null ? com.github.ylgrgyq.replicator.proto.ErrorInfo.getDefaultInstance() : error_;
   }
   /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+   * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
    */
   public com.github.ylgrgyq.replicator.proto.ErrorInfoOrBuilder getErrorOrBuilder() {
     return getError();
@@ -425,26 +441,32 @@ public  final class ReplicatorCommand extends
 
   public void writeTo(com.google.protobuf.CodedOutputStream output)
                       throws java.io.IOException {
-    if (type_ != com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType.UNKNOWN.getNumber()) {
+    if (type_ != com.github.ylgrgyq.replicator.proto.CommandType.UNKNOWN.getNumber()) {
       output.writeEnum(1, type_);
     }
-    if (!getTopicBytes().isEmpty()) {
-      com.google.protobuf.GeneratedMessageV3.writeString(output, 2, topic_);
+    if (msgType_ != com.github.ylgrgyq.replicator.proto.MessageType.ONE_WAY.getNumber()) {
+      output.writeEnum(2, msgType_);
     }
-    if (fromIndex_ != 0L) {
-      output.writeInt64(3, fromIndex_);
+    if (requestCase_ == 3) {
+      output.writeMessage(3, (com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_);
     }
-    if (limit_ != 0) {
-      output.writeInt32(4, limit_);
+    if (requestCase_ == 4) {
+      output.writeMessage(4, (com.github.ylgrgyq.replicator.proto.FetchLogsRequest) request_);
     }
-    if (logs_ != null) {
-      output.writeMessage(5, getLogs());
+    if (requestCase_ == 5) {
+      output.writeMessage(5, (com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest) request_);
     }
-    if (snapshot_ != null) {
-      output.writeMessage(6, getSnapshot());
+    if (responseCase_ == 6) {
+      output.writeMessage(6, (com.github.ylgrgyq.replicator.proto.HandshakeResponse) response_);
+    }
+    if (responseCase_ == 7) {
+      output.writeMessage(7, (com.github.ylgrgyq.replicator.proto.FetchLogsResponse) response_);
+    }
+    if (responseCase_ == 8) {
+      output.writeMessage(8, (com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse) response_);
     }
     if (error_ != null) {
-      output.writeMessage(7, getError());
+      output.writeMessage(9, getError());
     }
   }
 
@@ -453,32 +475,41 @@ public  final class ReplicatorCommand extends
     if (size != -1) return size;
 
     size = 0;
-    if (type_ != com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType.UNKNOWN.getNumber()) {
+    if (type_ != com.github.ylgrgyq.replicator.proto.CommandType.UNKNOWN.getNumber()) {
       size += com.google.protobuf.CodedOutputStream
         .computeEnumSize(1, type_);
     }
-    if (!getTopicBytes().isEmpty()) {
-      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(2, topic_);
-    }
-    if (fromIndex_ != 0L) {
+    if (msgType_ != com.github.ylgrgyq.replicator.proto.MessageType.ONE_WAY.getNumber()) {
       size += com.google.protobuf.CodedOutputStream
-        .computeInt64Size(3, fromIndex_);
+        .computeEnumSize(2, msgType_);
     }
-    if (limit_ != 0) {
+    if (requestCase_ == 3) {
       size += com.google.protobuf.CodedOutputStream
-        .computeInt32Size(4, limit_);
+        .computeMessageSize(3, (com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_);
     }
-    if (logs_ != null) {
+    if (requestCase_ == 4) {
       size += com.google.protobuf.CodedOutputStream
-        .computeMessageSize(5, getLogs());
+        .computeMessageSize(4, (com.github.ylgrgyq.replicator.proto.FetchLogsRequest) request_);
     }
-    if (snapshot_ != null) {
+    if (requestCase_ == 5) {
       size += com.google.protobuf.CodedOutputStream
-        .computeMessageSize(6, getSnapshot());
+        .computeMessageSize(5, (com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest) request_);
+    }
+    if (responseCase_ == 6) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeMessageSize(6, (com.github.ylgrgyq.replicator.proto.HandshakeResponse) response_);
+    }
+    if (responseCase_ == 7) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeMessageSize(7, (com.github.ylgrgyq.replicator.proto.FetchLogsResponse) response_);
+    }
+    if (responseCase_ == 8) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeMessageSize(8, (com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse) response_);
     }
     if (error_ != null) {
       size += com.google.protobuf.CodedOutputStream
-        .computeMessageSize(7, getError());
+        .computeMessageSize(9, getError());
     }
     memoizedSize = size;
     return size;
@@ -497,26 +528,49 @@ public  final class ReplicatorCommand extends
 
     boolean result = true;
     result = result && type_ == other.type_;
-    result = result && getTopic()
-        .equals(other.getTopic());
-    result = result && (getFromIndex()
-        == other.getFromIndex());
-    result = result && (getLimit()
-        == other.getLimit());
-    result = result && (hasLogs() == other.hasLogs());
-    if (hasLogs()) {
-      result = result && getLogs()
-          .equals(other.getLogs());
-    }
-    result = result && (hasSnapshot() == other.hasSnapshot());
-    if (hasSnapshot()) {
-      result = result && getSnapshot()
-          .equals(other.getSnapshot());
-    }
+    result = result && msgType_ == other.msgType_;
     result = result && (hasError() == other.hasError());
     if (hasError()) {
       result = result && getError()
           .equals(other.getError());
+    }
+    result = result && getRequestCase().equals(
+        other.getRequestCase());
+    if (!result) return false;
+    switch (requestCase_) {
+      case 3:
+        result = result && getHandshakeRequest()
+            .equals(other.getHandshakeRequest());
+        break;
+      case 4:
+        result = result && getFetchLogsRequest()
+            .equals(other.getFetchLogsRequest());
+        break;
+      case 5:
+        result = result && getFetchSnapshotRequest()
+            .equals(other.getFetchSnapshotRequest());
+        break;
+      case 0:
+      default:
+    }
+    result = result && getResponseCase().equals(
+        other.getResponseCase());
+    if (!result) return false;
+    switch (responseCase_) {
+      case 6:
+        result = result && getHandshakeResponse()
+            .equals(other.getHandshakeResponse());
+        break;
+      case 7:
+        result = result && getFetchLogsResponse()
+            .equals(other.getFetchLogsResponse());
+        break;
+      case 8:
+        result = result && getFetchSnapshotResponse()
+            .equals(other.getFetchSnapshotResponse());
+        break;
+      case 0:
+      default:
     }
     return result;
   }
@@ -530,24 +584,43 @@ public  final class ReplicatorCommand extends
     hash = (19 * hash) + getDescriptorForType().hashCode();
     hash = (37 * hash) + TYPE_FIELD_NUMBER;
     hash = (53 * hash) + type_;
-    hash = (37 * hash) + TOPIC_FIELD_NUMBER;
-    hash = (53 * hash) + getTopic().hashCode();
-    hash = (37 * hash) + FROMINDEX_FIELD_NUMBER;
-    hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
-        getFromIndex());
-    hash = (37 * hash) + LIMIT_FIELD_NUMBER;
-    hash = (53 * hash) + getLimit();
-    if (hasLogs()) {
-      hash = (37 * hash) + LOGS_FIELD_NUMBER;
-      hash = (53 * hash) + getLogs().hashCode();
-    }
-    if (hasSnapshot()) {
-      hash = (37 * hash) + SNAPSHOT_FIELD_NUMBER;
-      hash = (53 * hash) + getSnapshot().hashCode();
-    }
+    hash = (37 * hash) + MSG_TYPE_FIELD_NUMBER;
+    hash = (53 * hash) + msgType_;
     if (hasError()) {
       hash = (37 * hash) + ERROR_FIELD_NUMBER;
       hash = (53 * hash) + getError().hashCode();
+    }
+    switch (requestCase_) {
+      case 3:
+        hash = (37 * hash) + HANDSHAKE_REQUEST_FIELD_NUMBER;
+        hash = (53 * hash) + getHandshakeRequest().hashCode();
+        break;
+      case 4:
+        hash = (37 * hash) + FETCH_LOGS_REQUEST_FIELD_NUMBER;
+        hash = (53 * hash) + getFetchLogsRequest().hashCode();
+        break;
+      case 5:
+        hash = (37 * hash) + FETCH_SNAPSHOT_REQUEST_FIELD_NUMBER;
+        hash = (53 * hash) + getFetchSnapshotRequest().hashCode();
+        break;
+      case 0:
+      default:
+    }
+    switch (responseCase_) {
+      case 6:
+        hash = (37 * hash) + HANDSHAKE_RESPONSE_FIELD_NUMBER;
+        hash = (53 * hash) + getHandshakeResponse().hashCode();
+        break;
+      case 7:
+        hash = (37 * hash) + FETCH_LOGS_RESPONSE_FIELD_NUMBER;
+        hash = (53 * hash) + getFetchLogsResponse().hashCode();
+        break;
+      case 8:
+        hash = (37 * hash) + FETCH_SNAPSHOT_RESPONSE_FIELD_NUMBER;
+        hash = (53 * hash) + getFetchSnapshotResponse().hashCode();
+        break;
+      case 0:
+      default:
     }
     hash = (29 * hash) + unknownFields.hashCode();
     memoizedHashCode = hash;
@@ -669,30 +742,18 @@ public  final class ReplicatorCommand extends
       super.clear();
       type_ = 0;
 
-      topic_ = "";
+      msgType_ = 0;
 
-      fromIndex_ = 0L;
-
-      limit_ = 0;
-
-      if (logsBuilder_ == null) {
-        logs_ = null;
-      } else {
-        logs_ = null;
-        logsBuilder_ = null;
-      }
-      if (snapshotBuilder_ == null) {
-        snapshot_ = null;
-      } else {
-        snapshot_ = null;
-        snapshotBuilder_ = null;
-      }
       if (errorBuilder_ == null) {
         error_ = null;
       } else {
         error_ = null;
         errorBuilder_ = null;
       }
+      requestCase_ = 0;
+      request_ = null;
+      responseCase_ = 0;
+      response_ = null;
       return this;
     }
 
@@ -716,24 +777,56 @@ public  final class ReplicatorCommand extends
     public com.github.ylgrgyq.replicator.proto.ReplicatorCommand buildPartial() {
       com.github.ylgrgyq.replicator.proto.ReplicatorCommand result = new com.github.ylgrgyq.replicator.proto.ReplicatorCommand(this);
       result.type_ = type_;
-      result.topic_ = topic_;
-      result.fromIndex_ = fromIndex_;
-      result.limit_ = limit_;
-      if (logsBuilder_ == null) {
-        result.logs_ = logs_;
-      } else {
-        result.logs_ = logsBuilder_.build();
+      result.msgType_ = msgType_;
+      if (requestCase_ == 3) {
+        if (handshakeRequestBuilder_ == null) {
+          result.request_ = request_;
+        } else {
+          result.request_ = handshakeRequestBuilder_.build();
+        }
       }
-      if (snapshotBuilder_ == null) {
-        result.snapshot_ = snapshot_;
-      } else {
-        result.snapshot_ = snapshotBuilder_.build();
+      if (requestCase_ == 4) {
+        if (fetchLogsRequestBuilder_ == null) {
+          result.request_ = request_;
+        } else {
+          result.request_ = fetchLogsRequestBuilder_.build();
+        }
+      }
+      if (requestCase_ == 5) {
+        if (fetchSnapshotRequestBuilder_ == null) {
+          result.request_ = request_;
+        } else {
+          result.request_ = fetchSnapshotRequestBuilder_.build();
+        }
+      }
+      if (responseCase_ == 6) {
+        if (handshakeResponseBuilder_ == null) {
+          result.response_ = response_;
+        } else {
+          result.response_ = handshakeResponseBuilder_.build();
+        }
+      }
+      if (responseCase_ == 7) {
+        if (fetchLogsResponseBuilder_ == null) {
+          result.response_ = response_;
+        } else {
+          result.response_ = fetchLogsResponseBuilder_.build();
+        }
+      }
+      if (responseCase_ == 8) {
+        if (fetchSnapshotResponseBuilder_ == null) {
+          result.response_ = response_;
+        } else {
+          result.response_ = fetchSnapshotResponseBuilder_.build();
+        }
       }
       if (errorBuilder_ == null) {
         result.error_ = error_;
       } else {
         result.error_ = errorBuilder_.build();
       }
+      result.requestCase_ = requestCase_;
+      result.responseCase_ = responseCase_;
       onBuilt();
       return result;
     }
@@ -778,24 +871,45 @@ public  final class ReplicatorCommand extends
       if (other.type_ != 0) {
         setTypeValue(other.getTypeValue());
       }
-      if (!other.getTopic().isEmpty()) {
-        topic_ = other.topic_;
-        onChanged();
-      }
-      if (other.getFromIndex() != 0L) {
-        setFromIndex(other.getFromIndex());
-      }
-      if (other.getLimit() != 0) {
-        setLimit(other.getLimit());
-      }
-      if (other.hasLogs()) {
-        mergeLogs(other.getLogs());
-      }
-      if (other.hasSnapshot()) {
-        mergeSnapshot(other.getSnapshot());
+      if (other.msgType_ != 0) {
+        setMsgTypeValue(other.getMsgTypeValue());
       }
       if (other.hasError()) {
         mergeError(other.getError());
+      }
+      switch (other.getRequestCase()) {
+        case HANDSHAKE_REQUEST: {
+          mergeHandshakeRequest(other.getHandshakeRequest());
+          break;
+        }
+        case FETCH_LOGS_REQUEST: {
+          mergeFetchLogsRequest(other.getFetchLogsRequest());
+          break;
+        }
+        case FETCH_SNAPSHOT_REQUEST: {
+          mergeFetchSnapshotRequest(other.getFetchSnapshotRequest());
+          break;
+        }
+        case REQUEST_NOT_SET: {
+          break;
+        }
+      }
+      switch (other.getResponseCase()) {
+        case HANDSHAKE_RESPONSE: {
+          mergeHandshakeResponse(other.getHandshakeResponse());
+          break;
+        }
+        case FETCH_LOGS_RESPONSE: {
+          mergeFetchLogsResponse(other.getFetchLogsResponse());
+          break;
+        }
+        case FETCH_SNAPSHOT_RESPONSE: {
+          mergeFetchSnapshotResponse(other.getFetchSnapshotResponse());
+          break;
+        }
+        case RESPONSE_NOT_SET: {
+          break;
+        }
       }
       onChanged();
       return this;
@@ -822,16 +936,46 @@ public  final class ReplicatorCommand extends
       }
       return this;
     }
+    private int requestCase_ = 0;
+    private java.lang.Object request_;
+    public RequestCase
+        getRequestCase() {
+      return RequestCase.forNumber(
+          requestCase_);
+    }
+
+    public Builder clearRequest() {
+      requestCase_ = 0;
+      request_ = null;
+      onChanged();
+      return this;
+    }
+
+    private int responseCase_ = 0;
+    private java.lang.Object response_;
+    public ResponseCase
+        getResponseCase() {
+      return ResponseCase.forNumber(
+          responseCase_);
+    }
+
+    public Builder clearResponse() {
+      responseCase_ = 0;
+      response_ = null;
+      onChanged();
+      return this;
+    }
+
 
     private int type_ = 0;
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType type = 1;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
      */
     public int getTypeValue() {
       return type_;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType type = 1;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
      */
     public Builder setTypeValue(int value) {
       type_ = value;
@@ -839,16 +983,16 @@ public  final class ReplicatorCommand extends
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType type = 1;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
      */
-    public com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType getType() {
-      com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType result = com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType.valueOf(type_);
-      return result == null ? com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType.UNRECOGNIZED : result;
+    public com.github.ylgrgyq.replicator.proto.CommandType getType() {
+      com.github.ylgrgyq.replicator.proto.CommandType result = com.github.ylgrgyq.replicator.proto.CommandType.valueOf(type_);
+      return result == null ? com.github.ylgrgyq.replicator.proto.CommandType.UNRECOGNIZED : result;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType type = 1;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
      */
-    public Builder setType(com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType value) {
+    public Builder setType(com.github.ylgrgyq.replicator.proto.CommandType value) {
       if (value == null) {
         throw new NullPointerException();
       }
@@ -858,7 +1002,7 @@ public  final class ReplicatorCommand extends
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ReplicatorCommand.CommandType type = 1;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
      */
     public Builder clearType() {
       
@@ -867,372 +1011,841 @@ public  final class ReplicatorCommand extends
       return this;
     }
 
-    private java.lang.Object topic_ = "";
+    private int msgType_ = 0;
     /**
-     * <code>optional string topic = 2;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
      */
-    public java.lang.String getTopic() {
-      java.lang.Object ref = topic_;
-      if (!(ref instanceof java.lang.String)) {
-        com.google.protobuf.ByteString bs =
-            (com.google.protobuf.ByteString) ref;
-        java.lang.String s = bs.toStringUtf8();
-        topic_ = s;
-        return s;
-      } else {
-        return (java.lang.String) ref;
-      }
+    public int getMsgTypeValue() {
+      return msgType_;
     }
     /**
-     * <code>optional string topic = 2;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
      */
-    public com.google.protobuf.ByteString
-        getTopicBytes() {
-      java.lang.Object ref = topic_;
-      if (ref instanceof String) {
-        com.google.protobuf.ByteString b = 
-            com.google.protobuf.ByteString.copyFromUtf8(
-                (java.lang.String) ref);
-        topic_ = b;
-        return b;
-      } else {
-        return (com.google.protobuf.ByteString) ref;
-      }
+    public Builder setMsgTypeValue(int value) {
+      msgType_ = value;
+      onChanged();
+      return this;
     }
     /**
-     * <code>optional string topic = 2;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
      */
-    public Builder setTopic(
-        java.lang.String value) {
+    public com.github.ylgrgyq.replicator.proto.MessageType getMsgType() {
+      com.github.ylgrgyq.replicator.proto.MessageType result = com.github.ylgrgyq.replicator.proto.MessageType.valueOf(msgType_);
+      return result == null ? com.github.ylgrgyq.replicator.proto.MessageType.UNRECOGNIZED : result;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
+     */
+    public Builder setMsgType(com.github.ylgrgyq.replicator.proto.MessageType value) {
       if (value == null) {
-    throw new NullPointerException();
-  }
-  
-      topic_ = value;
+        throw new NullPointerException();
+      }
+      
+      msgType_ = value.getNumber();
       onChanged();
       return this;
     }
     /**
-     * <code>optional string topic = 2;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
      */
-    public Builder clearTopic() {
+    public Builder clearMsgType() {
       
-      topic_ = getDefaultInstance().getTopic();
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>optional string topic = 2;</code>
-     */
-    public Builder setTopicBytes(
-        com.google.protobuf.ByteString value) {
-      if (value == null) {
-    throw new NullPointerException();
-  }
-  checkByteStringIsUtf8(value);
-      
-      topic_ = value;
+      msgType_ = 0;
       onChanged();
       return this;
     }
 
-    private long fromIndex_ ;
-    /**
-     * <code>optional int64 fromIndex = 3;</code>
-     */
-    public long getFromIndex() {
-      return fromIndex_;
-    }
-    /**
-     * <code>optional int64 fromIndex = 3;</code>
-     */
-    public Builder setFromIndex(long value) {
-      
-      fromIndex_ = value;
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>optional int64 fromIndex = 3;</code>
-     */
-    public Builder clearFromIndex() {
-      
-      fromIndex_ = 0L;
-      onChanged();
-      return this;
-    }
-
-    private int limit_ ;
-    /**
-     * <code>optional int32 limit = 4;</code>
-     */
-    public int getLimit() {
-      return limit_;
-    }
-    /**
-     * <code>optional int32 limit = 4;</code>
-     */
-    public Builder setLimit(int value) {
-      
-      limit_ = value;
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>optional int32 limit = 4;</code>
-     */
-    public Builder clearLimit() {
-      
-      limit_ = 0;
-      onChanged();
-      return this;
-    }
-
-    private com.github.ylgrgyq.replicator.proto.SyncLogEntries logs_ = null;
     private com.google.protobuf.SingleFieldBuilderV3<
-        com.github.ylgrgyq.replicator.proto.SyncLogEntries, com.github.ylgrgyq.replicator.proto.SyncLogEntries.Builder, com.github.ylgrgyq.replicator.proto.SyncLogEntriesOrBuilder> logsBuilder_;
+        com.github.ylgrgyq.replicator.proto.HandshakeRequest, com.github.ylgrgyq.replicator.proto.HandshakeRequest.Builder, com.github.ylgrgyq.replicator.proto.HandshakeRequestOrBuilder> handshakeRequestBuilder_;
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
      */
-    public boolean hasLogs() {
-      return logsBuilder_ != null || logs_ != null;
-    }
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
-     */
-    public com.github.ylgrgyq.replicator.proto.SyncLogEntries getLogs() {
-      if (logsBuilder_ == null) {
-        return logs_ == null ? com.github.ylgrgyq.replicator.proto.SyncLogEntries.getDefaultInstance() : logs_;
+    public com.github.ylgrgyq.replicator.proto.HandshakeRequest getHandshakeRequest() {
+      if (handshakeRequestBuilder_ == null) {
+        if (requestCase_ == 3) {
+          return (com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_;
+        }
+        return com.github.ylgrgyq.replicator.proto.HandshakeRequest.getDefaultInstance();
       } else {
-        return logsBuilder_.getMessage();
+        if (requestCase_ == 3) {
+          return handshakeRequestBuilder_.getMessage();
+        }
+        return com.github.ylgrgyq.replicator.proto.HandshakeRequest.getDefaultInstance();
       }
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
      */
-    public Builder setLogs(com.github.ylgrgyq.replicator.proto.SyncLogEntries value) {
-      if (logsBuilder_ == null) {
+    public Builder setHandshakeRequest(com.github.ylgrgyq.replicator.proto.HandshakeRequest value) {
+      if (handshakeRequestBuilder_ == null) {
         if (value == null) {
           throw new NullPointerException();
         }
-        logs_ = value;
+        request_ = value;
         onChanged();
       } else {
-        logsBuilder_.setMessage(value);
+        handshakeRequestBuilder_.setMessage(value);
       }
-
+      requestCase_ = 3;
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
      */
-    public Builder setLogs(
-        com.github.ylgrgyq.replicator.proto.SyncLogEntries.Builder builderForValue) {
-      if (logsBuilder_ == null) {
-        logs_ = builderForValue.build();
+    public Builder setHandshakeRequest(
+        com.github.ylgrgyq.replicator.proto.HandshakeRequest.Builder builderForValue) {
+      if (handshakeRequestBuilder_ == null) {
+        request_ = builderForValue.build();
         onChanged();
       } else {
-        logsBuilder_.setMessage(builderForValue.build());
+        handshakeRequestBuilder_.setMessage(builderForValue.build());
       }
-
+      requestCase_ = 3;
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
      */
-    public Builder mergeLogs(com.github.ylgrgyq.replicator.proto.SyncLogEntries value) {
-      if (logsBuilder_ == null) {
-        if (logs_ != null) {
-          logs_ =
-            com.github.ylgrgyq.replicator.proto.SyncLogEntries.newBuilder(logs_).mergeFrom(value).buildPartial();
+    public Builder mergeHandshakeRequest(com.github.ylgrgyq.replicator.proto.HandshakeRequest value) {
+      if (handshakeRequestBuilder_ == null) {
+        if (requestCase_ == 3 &&
+            request_ != com.github.ylgrgyq.replicator.proto.HandshakeRequest.getDefaultInstance()) {
+          request_ = com.github.ylgrgyq.replicator.proto.HandshakeRequest.newBuilder((com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_)
+              .mergeFrom(value).buildPartial();
         } else {
-          logs_ = value;
+          request_ = value;
         }
         onChanged();
       } else {
-        logsBuilder_.mergeFrom(value);
+        if (requestCase_ == 3) {
+          handshakeRequestBuilder_.mergeFrom(value);
+        }
+        handshakeRequestBuilder_.setMessage(value);
       }
-
+      requestCase_ = 3;
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
      */
-    public Builder clearLogs() {
-      if (logsBuilder_ == null) {
-        logs_ = null;
-        onChanged();
+    public Builder clearHandshakeRequest() {
+      if (handshakeRequestBuilder_ == null) {
+        if (requestCase_ == 3) {
+          requestCase_ = 0;
+          request_ = null;
+          onChanged();
+        }
       } else {
-        logs_ = null;
-        logsBuilder_ = null;
+        if (requestCase_ == 3) {
+          requestCase_ = 0;
+          request_ = null;
+        }
+        handshakeRequestBuilder_.clear();
       }
-
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
      */
-    public com.github.ylgrgyq.replicator.proto.SyncLogEntries.Builder getLogsBuilder() {
-      
-      onChanged();
-      return getLogsFieldBuilder().getBuilder();
+    public com.github.ylgrgyq.replicator.proto.HandshakeRequest.Builder getHandshakeRequestBuilder() {
+      return getHandshakeRequestFieldBuilder().getBuilder();
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
      */
-    public com.github.ylgrgyq.replicator.proto.SyncLogEntriesOrBuilder getLogsOrBuilder() {
-      if (logsBuilder_ != null) {
-        return logsBuilder_.getMessageOrBuilder();
+    public com.github.ylgrgyq.replicator.proto.HandshakeRequestOrBuilder getHandshakeRequestOrBuilder() {
+      if ((requestCase_ == 3) && (handshakeRequestBuilder_ != null)) {
+        return handshakeRequestBuilder_.getMessageOrBuilder();
       } else {
-        return logs_ == null ?
-            com.github.ylgrgyq.replicator.proto.SyncLogEntries.getDefaultInstance() : logs_;
+        if (requestCase_ == 3) {
+          return (com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_;
+        }
+        return com.github.ylgrgyq.replicator.proto.HandshakeRequest.getDefaultInstance();
       }
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.SyncLogEntries logs = 5;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
      */
     private com.google.protobuf.SingleFieldBuilderV3<
-        com.github.ylgrgyq.replicator.proto.SyncLogEntries, com.github.ylgrgyq.replicator.proto.SyncLogEntries.Builder, com.github.ylgrgyq.replicator.proto.SyncLogEntriesOrBuilder> 
-        getLogsFieldBuilder() {
-      if (logsBuilder_ == null) {
-        logsBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
-            com.github.ylgrgyq.replicator.proto.SyncLogEntries, com.github.ylgrgyq.replicator.proto.SyncLogEntries.Builder, com.github.ylgrgyq.replicator.proto.SyncLogEntriesOrBuilder>(
-                getLogs(),
+        com.github.ylgrgyq.replicator.proto.HandshakeRequest, com.github.ylgrgyq.replicator.proto.HandshakeRequest.Builder, com.github.ylgrgyq.replicator.proto.HandshakeRequestOrBuilder> 
+        getHandshakeRequestFieldBuilder() {
+      if (handshakeRequestBuilder_ == null) {
+        if (!(requestCase_ == 3)) {
+          request_ = com.github.ylgrgyq.replicator.proto.HandshakeRequest.getDefaultInstance();
+        }
+        handshakeRequestBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+            com.github.ylgrgyq.replicator.proto.HandshakeRequest, com.github.ylgrgyq.replicator.proto.HandshakeRequest.Builder, com.github.ylgrgyq.replicator.proto.HandshakeRequestOrBuilder>(
+                (com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_,
                 getParentForChildren(),
                 isClean());
-        logs_ = null;
+        request_ = null;
       }
-      return logsBuilder_;
+      requestCase_ = 3;
+      onChanged();;
+      return handshakeRequestBuilder_;
     }
 
-    private com.github.ylgrgyq.replicator.proto.Snapshot snapshot_ = null;
     private com.google.protobuf.SingleFieldBuilderV3<
-        com.github.ylgrgyq.replicator.proto.Snapshot, com.github.ylgrgyq.replicator.proto.Snapshot.Builder, com.github.ylgrgyq.replicator.proto.SnapshotOrBuilder> snapshotBuilder_;
+        com.github.ylgrgyq.replicator.proto.FetchLogsRequest, com.github.ylgrgyq.replicator.proto.FetchLogsRequest.Builder, com.github.ylgrgyq.replicator.proto.FetchLogsRequestOrBuilder> fetchLogsRequestBuilder_;
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsRequest fetch_logs_request = 4;</code>
      */
-    public boolean hasSnapshot() {
-      return snapshotBuilder_ != null || snapshot_ != null;
-    }
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
-     */
-    public com.github.ylgrgyq.replicator.proto.Snapshot getSnapshot() {
-      if (snapshotBuilder_ == null) {
-        return snapshot_ == null ? com.github.ylgrgyq.replicator.proto.Snapshot.getDefaultInstance() : snapshot_;
+    public com.github.ylgrgyq.replicator.proto.FetchLogsRequest getFetchLogsRequest() {
+      if (fetchLogsRequestBuilder_ == null) {
+        if (requestCase_ == 4) {
+          return (com.github.ylgrgyq.replicator.proto.FetchLogsRequest) request_;
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchLogsRequest.getDefaultInstance();
       } else {
-        return snapshotBuilder_.getMessage();
+        if (requestCase_ == 4) {
+          return fetchLogsRequestBuilder_.getMessage();
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchLogsRequest.getDefaultInstance();
       }
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsRequest fetch_logs_request = 4;</code>
      */
-    public Builder setSnapshot(com.github.ylgrgyq.replicator.proto.Snapshot value) {
-      if (snapshotBuilder_ == null) {
+    public Builder setFetchLogsRequest(com.github.ylgrgyq.replicator.proto.FetchLogsRequest value) {
+      if (fetchLogsRequestBuilder_ == null) {
         if (value == null) {
           throw new NullPointerException();
         }
-        snapshot_ = value;
+        request_ = value;
         onChanged();
       } else {
-        snapshotBuilder_.setMessage(value);
+        fetchLogsRequestBuilder_.setMessage(value);
       }
-
+      requestCase_ = 4;
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsRequest fetch_logs_request = 4;</code>
      */
-    public Builder setSnapshot(
-        com.github.ylgrgyq.replicator.proto.Snapshot.Builder builderForValue) {
-      if (snapshotBuilder_ == null) {
-        snapshot_ = builderForValue.build();
+    public Builder setFetchLogsRequest(
+        com.github.ylgrgyq.replicator.proto.FetchLogsRequest.Builder builderForValue) {
+      if (fetchLogsRequestBuilder_ == null) {
+        request_ = builderForValue.build();
         onChanged();
       } else {
-        snapshotBuilder_.setMessage(builderForValue.build());
+        fetchLogsRequestBuilder_.setMessage(builderForValue.build());
       }
-
+      requestCase_ = 4;
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsRequest fetch_logs_request = 4;</code>
      */
-    public Builder mergeSnapshot(com.github.ylgrgyq.replicator.proto.Snapshot value) {
-      if (snapshotBuilder_ == null) {
-        if (snapshot_ != null) {
-          snapshot_ =
-            com.github.ylgrgyq.replicator.proto.Snapshot.newBuilder(snapshot_).mergeFrom(value).buildPartial();
+    public Builder mergeFetchLogsRequest(com.github.ylgrgyq.replicator.proto.FetchLogsRequest value) {
+      if (fetchLogsRequestBuilder_ == null) {
+        if (requestCase_ == 4 &&
+            request_ != com.github.ylgrgyq.replicator.proto.FetchLogsRequest.getDefaultInstance()) {
+          request_ = com.github.ylgrgyq.replicator.proto.FetchLogsRequest.newBuilder((com.github.ylgrgyq.replicator.proto.FetchLogsRequest) request_)
+              .mergeFrom(value).buildPartial();
         } else {
-          snapshot_ = value;
+          request_ = value;
         }
         onChanged();
       } else {
-        snapshotBuilder_.mergeFrom(value);
+        if (requestCase_ == 4) {
+          fetchLogsRequestBuilder_.mergeFrom(value);
+        }
+        fetchLogsRequestBuilder_.setMessage(value);
       }
-
+      requestCase_ = 4;
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsRequest fetch_logs_request = 4;</code>
      */
-    public Builder clearSnapshot() {
-      if (snapshotBuilder_ == null) {
-        snapshot_ = null;
-        onChanged();
+    public Builder clearFetchLogsRequest() {
+      if (fetchLogsRequestBuilder_ == null) {
+        if (requestCase_ == 4) {
+          requestCase_ = 0;
+          request_ = null;
+          onChanged();
+        }
       } else {
-        snapshot_ = null;
-        snapshotBuilder_ = null;
+        if (requestCase_ == 4) {
+          requestCase_ = 0;
+          request_ = null;
+        }
+        fetchLogsRequestBuilder_.clear();
       }
-
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsRequest fetch_logs_request = 4;</code>
      */
-    public com.github.ylgrgyq.replicator.proto.Snapshot.Builder getSnapshotBuilder() {
-      
-      onChanged();
-      return getSnapshotFieldBuilder().getBuilder();
+    public com.github.ylgrgyq.replicator.proto.FetchLogsRequest.Builder getFetchLogsRequestBuilder() {
+      return getFetchLogsRequestFieldBuilder().getBuilder();
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsRequest fetch_logs_request = 4;</code>
      */
-    public com.github.ylgrgyq.replicator.proto.SnapshotOrBuilder getSnapshotOrBuilder() {
-      if (snapshotBuilder_ != null) {
-        return snapshotBuilder_.getMessageOrBuilder();
+    public com.github.ylgrgyq.replicator.proto.FetchLogsRequestOrBuilder getFetchLogsRequestOrBuilder() {
+      if ((requestCase_ == 4) && (fetchLogsRequestBuilder_ != null)) {
+        return fetchLogsRequestBuilder_.getMessageOrBuilder();
       } else {
-        return snapshot_ == null ?
-            com.github.ylgrgyq.replicator.proto.Snapshot.getDefaultInstance() : snapshot_;
+        if (requestCase_ == 4) {
+          return (com.github.ylgrgyq.replicator.proto.FetchLogsRequest) request_;
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchLogsRequest.getDefaultInstance();
       }
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.Snapshot snapshot = 6;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsRequest fetch_logs_request = 4;</code>
      */
     private com.google.protobuf.SingleFieldBuilderV3<
-        com.github.ylgrgyq.replicator.proto.Snapshot, com.github.ylgrgyq.replicator.proto.Snapshot.Builder, com.github.ylgrgyq.replicator.proto.SnapshotOrBuilder> 
-        getSnapshotFieldBuilder() {
-      if (snapshotBuilder_ == null) {
-        snapshotBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
-            com.github.ylgrgyq.replicator.proto.Snapshot, com.github.ylgrgyq.replicator.proto.Snapshot.Builder, com.github.ylgrgyq.replicator.proto.SnapshotOrBuilder>(
-                getSnapshot(),
+        com.github.ylgrgyq.replicator.proto.FetchLogsRequest, com.github.ylgrgyq.replicator.proto.FetchLogsRequest.Builder, com.github.ylgrgyq.replicator.proto.FetchLogsRequestOrBuilder> 
+        getFetchLogsRequestFieldBuilder() {
+      if (fetchLogsRequestBuilder_ == null) {
+        if (!(requestCase_ == 4)) {
+          request_ = com.github.ylgrgyq.replicator.proto.FetchLogsRequest.getDefaultInstance();
+        }
+        fetchLogsRequestBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+            com.github.ylgrgyq.replicator.proto.FetchLogsRequest, com.github.ylgrgyq.replicator.proto.FetchLogsRequest.Builder, com.github.ylgrgyq.replicator.proto.FetchLogsRequestOrBuilder>(
+                (com.github.ylgrgyq.replicator.proto.FetchLogsRequest) request_,
                 getParentForChildren(),
                 isClean());
-        snapshot_ = null;
+        request_ = null;
       }
-      return snapshotBuilder_;
+      requestCase_ = 4;
+      onChanged();;
+      return fetchLogsRequestBuilder_;
+    }
+
+    private com.google.protobuf.SingleFieldBuilderV3<
+        com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest, com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.Builder, com.github.ylgrgyq.replicator.proto.FetchSnapshotRequestOrBuilder> fetchSnapshotRequestBuilder_;
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest fetch_snapshot_request = 5;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest getFetchSnapshotRequest() {
+      if (fetchSnapshotRequestBuilder_ == null) {
+        if (requestCase_ == 5) {
+          return (com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest) request_;
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.getDefaultInstance();
+      } else {
+        if (requestCase_ == 5) {
+          return fetchSnapshotRequestBuilder_.getMessage();
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.getDefaultInstance();
+      }
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest fetch_snapshot_request = 5;</code>
+     */
+    public Builder setFetchSnapshotRequest(com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest value) {
+      if (fetchSnapshotRequestBuilder_ == null) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        request_ = value;
+        onChanged();
+      } else {
+        fetchSnapshotRequestBuilder_.setMessage(value);
+      }
+      requestCase_ = 5;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest fetch_snapshot_request = 5;</code>
+     */
+    public Builder setFetchSnapshotRequest(
+        com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.Builder builderForValue) {
+      if (fetchSnapshotRequestBuilder_ == null) {
+        request_ = builderForValue.build();
+        onChanged();
+      } else {
+        fetchSnapshotRequestBuilder_.setMessage(builderForValue.build());
+      }
+      requestCase_ = 5;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest fetch_snapshot_request = 5;</code>
+     */
+    public Builder mergeFetchSnapshotRequest(com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest value) {
+      if (fetchSnapshotRequestBuilder_ == null) {
+        if (requestCase_ == 5 &&
+            request_ != com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.getDefaultInstance()) {
+          request_ = com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.newBuilder((com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest) request_)
+              .mergeFrom(value).buildPartial();
+        } else {
+          request_ = value;
+        }
+        onChanged();
+      } else {
+        if (requestCase_ == 5) {
+          fetchSnapshotRequestBuilder_.mergeFrom(value);
+        }
+        fetchSnapshotRequestBuilder_.setMessage(value);
+      }
+      requestCase_ = 5;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest fetch_snapshot_request = 5;</code>
+     */
+    public Builder clearFetchSnapshotRequest() {
+      if (fetchSnapshotRequestBuilder_ == null) {
+        if (requestCase_ == 5) {
+          requestCase_ = 0;
+          request_ = null;
+          onChanged();
+        }
+      } else {
+        if (requestCase_ == 5) {
+          requestCase_ = 0;
+          request_ = null;
+        }
+        fetchSnapshotRequestBuilder_.clear();
+      }
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest fetch_snapshot_request = 5;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.Builder getFetchSnapshotRequestBuilder() {
+      return getFetchSnapshotRequestFieldBuilder().getBuilder();
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest fetch_snapshot_request = 5;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.FetchSnapshotRequestOrBuilder getFetchSnapshotRequestOrBuilder() {
+      if ((requestCase_ == 5) && (fetchSnapshotRequestBuilder_ != null)) {
+        return fetchSnapshotRequestBuilder_.getMessageOrBuilder();
+      } else {
+        if (requestCase_ == 5) {
+          return (com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest) request_;
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.getDefaultInstance();
+      }
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest fetch_snapshot_request = 5;</code>
+     */
+    private com.google.protobuf.SingleFieldBuilderV3<
+        com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest, com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.Builder, com.github.ylgrgyq.replicator.proto.FetchSnapshotRequestOrBuilder> 
+        getFetchSnapshotRequestFieldBuilder() {
+      if (fetchSnapshotRequestBuilder_ == null) {
+        if (!(requestCase_ == 5)) {
+          request_ = com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.getDefaultInstance();
+        }
+        fetchSnapshotRequestBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+            com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest, com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest.Builder, com.github.ylgrgyq.replicator.proto.FetchSnapshotRequestOrBuilder>(
+                (com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest) request_,
+                getParentForChildren(),
+                isClean());
+        request_ = null;
+      }
+      requestCase_ = 5;
+      onChanged();;
+      return fetchSnapshotRequestBuilder_;
+    }
+
+    private com.google.protobuf.SingleFieldBuilderV3<
+        com.github.ylgrgyq.replicator.proto.HandshakeResponse, com.github.ylgrgyq.replicator.proto.HandshakeResponse.Builder, com.github.ylgrgyq.replicator.proto.HandshakeResponseOrBuilder> handshakeResponseBuilder_;
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeResponse handshake_response = 6;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.HandshakeResponse getHandshakeResponse() {
+      if (handshakeResponseBuilder_ == null) {
+        if (responseCase_ == 6) {
+          return (com.github.ylgrgyq.replicator.proto.HandshakeResponse) response_;
+        }
+        return com.github.ylgrgyq.replicator.proto.HandshakeResponse.getDefaultInstance();
+      } else {
+        if (responseCase_ == 6) {
+          return handshakeResponseBuilder_.getMessage();
+        }
+        return com.github.ylgrgyq.replicator.proto.HandshakeResponse.getDefaultInstance();
+      }
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeResponse handshake_response = 6;</code>
+     */
+    public Builder setHandshakeResponse(com.github.ylgrgyq.replicator.proto.HandshakeResponse value) {
+      if (handshakeResponseBuilder_ == null) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        response_ = value;
+        onChanged();
+      } else {
+        handshakeResponseBuilder_.setMessage(value);
+      }
+      responseCase_ = 6;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeResponse handshake_response = 6;</code>
+     */
+    public Builder setHandshakeResponse(
+        com.github.ylgrgyq.replicator.proto.HandshakeResponse.Builder builderForValue) {
+      if (handshakeResponseBuilder_ == null) {
+        response_ = builderForValue.build();
+        onChanged();
+      } else {
+        handshakeResponseBuilder_.setMessage(builderForValue.build());
+      }
+      responseCase_ = 6;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeResponse handshake_response = 6;</code>
+     */
+    public Builder mergeHandshakeResponse(com.github.ylgrgyq.replicator.proto.HandshakeResponse value) {
+      if (handshakeResponseBuilder_ == null) {
+        if (responseCase_ == 6 &&
+            response_ != com.github.ylgrgyq.replicator.proto.HandshakeResponse.getDefaultInstance()) {
+          response_ = com.github.ylgrgyq.replicator.proto.HandshakeResponse.newBuilder((com.github.ylgrgyq.replicator.proto.HandshakeResponse) response_)
+              .mergeFrom(value).buildPartial();
+        } else {
+          response_ = value;
+        }
+        onChanged();
+      } else {
+        if (responseCase_ == 6) {
+          handshakeResponseBuilder_.mergeFrom(value);
+        }
+        handshakeResponseBuilder_.setMessage(value);
+      }
+      responseCase_ = 6;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeResponse handshake_response = 6;</code>
+     */
+    public Builder clearHandshakeResponse() {
+      if (handshakeResponseBuilder_ == null) {
+        if (responseCase_ == 6) {
+          responseCase_ = 0;
+          response_ = null;
+          onChanged();
+        }
+      } else {
+        if (responseCase_ == 6) {
+          responseCase_ = 0;
+          response_ = null;
+        }
+        handshakeResponseBuilder_.clear();
+      }
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeResponse handshake_response = 6;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.HandshakeResponse.Builder getHandshakeResponseBuilder() {
+      return getHandshakeResponseFieldBuilder().getBuilder();
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeResponse handshake_response = 6;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.HandshakeResponseOrBuilder getHandshakeResponseOrBuilder() {
+      if ((responseCase_ == 6) && (handshakeResponseBuilder_ != null)) {
+        return handshakeResponseBuilder_.getMessageOrBuilder();
+      } else {
+        if (responseCase_ == 6) {
+          return (com.github.ylgrgyq.replicator.proto.HandshakeResponse) response_;
+        }
+        return com.github.ylgrgyq.replicator.proto.HandshakeResponse.getDefaultInstance();
+      }
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeResponse handshake_response = 6;</code>
+     */
+    private com.google.protobuf.SingleFieldBuilderV3<
+        com.github.ylgrgyq.replicator.proto.HandshakeResponse, com.github.ylgrgyq.replicator.proto.HandshakeResponse.Builder, com.github.ylgrgyq.replicator.proto.HandshakeResponseOrBuilder> 
+        getHandshakeResponseFieldBuilder() {
+      if (handshakeResponseBuilder_ == null) {
+        if (!(responseCase_ == 6)) {
+          response_ = com.github.ylgrgyq.replicator.proto.HandshakeResponse.getDefaultInstance();
+        }
+        handshakeResponseBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+            com.github.ylgrgyq.replicator.proto.HandshakeResponse, com.github.ylgrgyq.replicator.proto.HandshakeResponse.Builder, com.github.ylgrgyq.replicator.proto.HandshakeResponseOrBuilder>(
+                (com.github.ylgrgyq.replicator.proto.HandshakeResponse) response_,
+                getParentForChildren(),
+                isClean());
+        response_ = null;
+      }
+      responseCase_ = 6;
+      onChanged();;
+      return handshakeResponseBuilder_;
+    }
+
+    private com.google.protobuf.SingleFieldBuilderV3<
+        com.github.ylgrgyq.replicator.proto.FetchLogsResponse, com.github.ylgrgyq.replicator.proto.FetchLogsResponse.Builder, com.github.ylgrgyq.replicator.proto.FetchLogsResponseOrBuilder> fetchLogsResponseBuilder_;
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsResponse fetch_logs_response = 7;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.FetchLogsResponse getFetchLogsResponse() {
+      if (fetchLogsResponseBuilder_ == null) {
+        if (responseCase_ == 7) {
+          return (com.github.ylgrgyq.replicator.proto.FetchLogsResponse) response_;
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchLogsResponse.getDefaultInstance();
+      } else {
+        if (responseCase_ == 7) {
+          return fetchLogsResponseBuilder_.getMessage();
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchLogsResponse.getDefaultInstance();
+      }
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsResponse fetch_logs_response = 7;</code>
+     */
+    public Builder setFetchLogsResponse(com.github.ylgrgyq.replicator.proto.FetchLogsResponse value) {
+      if (fetchLogsResponseBuilder_ == null) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        response_ = value;
+        onChanged();
+      } else {
+        fetchLogsResponseBuilder_.setMessage(value);
+      }
+      responseCase_ = 7;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsResponse fetch_logs_response = 7;</code>
+     */
+    public Builder setFetchLogsResponse(
+        com.github.ylgrgyq.replicator.proto.FetchLogsResponse.Builder builderForValue) {
+      if (fetchLogsResponseBuilder_ == null) {
+        response_ = builderForValue.build();
+        onChanged();
+      } else {
+        fetchLogsResponseBuilder_.setMessage(builderForValue.build());
+      }
+      responseCase_ = 7;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsResponse fetch_logs_response = 7;</code>
+     */
+    public Builder mergeFetchLogsResponse(com.github.ylgrgyq.replicator.proto.FetchLogsResponse value) {
+      if (fetchLogsResponseBuilder_ == null) {
+        if (responseCase_ == 7 &&
+            response_ != com.github.ylgrgyq.replicator.proto.FetchLogsResponse.getDefaultInstance()) {
+          response_ = com.github.ylgrgyq.replicator.proto.FetchLogsResponse.newBuilder((com.github.ylgrgyq.replicator.proto.FetchLogsResponse) response_)
+              .mergeFrom(value).buildPartial();
+        } else {
+          response_ = value;
+        }
+        onChanged();
+      } else {
+        if (responseCase_ == 7) {
+          fetchLogsResponseBuilder_.mergeFrom(value);
+        }
+        fetchLogsResponseBuilder_.setMessage(value);
+      }
+      responseCase_ = 7;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsResponse fetch_logs_response = 7;</code>
+     */
+    public Builder clearFetchLogsResponse() {
+      if (fetchLogsResponseBuilder_ == null) {
+        if (responseCase_ == 7) {
+          responseCase_ = 0;
+          response_ = null;
+          onChanged();
+        }
+      } else {
+        if (responseCase_ == 7) {
+          responseCase_ = 0;
+          response_ = null;
+        }
+        fetchLogsResponseBuilder_.clear();
+      }
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsResponse fetch_logs_response = 7;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.FetchLogsResponse.Builder getFetchLogsResponseBuilder() {
+      return getFetchLogsResponseFieldBuilder().getBuilder();
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsResponse fetch_logs_response = 7;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.FetchLogsResponseOrBuilder getFetchLogsResponseOrBuilder() {
+      if ((responseCase_ == 7) && (fetchLogsResponseBuilder_ != null)) {
+        return fetchLogsResponseBuilder_.getMessageOrBuilder();
+      } else {
+        if (responseCase_ == 7) {
+          return (com.github.ylgrgyq.replicator.proto.FetchLogsResponse) response_;
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchLogsResponse.getDefaultInstance();
+      }
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchLogsResponse fetch_logs_response = 7;</code>
+     */
+    private com.google.protobuf.SingleFieldBuilderV3<
+        com.github.ylgrgyq.replicator.proto.FetchLogsResponse, com.github.ylgrgyq.replicator.proto.FetchLogsResponse.Builder, com.github.ylgrgyq.replicator.proto.FetchLogsResponseOrBuilder> 
+        getFetchLogsResponseFieldBuilder() {
+      if (fetchLogsResponseBuilder_ == null) {
+        if (!(responseCase_ == 7)) {
+          response_ = com.github.ylgrgyq.replicator.proto.FetchLogsResponse.getDefaultInstance();
+        }
+        fetchLogsResponseBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+            com.github.ylgrgyq.replicator.proto.FetchLogsResponse, com.github.ylgrgyq.replicator.proto.FetchLogsResponse.Builder, com.github.ylgrgyq.replicator.proto.FetchLogsResponseOrBuilder>(
+                (com.github.ylgrgyq.replicator.proto.FetchLogsResponse) response_,
+                getParentForChildren(),
+                isClean());
+        response_ = null;
+      }
+      responseCase_ = 7;
+      onChanged();;
+      return fetchLogsResponseBuilder_;
+    }
+
+    private com.google.protobuf.SingleFieldBuilderV3<
+        com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse, com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.Builder, com.github.ylgrgyq.replicator.proto.FetchSnapshotResponseOrBuilder> fetchSnapshotResponseBuilder_;
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse fetch_snapshot_response = 8;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse getFetchSnapshotResponse() {
+      if (fetchSnapshotResponseBuilder_ == null) {
+        if (responseCase_ == 8) {
+          return (com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse) response_;
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.getDefaultInstance();
+      } else {
+        if (responseCase_ == 8) {
+          return fetchSnapshotResponseBuilder_.getMessage();
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.getDefaultInstance();
+      }
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse fetch_snapshot_response = 8;</code>
+     */
+    public Builder setFetchSnapshotResponse(com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse value) {
+      if (fetchSnapshotResponseBuilder_ == null) {
+        if (value == null) {
+          throw new NullPointerException();
+        }
+        response_ = value;
+        onChanged();
+      } else {
+        fetchSnapshotResponseBuilder_.setMessage(value);
+      }
+      responseCase_ = 8;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse fetch_snapshot_response = 8;</code>
+     */
+    public Builder setFetchSnapshotResponse(
+        com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.Builder builderForValue) {
+      if (fetchSnapshotResponseBuilder_ == null) {
+        response_ = builderForValue.build();
+        onChanged();
+      } else {
+        fetchSnapshotResponseBuilder_.setMessage(builderForValue.build());
+      }
+      responseCase_ = 8;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse fetch_snapshot_response = 8;</code>
+     */
+    public Builder mergeFetchSnapshotResponse(com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse value) {
+      if (fetchSnapshotResponseBuilder_ == null) {
+        if (responseCase_ == 8 &&
+            response_ != com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.getDefaultInstance()) {
+          response_ = com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.newBuilder((com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse) response_)
+              .mergeFrom(value).buildPartial();
+        } else {
+          response_ = value;
+        }
+        onChanged();
+      } else {
+        if (responseCase_ == 8) {
+          fetchSnapshotResponseBuilder_.mergeFrom(value);
+        }
+        fetchSnapshotResponseBuilder_.setMessage(value);
+      }
+      responseCase_ = 8;
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse fetch_snapshot_response = 8;</code>
+     */
+    public Builder clearFetchSnapshotResponse() {
+      if (fetchSnapshotResponseBuilder_ == null) {
+        if (responseCase_ == 8) {
+          responseCase_ = 0;
+          response_ = null;
+          onChanged();
+        }
+      } else {
+        if (responseCase_ == 8) {
+          responseCase_ = 0;
+          response_ = null;
+        }
+        fetchSnapshotResponseBuilder_.clear();
+      }
+      return this;
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse fetch_snapshot_response = 8;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.Builder getFetchSnapshotResponseBuilder() {
+      return getFetchSnapshotResponseFieldBuilder().getBuilder();
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse fetch_snapshot_response = 8;</code>
+     */
+    public com.github.ylgrgyq.replicator.proto.FetchSnapshotResponseOrBuilder getFetchSnapshotResponseOrBuilder() {
+      if ((responseCase_ == 8) && (fetchSnapshotResponseBuilder_ != null)) {
+        return fetchSnapshotResponseBuilder_.getMessageOrBuilder();
+      } else {
+        if (responseCase_ == 8) {
+          return (com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse) response_;
+        }
+        return com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.getDefaultInstance();
+      }
+    }
+    /**
+     * <code>optional .com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse fetch_snapshot_response = 8;</code>
+     */
+    private com.google.protobuf.SingleFieldBuilderV3<
+        com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse, com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.Builder, com.github.ylgrgyq.replicator.proto.FetchSnapshotResponseOrBuilder> 
+        getFetchSnapshotResponseFieldBuilder() {
+      if (fetchSnapshotResponseBuilder_ == null) {
+        if (!(responseCase_ == 8)) {
+          response_ = com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.getDefaultInstance();
+        }
+        fetchSnapshotResponseBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+            com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse, com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse.Builder, com.github.ylgrgyq.replicator.proto.FetchSnapshotResponseOrBuilder>(
+                (com.github.ylgrgyq.replicator.proto.FetchSnapshotResponse) response_,
+                getParentForChildren(),
+                isClean());
+        response_ = null;
+      }
+      responseCase_ = 8;
+      onChanged();;
+      return fetchSnapshotResponseBuilder_;
     }
 
     private com.github.ylgrgyq.replicator.proto.ErrorInfo error_ = null;
     private com.google.protobuf.SingleFieldBuilderV3<
         com.github.ylgrgyq.replicator.proto.ErrorInfo, com.github.ylgrgyq.replicator.proto.ErrorInfo.Builder, com.github.ylgrgyq.replicator.proto.ErrorInfoOrBuilder> errorBuilder_;
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
      */
     public boolean hasError() {
       return errorBuilder_ != null || error_ != null;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
      */
     public com.github.ylgrgyq.replicator.proto.ErrorInfo getError() {
       if (errorBuilder_ == null) {
@@ -1242,7 +1855,7 @@ public  final class ReplicatorCommand extends
       }
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
      */
     public Builder setError(com.github.ylgrgyq.replicator.proto.ErrorInfo value) {
       if (errorBuilder_ == null) {
@@ -1258,7 +1871,7 @@ public  final class ReplicatorCommand extends
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
      */
     public Builder setError(
         com.github.ylgrgyq.replicator.proto.ErrorInfo.Builder builderForValue) {
@@ -1272,7 +1885,7 @@ public  final class ReplicatorCommand extends
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
      */
     public Builder mergeError(com.github.ylgrgyq.replicator.proto.ErrorInfo value) {
       if (errorBuilder_ == null) {
@@ -1290,7 +1903,7 @@ public  final class ReplicatorCommand extends
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
      */
     public Builder clearError() {
       if (errorBuilder_ == null) {
@@ -1304,7 +1917,7 @@ public  final class ReplicatorCommand extends
       return this;
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
      */
     public com.github.ylgrgyq.replicator.proto.ErrorInfo.Builder getErrorBuilder() {
       
@@ -1312,7 +1925,7 @@ public  final class ReplicatorCommand extends
       return getErrorFieldBuilder().getBuilder();
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
      */
     public com.github.ylgrgyq.replicator.proto.ErrorInfoOrBuilder getErrorOrBuilder() {
       if (errorBuilder_ != null) {
@@ -1323,7 +1936,7 @@ public  final class ReplicatorCommand extends
       }
     }
     /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 7;</code>
+     * <code>optional .com.github.ylgrgyq.replicator.proto.ErrorInfo error = 9;</code>
      */
     private com.google.protobuf.SingleFieldBuilderV3<
         com.github.ylgrgyq.replicator.proto.ErrorInfo, com.github.ylgrgyq.replicator.proto.ErrorInfo.Builder, com.github.ylgrgyq.replicator.proto.ErrorInfoOrBuilder> 

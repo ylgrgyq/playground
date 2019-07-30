@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.server;
 
+import com.github.ylgrgyq.replicator.proto.BatchLogEntries;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
-import com.github.ylgrgyq.replicator.proto.SyncLogEntries;
 import com.github.ylgrgyq.replicator.server.sequence.Sequence;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +35,7 @@ public class Replica implements ReplicateRequestHandler {
             return;
         }
 
-        SyncLogEntries log = seq.syncLogs(fromIndex, limit);
+        BatchLogEntries log = seq.getLogs(fromIndex, limit);
 
         channel.writeSyncLog(log);
     }

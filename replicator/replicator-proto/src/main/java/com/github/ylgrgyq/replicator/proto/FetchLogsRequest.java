@@ -4,19 +4,19 @@
 package com.github.ylgrgyq.replicator.proto;
 
 /**
- * Protobuf type {@code com.github.ylgrgyq.replicator.proto.LogEntry}
+ * Protobuf type {@code com.github.ylgrgyq.replicator.proto.FetchLogsRequest}
  */
-public  final class LogEntry extends
+public  final class FetchLogsRequest extends
     com.google.protobuf.GeneratedMessageV3 implements
-    // @@protoc_insertion_point(message_implements:com.github.ylgrgyq.replicator.proto.LogEntry)
-    LogEntryOrBuilder {
-  // Use LogEntry.newBuilder() to construct.
-  private LogEntry(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+    // @@protoc_insertion_point(message_implements:com.github.ylgrgyq.replicator.proto.FetchLogsRequest)
+    FetchLogsRequestOrBuilder {
+  // Use FetchLogsRequest.newBuilder() to construct.
+  private FetchLogsRequest(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
     super(builder);
   }
-  private LogEntry() {
-    id_ = 0L;
-    data_ = com.google.protobuf.ByteString.EMPTY;
+  private FetchLogsRequest() {
+    fromId_ = 0L;
+    limit_ = 0;
   }
 
   @java.lang.Override
@@ -24,7 +24,7 @@ public  final class LogEntry extends
   getUnknownFields() {
     return com.google.protobuf.UnknownFieldSet.getDefaultInstance();
   }
-  private LogEntry(
+  private FetchLogsRequest(
       com.google.protobuf.CodedInputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
@@ -46,12 +46,12 @@ public  final class LogEntry extends
           }
           case 8: {
 
-            id_ = input.readInt64();
+            fromId_ = input.readInt64();
             break;
           }
-          case 26: {
+          case 16: {
 
-            data_ = input.readBytes();
+            limit_ = input.readInt32();
             break;
           }
         }
@@ -67,32 +67,32 @@ public  final class LogEntry extends
   }
   public static final com.google.protobuf.Descriptors.Descriptor
       getDescriptor() {
-    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_descriptor;
+    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsRequest_descriptor;
   }
 
   protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internalGetFieldAccessorTable() {
-    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_fieldAccessorTable
+    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsRequest_fieldAccessorTable
         .ensureFieldAccessorsInitialized(
-            com.github.ylgrgyq.replicator.proto.LogEntry.class, com.github.ylgrgyq.replicator.proto.LogEntry.Builder.class);
+            com.github.ylgrgyq.replicator.proto.FetchLogsRequest.class, com.github.ylgrgyq.replicator.proto.FetchLogsRequest.Builder.class);
   }
 
-  public static final int ID_FIELD_NUMBER = 1;
-  private long id_;
+  public static final int FROMID_FIELD_NUMBER = 1;
+  private long fromId_;
   /**
-   * <code>optional int64 id = 1;</code>
+   * <code>optional int64 fromId = 1;</code>
    */
-  public long getId() {
-    return id_;
+  public long getFromId() {
+    return fromId_;
   }
 
-  public static final int DATA_FIELD_NUMBER = 3;
-  private com.google.protobuf.ByteString data_;
+  public static final int LIMIT_FIELD_NUMBER = 2;
+  private int limit_;
   /**
-   * <code>optional bytes data = 3;</code>
+   * <code>optional int32 limit = 2;</code>
    */
-  public com.google.protobuf.ByteString getData() {
-    return data_;
+  public int getLimit() {
+    return limit_;
   }
 
   private byte memoizedIsInitialized = -1;
@@ -107,11 +107,11 @@ public  final class LogEntry extends
 
   public void writeTo(com.google.protobuf.CodedOutputStream output)
                       throws java.io.IOException {
-    if (id_ != 0L) {
-      output.writeInt64(1, id_);
+    if (fromId_ != 0L) {
+      output.writeInt64(1, fromId_);
     }
-    if (!data_.isEmpty()) {
-      output.writeBytes(3, data_);
+    if (limit_ != 0) {
+      output.writeInt32(2, limit_);
     }
   }
 
@@ -120,13 +120,13 @@ public  final class LogEntry extends
     if (size != -1) return size;
 
     size = 0;
-    if (id_ != 0L) {
+    if (fromId_ != 0L) {
       size += com.google.protobuf.CodedOutputStream
-        .computeInt64Size(1, id_);
+        .computeInt64Size(1, fromId_);
     }
-    if (!data_.isEmpty()) {
+    if (limit_ != 0) {
       size += com.google.protobuf.CodedOutputStream
-        .computeBytesSize(3, data_);
+        .computeInt32Size(2, limit_);
     }
     memoizedSize = size;
     return size;
@@ -138,16 +138,16 @@ public  final class LogEntry extends
     if (obj == this) {
      return true;
     }
-    if (!(obj instanceof com.github.ylgrgyq.replicator.proto.LogEntry)) {
+    if (!(obj instanceof com.github.ylgrgyq.replicator.proto.FetchLogsRequest)) {
       return super.equals(obj);
     }
-    com.github.ylgrgyq.replicator.proto.LogEntry other = (com.github.ylgrgyq.replicator.proto.LogEntry) obj;
+    com.github.ylgrgyq.replicator.proto.FetchLogsRequest other = (com.github.ylgrgyq.replicator.proto.FetchLogsRequest) obj;
 
     boolean result = true;
-    result = result && (getId()
-        == other.getId());
-    result = result && getData()
-        .equals(other.getData());
+    result = result && (getFromId()
+        == other.getFromId());
+    result = result && (getLimit()
+        == other.getLimit());
     return result;
   }
 
@@ -158,68 +158,68 @@ public  final class LogEntry extends
     }
     int hash = 41;
     hash = (19 * hash) + getDescriptorForType().hashCode();
-    hash = (37 * hash) + ID_FIELD_NUMBER;
+    hash = (37 * hash) + FROMID_FIELD_NUMBER;
     hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
-        getId());
-    hash = (37 * hash) + DATA_FIELD_NUMBER;
-    hash = (53 * hash) + getData().hashCode();
+        getFromId());
+    hash = (37 * hash) + LIMIT_FIELD_NUMBER;
+    hash = (53 * hash) + getLimit();
     hash = (29 * hash) + unknownFields.hashCode();
     memoizedHashCode = hash;
     return hash;
   }
 
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.FetchLogsRequest parseFrom(
       com.google.protobuf.ByteString data)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.FetchLogsRequest parseFrom(
       com.google.protobuf.ByteString data,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(byte[] data)
+  public static com.github.ylgrgyq.replicator.proto.FetchLogsRequest parseFrom(byte[] data)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.FetchLogsRequest parseFrom(
       byte[] data,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(java.io.InputStream input)
+  public static com.github.ylgrgyq.replicator.proto.FetchLogsRequest parseFrom(java.io.InputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.FetchLogsRequest parseFrom(
       java.io.InputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseDelimitedFrom(java.io.InputStream input)
+  public static com.github.ylgrgyq.replicator.proto.FetchLogsRequest parseDelimitedFrom(java.io.InputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseDelimitedWithIOException(PARSER, input);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseDelimitedFrom(
+  public static com.github.ylgrgyq.replicator.proto.FetchLogsRequest parseDelimitedFrom(
       java.io.InputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.FetchLogsRequest parseFrom(
       com.google.protobuf.CodedInputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.FetchLogsRequest parseFrom(
       com.google.protobuf.CodedInputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
@@ -231,7 +231,7 @@ public  final class LogEntry extends
   public static Builder newBuilder() {
     return DEFAULT_INSTANCE.toBuilder();
   }
-  public static Builder newBuilder(com.github.ylgrgyq.replicator.proto.LogEntry prototype) {
+  public static Builder newBuilder(com.github.ylgrgyq.replicator.proto.FetchLogsRequest prototype) {
     return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
   }
   public Builder toBuilder() {
@@ -246,25 +246,25 @@ public  final class LogEntry extends
     return builder;
   }
   /**
-   * Protobuf type {@code com.github.ylgrgyq.replicator.proto.LogEntry}
+   * Protobuf type {@code com.github.ylgrgyq.replicator.proto.FetchLogsRequest}
    */
   public static final class Builder extends
       com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
-      // @@protoc_insertion_point(builder_implements:com.github.ylgrgyq.replicator.proto.LogEntry)
-      com.github.ylgrgyq.replicator.proto.LogEntryOrBuilder {
+      // @@protoc_insertion_point(builder_implements:com.github.ylgrgyq.replicator.proto.FetchLogsRequest)
+      com.github.ylgrgyq.replicator.proto.FetchLogsRequestOrBuilder {
     public static final com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
-      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_descriptor;
+      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsRequest_descriptor;
     }
 
     protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
         internalGetFieldAccessorTable() {
-      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_fieldAccessorTable
+      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsRequest_fieldAccessorTable
           .ensureFieldAccessorsInitialized(
-              com.github.ylgrgyq.replicator.proto.LogEntry.class, com.github.ylgrgyq.replicator.proto.LogEntry.Builder.class);
+              com.github.ylgrgyq.replicator.proto.FetchLogsRequest.class, com.github.ylgrgyq.replicator.proto.FetchLogsRequest.Builder.class);
     }
 
-    // Construct using com.github.ylgrgyq.replicator.proto.LogEntry.newBuilder()
+    // Construct using com.github.ylgrgyq.replicator.proto.FetchLogsRequest.newBuilder()
     private Builder() {
       maybeForceBuilderInitialization();
     }
@@ -281,34 +281,34 @@ public  final class LogEntry extends
     }
     public Builder clear() {
       super.clear();
-      id_ = 0L;
+      fromId_ = 0L;
 
-      data_ = com.google.protobuf.ByteString.EMPTY;
+      limit_ = 0;
 
       return this;
     }
 
     public com.google.protobuf.Descriptors.Descriptor
         getDescriptorForType() {
-      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_descriptor;
+      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsRequest_descriptor;
     }
 
-    public com.github.ylgrgyq.replicator.proto.LogEntry getDefaultInstanceForType() {
-      return com.github.ylgrgyq.replicator.proto.LogEntry.getDefaultInstance();
+    public com.github.ylgrgyq.replicator.proto.FetchLogsRequest getDefaultInstanceForType() {
+      return com.github.ylgrgyq.replicator.proto.FetchLogsRequest.getDefaultInstance();
     }
 
-    public com.github.ylgrgyq.replicator.proto.LogEntry build() {
-      com.github.ylgrgyq.replicator.proto.LogEntry result = buildPartial();
+    public com.github.ylgrgyq.replicator.proto.FetchLogsRequest build() {
+      com.github.ylgrgyq.replicator.proto.FetchLogsRequest result = buildPartial();
       if (!result.isInitialized()) {
         throw newUninitializedMessageException(result);
       }
       return result;
     }
 
-    public com.github.ylgrgyq.replicator.proto.LogEntry buildPartial() {
-      com.github.ylgrgyq.replicator.proto.LogEntry result = new com.github.ylgrgyq.replicator.proto.LogEntry(this);
-      result.id_ = id_;
-      result.data_ = data_;
+    public com.github.ylgrgyq.replicator.proto.FetchLogsRequest buildPartial() {
+      com.github.ylgrgyq.replicator.proto.FetchLogsRequest result = new com.github.ylgrgyq.replicator.proto.FetchLogsRequest(this);
+      result.fromId_ = fromId_;
+      result.limit_ = limit_;
       onBuilt();
       return result;
     }
@@ -340,21 +340,21 @@ public  final class LogEntry extends
       return (Builder) super.addRepeatedField(field, value);
     }
     public Builder mergeFrom(com.google.protobuf.Message other) {
-      if (other instanceof com.github.ylgrgyq.replicator.proto.LogEntry) {
-        return mergeFrom((com.github.ylgrgyq.replicator.proto.LogEntry)other);
+      if (other instanceof com.github.ylgrgyq.replicator.proto.FetchLogsRequest) {
+        return mergeFrom((com.github.ylgrgyq.replicator.proto.FetchLogsRequest)other);
       } else {
         super.mergeFrom(other);
         return this;
       }
     }
 
-    public Builder mergeFrom(com.github.ylgrgyq.replicator.proto.LogEntry other) {
-      if (other == com.github.ylgrgyq.replicator.proto.LogEntry.getDefaultInstance()) return this;
-      if (other.getId() != 0L) {
-        setId(other.getId());
+    public Builder mergeFrom(com.github.ylgrgyq.replicator.proto.FetchLogsRequest other) {
+      if (other == com.github.ylgrgyq.replicator.proto.FetchLogsRequest.getDefaultInstance()) return this;
+      if (other.getFromId() != 0L) {
+        setFromId(other.getFromId());
       }
-      if (other.getData() != com.google.protobuf.ByteString.EMPTY) {
-        setData(other.getData());
+      if (other.getLimit() != 0) {
+        setLimit(other.getLimit());
       }
       onChanged();
       return this;
@@ -368,11 +368,11 @@ public  final class LogEntry extends
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      com.github.ylgrgyq.replicator.proto.LogEntry parsedMessage = null;
+      com.github.ylgrgyq.replicator.proto.FetchLogsRequest parsedMessage = null;
       try {
         parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
       } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-        parsedMessage = (com.github.ylgrgyq.replicator.proto.LogEntry) e.getUnfinishedMessage();
+        parsedMessage = (com.github.ylgrgyq.replicator.proto.FetchLogsRequest) e.getUnfinishedMessage();
         throw e.unwrapIOException();
       } finally {
         if (parsedMessage != null) {
@@ -382,57 +382,54 @@ public  final class LogEntry extends
       return this;
     }
 
-    private long id_ ;
+    private long fromId_ ;
     /**
-     * <code>optional int64 id = 1;</code>
+     * <code>optional int64 fromId = 1;</code>
      */
-    public long getId() {
-      return id_;
+    public long getFromId() {
+      return fromId_;
     }
     /**
-     * <code>optional int64 id = 1;</code>
+     * <code>optional int64 fromId = 1;</code>
      */
-    public Builder setId(long value) {
+    public Builder setFromId(long value) {
       
-      id_ = value;
+      fromId_ = value;
       onChanged();
       return this;
     }
     /**
-     * <code>optional int64 id = 1;</code>
+     * <code>optional int64 fromId = 1;</code>
      */
-    public Builder clearId() {
+    public Builder clearFromId() {
       
-      id_ = 0L;
+      fromId_ = 0L;
       onChanged();
       return this;
     }
 
-    private com.google.protobuf.ByteString data_ = com.google.protobuf.ByteString.EMPTY;
+    private int limit_ ;
     /**
-     * <code>optional bytes data = 3;</code>
+     * <code>optional int32 limit = 2;</code>
      */
-    public com.google.protobuf.ByteString getData() {
-      return data_;
+    public int getLimit() {
+      return limit_;
     }
     /**
-     * <code>optional bytes data = 3;</code>
+     * <code>optional int32 limit = 2;</code>
      */
-    public Builder setData(com.google.protobuf.ByteString value) {
-      if (value == null) {
-    throw new NullPointerException();
-  }
-  
-      data_ = value;
+    public Builder setLimit(int value) {
+      
+      limit_ = value;
       onChanged();
       return this;
     }
     /**
-     * <code>optional bytes data = 3;</code>
+     * <code>optional int32 limit = 2;</code>
      */
-    public Builder clearData() {
+    public Builder clearLimit() {
       
-      data_ = getDefaultInstance().getData();
+      limit_ = 0;
       onChanged();
       return this;
     }
@@ -447,39 +444,39 @@ public  final class LogEntry extends
     }
 
 
-    // @@protoc_insertion_point(builder_scope:com.github.ylgrgyq.replicator.proto.LogEntry)
+    // @@protoc_insertion_point(builder_scope:com.github.ylgrgyq.replicator.proto.FetchLogsRequest)
   }
 
-  // @@protoc_insertion_point(class_scope:com.github.ylgrgyq.replicator.proto.LogEntry)
-  private static final com.github.ylgrgyq.replicator.proto.LogEntry DEFAULT_INSTANCE;
+  // @@protoc_insertion_point(class_scope:com.github.ylgrgyq.replicator.proto.FetchLogsRequest)
+  private static final com.github.ylgrgyq.replicator.proto.FetchLogsRequest DEFAULT_INSTANCE;
   static {
-    DEFAULT_INSTANCE = new com.github.ylgrgyq.replicator.proto.LogEntry();
+    DEFAULT_INSTANCE = new com.github.ylgrgyq.replicator.proto.FetchLogsRequest();
   }
 
-  public static com.github.ylgrgyq.replicator.proto.LogEntry getDefaultInstance() {
+  public static com.github.ylgrgyq.replicator.proto.FetchLogsRequest getDefaultInstance() {
     return DEFAULT_INSTANCE;
   }
 
-  private static final com.google.protobuf.Parser<LogEntry>
-      PARSER = new com.google.protobuf.AbstractParser<LogEntry>() {
-    public LogEntry parsePartialFrom(
+  private static final com.google.protobuf.Parser<FetchLogsRequest>
+      PARSER = new com.google.protobuf.AbstractParser<FetchLogsRequest>() {
+    public FetchLogsRequest parsePartialFrom(
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
-        return new LogEntry(input, extensionRegistry);
+        return new FetchLogsRequest(input, extensionRegistry);
     }
   };
 
-  public static com.google.protobuf.Parser<LogEntry> parser() {
+  public static com.google.protobuf.Parser<FetchLogsRequest> parser() {
     return PARSER;
   }
 
   @java.lang.Override
-  public com.google.protobuf.Parser<LogEntry> getParserForType() {
+  public com.google.protobuf.Parser<FetchLogsRequest> getParserForType() {
     return PARSER;
   }
 
-  public com.github.ylgrgyq.replicator.proto.LogEntry getDefaultInstanceForType() {
+  public com.github.ylgrgyq.replicator.proto.FetchLogsRequest getDefaultInstanceForType() {
     return DEFAULT_INSTANCE;
   }
 

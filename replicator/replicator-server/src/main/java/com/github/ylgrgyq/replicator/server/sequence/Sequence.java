@@ -1,8 +1,8 @@
 package com.github.ylgrgyq.replicator.server.sequence;
 
+import com.github.ylgrgyq.replicator.proto.BatchLogEntries;
 import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
-import com.github.ylgrgyq.replicator.proto.SyncLogEntries;
 import com.github.ylgrgyq.replicator.server.SnapshotGenerator;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import org.slf4j.Logger;
@@ -68,10 +68,10 @@ public class Sequence implements SequenceAppender, SequenceReader {
         }
     }
 
-    public SyncLogEntries syncLogs(long fromId, int limit) {
+    public BatchLogEntries getLogs(long fromId, int limit) {
         List<LogEntry> entries = storage.getEntries(fromId, limit);
 
-        SyncLogEntries.Builder builder = SyncLogEntries.newBuilder();
+        BatchLogEntries.Builder builder = BatchLogEntries.newBuilder();
         builder.addAllEntries(entries);
         return builder.build();
     }

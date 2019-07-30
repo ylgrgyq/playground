@@ -4,19 +4,18 @@
 package com.github.ylgrgyq.replicator.proto;
 
 /**
- * Protobuf type {@code com.github.ylgrgyq.replicator.proto.LogEntry}
+ * Protobuf type {@code com.github.ylgrgyq.replicator.proto.HandshakeRequest}
  */
-public  final class LogEntry extends
+public  final class HandshakeRequest extends
     com.google.protobuf.GeneratedMessageV3 implements
-    // @@protoc_insertion_point(message_implements:com.github.ylgrgyq.replicator.proto.LogEntry)
-    LogEntryOrBuilder {
-  // Use LogEntry.newBuilder() to construct.
-  private LogEntry(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+    // @@protoc_insertion_point(message_implements:com.github.ylgrgyq.replicator.proto.HandshakeRequest)
+    HandshakeRequestOrBuilder {
+  // Use HandshakeRequest.newBuilder() to construct.
+  private HandshakeRequest(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
     super(builder);
   }
-  private LogEntry() {
-    id_ = 0L;
-    data_ = com.google.protobuf.ByteString.EMPTY;
+  private HandshakeRequest() {
+    topic_ = "";
   }
 
   @java.lang.Override
@@ -24,7 +23,7 @@ public  final class LogEntry extends
   getUnknownFields() {
     return com.google.protobuf.UnknownFieldSet.getDefaultInstance();
   }
-  private LogEntry(
+  private HandshakeRequest(
       com.google.protobuf.CodedInputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
@@ -44,14 +43,10 @@ public  final class LogEntry extends
             }
             break;
           }
-          case 8: {
+          case 10: {
+            java.lang.String s = input.readStringRequireUtf8();
 
-            id_ = input.readInt64();
-            break;
-          }
-          case 26: {
-
-            data_ = input.readBytes();
+            topic_ = s;
             break;
           }
         }
@@ -67,32 +62,48 @@ public  final class LogEntry extends
   }
   public static final com.google.protobuf.Descriptors.Descriptor
       getDescriptor() {
-    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_descriptor;
+    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_HandshakeRequest_descriptor;
   }
 
   protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internalGetFieldAccessorTable() {
-    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_fieldAccessorTable
+    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_HandshakeRequest_fieldAccessorTable
         .ensureFieldAccessorsInitialized(
-            com.github.ylgrgyq.replicator.proto.LogEntry.class, com.github.ylgrgyq.replicator.proto.LogEntry.Builder.class);
+            com.github.ylgrgyq.replicator.proto.HandshakeRequest.class, com.github.ylgrgyq.replicator.proto.HandshakeRequest.Builder.class);
   }
 
-  public static final int ID_FIELD_NUMBER = 1;
-  private long id_;
+  public static final int TOPIC_FIELD_NUMBER = 1;
+  private volatile java.lang.Object topic_;
   /**
-   * <code>optional int64 id = 1;</code>
+   * <code>optional string topic = 1;</code>
    */
-  public long getId() {
-    return id_;
+  public java.lang.String getTopic() {
+    java.lang.Object ref = topic_;
+    if (ref instanceof java.lang.String) {
+      return (java.lang.String) ref;
+    } else {
+      com.google.protobuf.ByteString bs = 
+          (com.google.protobuf.ByteString) ref;
+      java.lang.String s = bs.toStringUtf8();
+      topic_ = s;
+      return s;
+    }
   }
-
-  public static final int DATA_FIELD_NUMBER = 3;
-  private com.google.protobuf.ByteString data_;
   /**
-   * <code>optional bytes data = 3;</code>
+   * <code>optional string topic = 1;</code>
    */
-  public com.google.protobuf.ByteString getData() {
-    return data_;
+  public com.google.protobuf.ByteString
+      getTopicBytes() {
+    java.lang.Object ref = topic_;
+    if (ref instanceof java.lang.String) {
+      com.google.protobuf.ByteString b = 
+          com.google.protobuf.ByteString.copyFromUtf8(
+              (java.lang.String) ref);
+      topic_ = b;
+      return b;
+    } else {
+      return (com.google.protobuf.ByteString) ref;
+    }
   }
 
   private byte memoizedIsInitialized = -1;
@@ -107,11 +118,8 @@ public  final class LogEntry extends
 
   public void writeTo(com.google.protobuf.CodedOutputStream output)
                       throws java.io.IOException {
-    if (id_ != 0L) {
-      output.writeInt64(1, id_);
-    }
-    if (!data_.isEmpty()) {
-      output.writeBytes(3, data_);
+    if (!getTopicBytes().isEmpty()) {
+      com.google.protobuf.GeneratedMessageV3.writeString(output, 1, topic_);
     }
   }
 
@@ -120,13 +128,8 @@ public  final class LogEntry extends
     if (size != -1) return size;
 
     size = 0;
-    if (id_ != 0L) {
-      size += com.google.protobuf.CodedOutputStream
-        .computeInt64Size(1, id_);
-    }
-    if (!data_.isEmpty()) {
-      size += com.google.protobuf.CodedOutputStream
-        .computeBytesSize(3, data_);
+    if (!getTopicBytes().isEmpty()) {
+      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(1, topic_);
     }
     memoizedSize = size;
     return size;
@@ -138,16 +141,14 @@ public  final class LogEntry extends
     if (obj == this) {
      return true;
     }
-    if (!(obj instanceof com.github.ylgrgyq.replicator.proto.LogEntry)) {
+    if (!(obj instanceof com.github.ylgrgyq.replicator.proto.HandshakeRequest)) {
       return super.equals(obj);
     }
-    com.github.ylgrgyq.replicator.proto.LogEntry other = (com.github.ylgrgyq.replicator.proto.LogEntry) obj;
+    com.github.ylgrgyq.replicator.proto.HandshakeRequest other = (com.github.ylgrgyq.replicator.proto.HandshakeRequest) obj;
 
     boolean result = true;
-    result = result && (getId()
-        == other.getId());
-    result = result && getData()
-        .equals(other.getData());
+    result = result && getTopic()
+        .equals(other.getTopic());
     return result;
   }
 
@@ -158,68 +159,65 @@ public  final class LogEntry extends
     }
     int hash = 41;
     hash = (19 * hash) + getDescriptorForType().hashCode();
-    hash = (37 * hash) + ID_FIELD_NUMBER;
-    hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
-        getId());
-    hash = (37 * hash) + DATA_FIELD_NUMBER;
-    hash = (53 * hash) + getData().hashCode();
+    hash = (37 * hash) + TOPIC_FIELD_NUMBER;
+    hash = (53 * hash) + getTopic().hashCode();
     hash = (29 * hash) + unknownFields.hashCode();
     memoizedHashCode = hash;
     return hash;
   }
 
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.HandshakeRequest parseFrom(
       com.google.protobuf.ByteString data)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.HandshakeRequest parseFrom(
       com.google.protobuf.ByteString data,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(byte[] data)
+  public static com.github.ylgrgyq.replicator.proto.HandshakeRequest parseFrom(byte[] data)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.HandshakeRequest parseFrom(
       byte[] data,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(java.io.InputStream input)
+  public static com.github.ylgrgyq.replicator.proto.HandshakeRequest parseFrom(java.io.InputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.HandshakeRequest parseFrom(
       java.io.InputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseDelimitedFrom(java.io.InputStream input)
+  public static com.github.ylgrgyq.replicator.proto.HandshakeRequest parseDelimitedFrom(java.io.InputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseDelimitedWithIOException(PARSER, input);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseDelimitedFrom(
+  public static com.github.ylgrgyq.replicator.proto.HandshakeRequest parseDelimitedFrom(
       java.io.InputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.HandshakeRequest parseFrom(
       com.google.protobuf.CodedInputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input);
   }
-  public static com.github.ylgrgyq.replicator.proto.LogEntry parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.HandshakeRequest parseFrom(
       com.google.protobuf.CodedInputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
@@ -231,7 +229,7 @@ public  final class LogEntry extends
   public static Builder newBuilder() {
     return DEFAULT_INSTANCE.toBuilder();
   }
-  public static Builder newBuilder(com.github.ylgrgyq.replicator.proto.LogEntry prototype) {
+  public static Builder newBuilder(com.github.ylgrgyq.replicator.proto.HandshakeRequest prototype) {
     return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
   }
   public Builder toBuilder() {
@@ -246,25 +244,25 @@ public  final class LogEntry extends
     return builder;
   }
   /**
-   * Protobuf type {@code com.github.ylgrgyq.replicator.proto.LogEntry}
+   * Protobuf type {@code com.github.ylgrgyq.replicator.proto.HandshakeRequest}
    */
   public static final class Builder extends
       com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
-      // @@protoc_insertion_point(builder_implements:com.github.ylgrgyq.replicator.proto.LogEntry)
-      com.github.ylgrgyq.replicator.proto.LogEntryOrBuilder {
+      // @@protoc_insertion_point(builder_implements:com.github.ylgrgyq.replicator.proto.HandshakeRequest)
+      com.github.ylgrgyq.replicator.proto.HandshakeRequestOrBuilder {
     public static final com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
-      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_descriptor;
+      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_HandshakeRequest_descriptor;
     }
 
     protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
         internalGetFieldAccessorTable() {
-      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_fieldAccessorTable
+      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_HandshakeRequest_fieldAccessorTable
           .ensureFieldAccessorsInitialized(
-              com.github.ylgrgyq.replicator.proto.LogEntry.class, com.github.ylgrgyq.replicator.proto.LogEntry.Builder.class);
+              com.github.ylgrgyq.replicator.proto.HandshakeRequest.class, com.github.ylgrgyq.replicator.proto.HandshakeRequest.Builder.class);
     }
 
-    // Construct using com.github.ylgrgyq.replicator.proto.LogEntry.newBuilder()
+    // Construct using com.github.ylgrgyq.replicator.proto.HandshakeRequest.newBuilder()
     private Builder() {
       maybeForceBuilderInitialization();
     }
@@ -281,34 +279,31 @@ public  final class LogEntry extends
     }
     public Builder clear() {
       super.clear();
-      id_ = 0L;
-
-      data_ = com.google.protobuf.ByteString.EMPTY;
+      topic_ = "";
 
       return this;
     }
 
     public com.google.protobuf.Descriptors.Descriptor
         getDescriptorForType() {
-      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_descriptor;
+      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_HandshakeRequest_descriptor;
     }
 
-    public com.github.ylgrgyq.replicator.proto.LogEntry getDefaultInstanceForType() {
-      return com.github.ylgrgyq.replicator.proto.LogEntry.getDefaultInstance();
+    public com.github.ylgrgyq.replicator.proto.HandshakeRequest getDefaultInstanceForType() {
+      return com.github.ylgrgyq.replicator.proto.HandshakeRequest.getDefaultInstance();
     }
 
-    public com.github.ylgrgyq.replicator.proto.LogEntry build() {
-      com.github.ylgrgyq.replicator.proto.LogEntry result = buildPartial();
+    public com.github.ylgrgyq.replicator.proto.HandshakeRequest build() {
+      com.github.ylgrgyq.replicator.proto.HandshakeRequest result = buildPartial();
       if (!result.isInitialized()) {
         throw newUninitializedMessageException(result);
       }
       return result;
     }
 
-    public com.github.ylgrgyq.replicator.proto.LogEntry buildPartial() {
-      com.github.ylgrgyq.replicator.proto.LogEntry result = new com.github.ylgrgyq.replicator.proto.LogEntry(this);
-      result.id_ = id_;
-      result.data_ = data_;
+    public com.github.ylgrgyq.replicator.proto.HandshakeRequest buildPartial() {
+      com.github.ylgrgyq.replicator.proto.HandshakeRequest result = new com.github.ylgrgyq.replicator.proto.HandshakeRequest(this);
+      result.topic_ = topic_;
       onBuilt();
       return result;
     }
@@ -340,21 +335,19 @@ public  final class LogEntry extends
       return (Builder) super.addRepeatedField(field, value);
     }
     public Builder mergeFrom(com.google.protobuf.Message other) {
-      if (other instanceof com.github.ylgrgyq.replicator.proto.LogEntry) {
-        return mergeFrom((com.github.ylgrgyq.replicator.proto.LogEntry)other);
+      if (other instanceof com.github.ylgrgyq.replicator.proto.HandshakeRequest) {
+        return mergeFrom((com.github.ylgrgyq.replicator.proto.HandshakeRequest)other);
       } else {
         super.mergeFrom(other);
         return this;
       }
     }
 
-    public Builder mergeFrom(com.github.ylgrgyq.replicator.proto.LogEntry other) {
-      if (other == com.github.ylgrgyq.replicator.proto.LogEntry.getDefaultInstance()) return this;
-      if (other.getId() != 0L) {
-        setId(other.getId());
-      }
-      if (other.getData() != com.google.protobuf.ByteString.EMPTY) {
-        setData(other.getData());
+    public Builder mergeFrom(com.github.ylgrgyq.replicator.proto.HandshakeRequest other) {
+      if (other == com.github.ylgrgyq.replicator.proto.HandshakeRequest.getDefaultInstance()) return this;
+      if (!other.getTopic().isEmpty()) {
+        topic_ = other.topic_;
+        onChanged();
       }
       onChanged();
       return this;
@@ -368,11 +361,11 @@ public  final class LogEntry extends
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      com.github.ylgrgyq.replicator.proto.LogEntry parsedMessage = null;
+      com.github.ylgrgyq.replicator.proto.HandshakeRequest parsedMessage = null;
       try {
         parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
       } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-        parsedMessage = (com.github.ylgrgyq.replicator.proto.LogEntry) e.getUnfinishedMessage();
+        parsedMessage = (com.github.ylgrgyq.replicator.proto.HandshakeRequest) e.getUnfinishedMessage();
         throw e.unwrapIOException();
       } finally {
         if (parsedMessage != null) {
@@ -382,57 +375,71 @@ public  final class LogEntry extends
       return this;
     }
 
-    private long id_ ;
+    private java.lang.Object topic_ = "";
     /**
-     * <code>optional int64 id = 1;</code>
+     * <code>optional string topic = 1;</code>
      */
-    public long getId() {
-      return id_;
+    public java.lang.String getTopic() {
+      java.lang.Object ref = topic_;
+      if (!(ref instanceof java.lang.String)) {
+        com.google.protobuf.ByteString bs =
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        topic_ = s;
+        return s;
+      } else {
+        return (java.lang.String) ref;
+      }
     }
     /**
-     * <code>optional int64 id = 1;</code>
+     * <code>optional string topic = 1;</code>
      */
-    public Builder setId(long value) {
-      
-      id_ = value;
-      onChanged();
-      return this;
+    public com.google.protobuf.ByteString
+        getTopicBytes() {
+      java.lang.Object ref = topic_;
+      if (ref instanceof String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        topic_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
     }
     /**
-     * <code>optional int64 id = 1;</code>
+     * <code>optional string topic = 1;</code>
      */
-    public Builder clearId() {
-      
-      id_ = 0L;
-      onChanged();
-      return this;
-    }
-
-    private com.google.protobuf.ByteString data_ = com.google.protobuf.ByteString.EMPTY;
-    /**
-     * <code>optional bytes data = 3;</code>
-     */
-    public com.google.protobuf.ByteString getData() {
-      return data_;
-    }
-    /**
-     * <code>optional bytes data = 3;</code>
-     */
-    public Builder setData(com.google.protobuf.ByteString value) {
+    public Builder setTopic(
+        java.lang.String value) {
       if (value == null) {
     throw new NullPointerException();
   }
   
-      data_ = value;
+      topic_ = value;
       onChanged();
       return this;
     }
     /**
-     * <code>optional bytes data = 3;</code>
+     * <code>optional string topic = 1;</code>
      */
-    public Builder clearData() {
+    public Builder clearTopic() {
       
-      data_ = getDefaultInstance().getData();
+      topic_ = getDefaultInstance().getTopic();
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>optional string topic = 1;</code>
+     */
+    public Builder setTopicBytes(
+        com.google.protobuf.ByteString value) {
+      if (value == null) {
+    throw new NullPointerException();
+  }
+  checkByteStringIsUtf8(value);
+      
+      topic_ = value;
       onChanged();
       return this;
     }
@@ -447,39 +454,39 @@ public  final class LogEntry extends
     }
 
 
-    // @@protoc_insertion_point(builder_scope:com.github.ylgrgyq.replicator.proto.LogEntry)
+    // @@protoc_insertion_point(builder_scope:com.github.ylgrgyq.replicator.proto.HandshakeRequest)
   }
 
-  // @@protoc_insertion_point(class_scope:com.github.ylgrgyq.replicator.proto.LogEntry)
-  private static final com.github.ylgrgyq.replicator.proto.LogEntry DEFAULT_INSTANCE;
+  // @@protoc_insertion_point(class_scope:com.github.ylgrgyq.replicator.proto.HandshakeRequest)
+  private static final com.github.ylgrgyq.replicator.proto.HandshakeRequest DEFAULT_INSTANCE;
   static {
-    DEFAULT_INSTANCE = new com.github.ylgrgyq.replicator.proto.LogEntry();
+    DEFAULT_INSTANCE = new com.github.ylgrgyq.replicator.proto.HandshakeRequest();
   }
 
-  public static com.github.ylgrgyq.replicator.proto.LogEntry getDefaultInstance() {
+  public static com.github.ylgrgyq.replicator.proto.HandshakeRequest getDefaultInstance() {
     return DEFAULT_INSTANCE;
   }
 
-  private static final com.google.protobuf.Parser<LogEntry>
-      PARSER = new com.google.protobuf.AbstractParser<LogEntry>() {
-    public LogEntry parsePartialFrom(
+  private static final com.google.protobuf.Parser<HandshakeRequest>
+      PARSER = new com.google.protobuf.AbstractParser<HandshakeRequest>() {
+    public HandshakeRequest parsePartialFrom(
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
-        return new LogEntry(input, extensionRegistry);
+        return new HandshakeRequest(input, extensionRegistry);
     }
   };
 
-  public static com.google.protobuf.Parser<LogEntry> parser() {
+  public static com.google.protobuf.Parser<HandshakeRequest> parser() {
     return PARSER;
   }
 
   @java.lang.Override
-  public com.google.protobuf.Parser<LogEntry> getParserForType() {
+  public com.google.protobuf.Parser<HandshakeRequest> getParserForType() {
     return PARSER;
   }
 
-  public com.github.ylgrgyq.replicator.proto.LogEntry getDefaultInstanceForType() {
+  public com.github.ylgrgyq.replicator.proto.HandshakeRequest getDefaultInstanceForType() {
     return DEFAULT_INSTANCE;
   }
 

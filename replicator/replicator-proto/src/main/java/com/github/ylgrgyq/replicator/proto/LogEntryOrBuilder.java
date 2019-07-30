@@ -8,12 +8,7 @@ public interface LogEntryOrBuilder extends
     com.google.protobuf.MessageOrBuilder {
 
   /**
-   * <code>optional int64 index = 1;</code>
-   */
-  long getIndex();
-
-  /**
-   * <code>optional int64 id = 2;</code>
+   * <code>optional int64 id = 1;</code>
    */
   long getId();
 

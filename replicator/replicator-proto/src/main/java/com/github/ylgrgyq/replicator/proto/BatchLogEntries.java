@@ -4,17 +4,17 @@
 package com.github.ylgrgyq.replicator.proto;
 
 /**
- * Protobuf type {@code com.github.ylgrgyq.replicator.proto.SyncLogEntries}
+ * Protobuf type {@code com.github.ylgrgyq.replicator.proto.BatchLogEntries}
  */
-public  final class SyncLogEntries extends
+public  final class BatchLogEntries extends
     com.google.protobuf.GeneratedMessageV3 implements
-    // @@protoc_insertion_point(message_implements:com.github.ylgrgyq.replicator.proto.SyncLogEntries)
-    SyncLogEntriesOrBuilder {
-  // Use SyncLogEntries.newBuilder() to construct.
-  private SyncLogEntries(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+    // @@protoc_insertion_point(message_implements:com.github.ylgrgyq.replicator.proto.BatchLogEntries)
+    BatchLogEntriesOrBuilder {
+  // Use BatchLogEntries.newBuilder() to construct.
+  private BatchLogEntries(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
     super(builder);
   }
-  private SyncLogEntries() {
+  private BatchLogEntries() {
     entries_ = java.util.Collections.emptyList();
   }
 
@@ -23,7 +23,7 @@ public  final class SyncLogEntries extends
   getUnknownFields() {
     return com.google.protobuf.UnknownFieldSet.getDefaultInstance();
   }
-  private SyncLogEntries(
+  private BatchLogEntries(
       com.google.protobuf.CodedInputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
@@ -68,14 +68,14 @@ public  final class SyncLogEntries extends
   }
   public static final com.google.protobuf.Descriptors.Descriptor
       getDescriptor() {
-    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_SyncLogEntries_descriptor;
+    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_descriptor;
   }
 
   protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internalGetFieldAccessorTable() {
-    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_SyncLogEntries_fieldAccessorTable
+    return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_fieldAccessorTable
         .ensureFieldAccessorsInitialized(
-            com.github.ylgrgyq.replicator.proto.SyncLogEntries.class, com.github.ylgrgyq.replicator.proto.SyncLogEntries.Builder.class);
+            com.github.ylgrgyq.replicator.proto.BatchLogEntries.class, com.github.ylgrgyq.replicator.proto.BatchLogEntries.Builder.class);
   }
 
   public static final int ENTRIES_FIELD_NUMBER = 1;
@@ -149,10 +149,10 @@ public  final class SyncLogEntries extends
     if (obj == this) {
      return true;
     }
-    if (!(obj instanceof com.github.ylgrgyq.replicator.proto.SyncLogEntries)) {
+    if (!(obj instanceof com.github.ylgrgyq.replicator.proto.BatchLogEntries)) {
       return super.equals(obj);
     }
-    com.github.ylgrgyq.replicator.proto.SyncLogEntries other = (com.github.ylgrgyq.replicator.proto.SyncLogEntries) obj;
+    com.github.ylgrgyq.replicator.proto.BatchLogEntries other = (com.github.ylgrgyq.replicator.proto.BatchLogEntries) obj;
 
     boolean result = true;
     result = result && getEntriesList()
@@ -176,58 +176,58 @@ public  final class SyncLogEntries extends
     return hash;
   }
 
-  public static com.github.ylgrgyq.replicator.proto.SyncLogEntries parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.BatchLogEntries parseFrom(
       com.google.protobuf.ByteString data)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data);
   }
-  public static com.github.ylgrgyq.replicator.proto.SyncLogEntries parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.BatchLogEntries parseFrom(
       com.google.protobuf.ByteString data,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.SyncLogEntries parseFrom(byte[] data)
+  public static com.github.ylgrgyq.replicator.proto.BatchLogEntries parseFrom(byte[] data)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data);
   }
-  public static com.github.ylgrgyq.replicator.proto.SyncLogEntries parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.BatchLogEntries parseFrom(
       byte[] data,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws com.google.protobuf.InvalidProtocolBufferException {
     return PARSER.parseFrom(data, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.SyncLogEntries parseFrom(java.io.InputStream input)
+  public static com.github.ylgrgyq.replicator.proto.BatchLogEntries parseFrom(java.io.InputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input);
   }
-  public static com.github.ylgrgyq.replicator.proto.SyncLogEntries parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.BatchLogEntries parseFrom(
       java.io.InputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.SyncLogEntries parseDelimitedFrom(java.io.InputStream input)
+  public static com.github.ylgrgyq.replicator.proto.BatchLogEntries parseDelimitedFrom(java.io.InputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseDelimitedWithIOException(PARSER, input);
   }
-  public static com.github.ylgrgyq.replicator.proto.SyncLogEntries parseDelimitedFrom(
+  public static com.github.ylgrgyq.replicator.proto.BatchLogEntries parseDelimitedFrom(
       java.io.InputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
   }
-  public static com.github.ylgrgyq.replicator.proto.SyncLogEntries parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.BatchLogEntries parseFrom(
       com.google.protobuf.CodedInputStream input)
       throws java.io.IOException {
     return com.google.protobuf.GeneratedMessageV3
         .parseWithIOException(PARSER, input);
   }
-  public static com.github.ylgrgyq.replicator.proto.SyncLogEntries parseFrom(
+  public static com.github.ylgrgyq.replicator.proto.BatchLogEntries parseFrom(
       com.google.protobuf.CodedInputStream input,
       com.google.protobuf.ExtensionRegistryLite extensionRegistry)
       throws java.io.IOException {
@@ -239,7 +239,7 @@ public  final class SyncLogEntries extends
   public static Builder newBuilder() {
     return DEFAULT_INSTANCE.toBuilder();
   }
-  public static Builder newBuilder(com.github.ylgrgyq.replicator.proto.SyncLogEntries prototype) {
+  public static Builder newBuilder(com.github.ylgrgyq.replicator.proto.BatchLogEntries prototype) {
     return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
   }
   public Builder toBuilder() {
@@ -254,25 +254,25 @@ public  final class SyncLogEntries extends
     return builder;
   }
   /**
-   * Protobuf type {@code com.github.ylgrgyq.replicator.proto.SyncLogEntries}
+   * Protobuf type {@code com.github.ylgrgyq.replicator.proto.BatchLogEntries}
    */
   public static final class Builder extends
       com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
-      // @@protoc_insertion_point(builder_implements:com.github.ylgrgyq.replicator.proto.SyncLogEntries)
-      com.github.ylgrgyq.replicator.proto.SyncLogEntriesOrBuilder {
+      // @@protoc_insertion_point(builder_implements:com.github.ylgrgyq.replicator.proto.BatchLogEntries)
+      com.github.ylgrgyq.replicator.proto.BatchLogEntriesOrBuilder {
     public static final com.google.protobuf.Descriptors.Descriptor
         getDescriptor() {
-      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_SyncLogEntries_descriptor;
+      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_descriptor;
     }
 
     protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
         internalGetFieldAccessorTable() {
-      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_SyncLogEntries_fieldAccessorTable
+      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_fieldAccessorTable
           .ensureFieldAccessorsInitialized(
-              com.github.ylgrgyq.replicator.proto.SyncLogEntries.class, com.github.ylgrgyq.replicator.proto.SyncLogEntries.Builder.class);
+              com.github.ylgrgyq.replicator.proto.BatchLogEntries.class, com.github.ylgrgyq.replicator.proto.BatchLogEntries.Builder.class);
     }
 
-    // Construct using com.github.ylgrgyq.replicator.proto.SyncLogEntries.newBuilder()
+    // Construct using com.github.ylgrgyq.replicator.proto.BatchLogEntries.newBuilder()
     private Builder() {
       maybeForceBuilderInitialization();
     }
@@ -301,23 +301,23 @@ public  final class SyncLogEntries extends
 
     public com.google.protobuf.Descriptors.Descriptor
         getDescriptorForType() {
-      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_SyncLogEntries_descriptor;
+      return com.github.ylgrgyq.replicator.proto.Commands.internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_descriptor;
     }
 
-    public com.github.ylgrgyq.replicator.proto.SyncLogEntries getDefaultInstanceForType() {
-      return com.github.ylgrgyq.replicator.proto.SyncLogEntries.getDefaultInstance();
+    public com.github.ylgrgyq.replicator.proto.BatchLogEntries getDefaultInstanceForType() {
+      return com.github.ylgrgyq.replicator.proto.BatchLogEntries.getDefaultInstance();
     }
 
-    public com.github.ylgrgyq.replicator.proto.SyncLogEntries build() {
-      com.github.ylgrgyq.replicator.proto.SyncLogEntries result = buildPartial();
+    public com.github.ylgrgyq.replicator.proto.BatchLogEntries build() {
+      com.github.ylgrgyq.replicator.proto.BatchLogEntries result = buildPartial();
       if (!result.isInitialized()) {
         throw newUninitializedMessageException(result);
       }
       return result;
     }
 
-    public com.github.ylgrgyq.replicator.proto.SyncLogEntries buildPartial() {
-      com.github.ylgrgyq.replicator.proto.SyncLogEntries result = new com.github.ylgrgyq.replicator.proto.SyncLogEntries(this);
+    public com.github.ylgrgyq.replicator.proto.BatchLogEntries buildPartial() {
+      com.github.ylgrgyq.replicator.proto.BatchLogEntries result = new com.github.ylgrgyq.replicator.proto.BatchLogEntries(this);
       int from_bitField0_ = bitField0_;
       if (entriesBuilder_ == null) {
         if (((bitField0_ & 0x00000001) == 0x00000001)) {
@@ -359,16 +359,16 @@ public  final class SyncLogEntries extends
       return (Builder) super.addRepeatedField(field, value);
     }
     public Builder mergeFrom(com.google.protobuf.Message other) {
-      if (other instanceof com.github.ylgrgyq.replicator.proto.SyncLogEntries) {
-        return mergeFrom((com.github.ylgrgyq.replicator.proto.SyncLogEntries)other);
+      if (other instanceof com.github.ylgrgyq.replicator.proto.BatchLogEntries) {
+        return mergeFrom((com.github.ylgrgyq.replicator.proto.BatchLogEntries)other);
       } else {
         super.mergeFrom(other);
         return this;
       }
     }
 
-    public Builder mergeFrom(com.github.ylgrgyq.replicator.proto.SyncLogEntries other) {
-      if (other == com.github.ylgrgyq.replicator.proto.SyncLogEntries.getDefaultInstance()) return this;
+    public Builder mergeFrom(com.github.ylgrgyq.replicator.proto.BatchLogEntries other) {
+      if (other == com.github.ylgrgyq.replicator.proto.BatchLogEntries.getDefaultInstance()) return this;
       if (entriesBuilder_ == null) {
         if (!other.entries_.isEmpty()) {
           if (entries_.isEmpty()) {
@@ -407,11 +407,11 @@ public  final class SyncLogEntries extends
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws java.io.IOException {
-      com.github.ylgrgyq.replicator.proto.SyncLogEntries parsedMessage = null;
+      com.github.ylgrgyq.replicator.proto.BatchLogEntries parsedMessage = null;
       try {
         parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
       } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-        parsedMessage = (com.github.ylgrgyq.replicator.proto.SyncLogEntries) e.getUnfinishedMessage();
+        parsedMessage = (com.github.ylgrgyq.replicator.proto.BatchLogEntries) e.getUnfinishedMessage();
         throw e.unwrapIOException();
       } finally {
         if (parsedMessage != null) {
@@ -672,39 +672,39 @@ public  final class SyncLogEntries extends
     }
 
 
-    // @@protoc_insertion_point(builder_scope:com.github.ylgrgyq.replicator.proto.SyncLogEntries)
+    // @@protoc_insertion_point(builder_scope:com.github.ylgrgyq.replicator.proto.BatchLogEntries)
   }
 
-  // @@protoc_insertion_point(class_scope:com.github.ylgrgyq.replicator.proto.SyncLogEntries)
-  private static final com.github.ylgrgyq.replicator.proto.SyncLogEntries DEFAULT_INSTANCE;
+  // @@protoc_insertion_point(class_scope:com.github.ylgrgyq.replicator.proto.BatchLogEntries)
+  private static final com.github.ylgrgyq.replicator.proto.BatchLogEntries DEFAULT_INSTANCE;
   static {
-    DEFAULT_INSTANCE = new com.github.ylgrgyq.replicator.proto.SyncLogEntries();
+    DEFAULT_INSTANCE = new com.github.ylgrgyq.replicator.proto.BatchLogEntries();
   }
 
-  public static com.github.ylgrgyq.replicator.proto.SyncLogEntries getDefaultInstance() {
+  public static com.github.ylgrgyq.replicator.proto.BatchLogEntries getDefaultInstance() {
     return DEFAULT_INSTANCE;
   }
 
-  private static final com.google.protobuf.Parser<SyncLogEntries>
-      PARSER = new com.google.protobuf.AbstractParser<SyncLogEntries>() {
-    public SyncLogEntries parsePartialFrom(
+  private static final com.google.protobuf.Parser<BatchLogEntries>
+      PARSER = new com.google.protobuf.AbstractParser<BatchLogEntries>() {
+    public BatchLogEntries parsePartialFrom(
         com.google.protobuf.CodedInputStream input,
         com.google.protobuf.ExtensionRegistryLite extensionRegistry)
         throws com.google.protobuf.InvalidProtocolBufferException {
-        return new SyncLogEntries(input, extensionRegistry);
+        return new BatchLogEntries(input, extensionRegistry);
     }
   };
 
-  public static com.google.protobuf.Parser<SyncLogEntries> parser() {
+  public static com.google.protobuf.Parser<BatchLogEntries> parser() {
     return PARSER;
   }
 
   @java.lang.Override
-  public com.google.protobuf.Parser<SyncLogEntries> getParserForType() {
+  public com.google.protobuf.Parser<BatchLogEntries> getParserForType() {
     return PARSER;
   }
 
-  public com.github.ylgrgyq.replicator.proto.SyncLogEntries getDefaultInstanceForType() {
+  public com.github.ylgrgyq.replicator.proto.BatchLogEntries getDefaultInstanceForType() {
     return DEFAULT_INSTANCE;
   }
 

@@ -43,15 +43,15 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, ReplicatorCommand cmd) {
         switch (cmd.getType()) {
-            case HANDSHAKE_RESP:
+            case HANDSHAKE:
                 handleHandshakeResp(ctx);
                 break;
-            case GET_RESP:
-                SyncLogEntries logs = cmd.getLogs();
+            case FETCH_LOGS:
+                BatchLogEntries logs = cmd.getFetchLogsResponse().getLogs();
                 handleSyncLogs(ctx, logs);
                 break;
-            case SNAPSHOT_RESP:
-                Snapshot snapshot = cmd.getSnapshot();
+            case FETCH_SNAPSHOT:
+                Snapshot snapshot = cmd.getFetchSnapshotResponse().getSnapshot();
                 handleApplySnapshot(ctx, snapshot);
                 break;
             case ERROR:
@@ -76,13 +76,13 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
 
     private void requestSnapshot(Channel ch) {
         ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
-        get.setType(ReplicatorCommand.CommandType.SNAPSHOT);
-        get.setTopic(topic);
+        get.setMsgType(MessageType.REQUEST);
+        get.setType(CommandType.FETCH_SNAPSHOT);
 
         ch.writeAndFlush(get.build());
     }
 
-    private void handleSyncLogs(ChannelHandlerContext ctx, SyncLogEntries logs) {
+    private void handleSyncLogs(ChannelHandlerContext ctx, BatchLogEntries logs) {
         List<LogEntry> entryList = logs.getEntriesList();
 
         if (!entryList.isEmpty()) {
@@ -132,16 +132,20 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
                 });
     }
 
-    private void requestLogs(Channel ch, String topic, long fromIndex) {
+    private void requestLogs(Channel ch, String topic, long fromId) {
         if (suspend) {
             return;
         }
 
         ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
-        get.setType(ReplicatorCommand.CommandType.GET);
-        get.setTopic(topic);
-        get.setFromIndex(fromIndex);
-        get.setLimit(100);
+        get.setMsgType(MessageType.REQUEST);
+        get.setType(CommandType.FETCH_LOGS);
+
+        FetchLogsRequest req = FetchLogsRequest.newBuilder()
+                .setFromId(fromId)
+                .setLimit(100)
+                .build();
+        get.setFetchLogsRequest(req);
 
         ch.writeAndFlush(get.build());
     }
@@ -197,8 +201,13 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
 
     public void handshake(Channel ch, String topic) {
         ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
-        get.setType(ReplicatorCommand.CommandType.HANDSHAKE);
-        get.setTopic(topic);
+
+        HandshakeRequest request = HandshakeRequest.newBuilder()
+                .setTopic(topic)
+                .build();
+        get.setType(CommandType.HANDSHAKE);
+        get.setMsgType(MessageType.REQUEST);
+        get.setHandshakeRequest(request);
 
         ch.writeAndFlush(get.build());
     }

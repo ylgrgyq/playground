@@ -3,8 +3,8 @@
 
 package com.github.ylgrgyq.replicator.proto;
 
-public interface SyncLogEntriesOrBuilder extends
-    // @@protoc_insertion_point(interface_extends:com.github.ylgrgyq.replicator.proto.SyncLogEntries)
+public interface BatchLogEntriesOrBuilder extends
+    // @@protoc_insertion_point(interface_extends:com.github.ylgrgyq.replicator.proto.BatchLogEntries)
     com.google.protobuf.MessageOrBuilder {
 
   /**

@@ -8,22 +8,12 @@ public interface SnapshotOrBuilder extends
     com.google.protobuf.MessageOrBuilder {
 
   /**
-   * <code>optional bytes data = 1;</code>
-   */
-  com.google.protobuf.ByteString getData();
-
-  /**
-   * <code>optional int64 id = 2;</code>
+   * <code>optional int64 id = 1;</code>
    */
   long getId();
 
   /**
-   * <code>optional string topic = 3;</code>
+   * <code>optional bytes data = 2;</code>
    */
-  java.lang.String getTopic();
-  /**
-   * <code>optional string topic = 3;</code>
-   */
-  com.google.protobuf.ByteString
-      getTopicBytes();
+  com.google.protobuf.ByteString getData();
 }

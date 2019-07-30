@@ -32,7 +32,7 @@ public class ReplicatorServerHandler extends SimpleChannelInboundHandler<Replica
         try {
             switch (cmd.getType()) {
                 case HANDSHAKE:
-                    String topic = cmd.getTopic();
+                    String topic = cmd.getHandshakeRequest().getTopic();
 
                     Sequence seq = groups.getSequence(topic);
                     if (seq == null) {
@@ -41,13 +41,13 @@ public class ReplicatorServerHandler extends SimpleChannelInboundHandler<Replica
 
                     replica.onStart(topic, seq);
                     break;
-                case GET:
-                    long fromIndex = cmd.getFromIndex();
-                    int limit = cmd.getLimit();
+                case FETCH_LOGS:
+                    long fromIndex = cmd.getFetchLogsRequest().getFromId();
+                    int limit = cmd.getFetchLogsRequest().getLimit();
 
                     replica.handleSyncLogs(fromIndex, limit);
                     break;
-                case SNAPSHOT:
+                case FETCH_SNAPSHOT:
                     replica.handleSyncSnapshot();
                     break;
             }

@@ -15,9 +15,8 @@ public  final class Snapshot extends
     super(builder);
   }
   private Snapshot() {
-    data_ = com.google.protobuf.ByteString.EMPTY;
     id_ = 0L;
-    topic_ = "";
+    data_ = com.google.protobuf.ByteString.EMPTY;
   }
 
   @java.lang.Override
@@ -45,20 +44,14 @@ public  final class Snapshot extends
             }
             break;
           }
-          case 10: {
-
-            data_ = input.readBytes();
-            break;
-          }
-          case 16: {
+          case 8: {
 
             id_ = input.readInt64();
             break;
           }
-          case 26: {
-            java.lang.String s = input.readStringRequireUtf8();
+          case 18: {
 
-            topic_ = s;
+            data_ = input.readBytes();
             break;
           }
         }
@@ -84,56 +77,22 @@ public  final class Snapshot extends
             com.github.ylgrgyq.replicator.proto.Snapshot.class, com.github.ylgrgyq.replicator.proto.Snapshot.Builder.class);
   }
 
-  public static final int DATA_FIELD_NUMBER = 1;
-  private com.google.protobuf.ByteString data_;
-  /**
-   * <code>optional bytes data = 1;</code>
-   */
-  public com.google.protobuf.ByteString getData() {
-    return data_;
-  }
-
-  public static final int ID_FIELD_NUMBER = 2;
+  public static final int ID_FIELD_NUMBER = 1;
   private long id_;
   /**
-   * <code>optional int64 id = 2;</code>
+   * <code>optional int64 id = 1;</code>
    */
   public long getId() {
     return id_;
   }
 
-  public static final int TOPIC_FIELD_NUMBER = 3;
-  private volatile java.lang.Object topic_;
+  public static final int DATA_FIELD_NUMBER = 2;
+  private com.google.protobuf.ByteString data_;
   /**
-   * <code>optional string topic = 3;</code>
+   * <code>optional bytes data = 2;</code>
    */
-  public java.lang.String getTopic() {
-    java.lang.Object ref = topic_;
-    if (ref instanceof java.lang.String) {
-      return (java.lang.String) ref;
-    } else {
-      com.google.protobuf.ByteString bs = 
-          (com.google.protobuf.ByteString) ref;
-      java.lang.String s = bs.toStringUtf8();
-      topic_ = s;
-      return s;
-    }
-  }
-  /**
-   * <code>optional string topic = 3;</code>
-   */
-  public com.google.protobuf.ByteString
-      getTopicBytes() {
-    java.lang.Object ref = topic_;
-    if (ref instanceof java.lang.String) {
-      com.google.protobuf.ByteString b = 
-          com.google.protobuf.ByteString.copyFromUtf8(
-              (java.lang.String) ref);
-      topic_ = b;
-      return b;
-    } else {
-      return (com.google.protobuf.ByteString) ref;
-    }
+  public com.google.protobuf.ByteString getData() {
+    return data_;
   }
 
   private byte memoizedIsInitialized = -1;
@@ -148,14 +107,11 @@ public  final class Snapshot extends
 
   public void writeTo(com.google.protobuf.CodedOutputStream output)
                       throws java.io.IOException {
-    if (!data_.isEmpty()) {
-      output.writeBytes(1, data_);
-    }
     if (id_ != 0L) {
-      output.writeInt64(2, id_);
+      output.writeInt64(1, id_);
     }
-    if (!getTopicBytes().isEmpty()) {
-      com.google.protobuf.GeneratedMessageV3.writeString(output, 3, topic_);
+    if (!data_.isEmpty()) {
+      output.writeBytes(2, data_);
     }
   }
 
@@ -164,16 +120,13 @@ public  final class Snapshot extends
     if (size != -1) return size;
 
     size = 0;
-    if (!data_.isEmpty()) {
-      size += com.google.protobuf.CodedOutputStream
-        .computeBytesSize(1, data_);
-    }
     if (id_ != 0L) {
       size += com.google.protobuf.CodedOutputStream
-        .computeInt64Size(2, id_);
+        .computeInt64Size(1, id_);
     }
-    if (!getTopicBytes().isEmpty()) {
-      size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, topic_);
+    if (!data_.isEmpty()) {
+      size += com.google.protobuf.CodedOutputStream
+        .computeBytesSize(2, data_);
     }
     memoizedSize = size;
     return size;
@@ -191,12 +144,10 @@ public  final class Snapshot extends
     com.github.ylgrgyq.replicator.proto.Snapshot other = (com.github.ylgrgyq.replicator.proto.Snapshot) obj;
 
     boolean result = true;
-    result = result && getData()
-        .equals(other.getData());
     result = result && (getId()
         == other.getId());
-    result = result && getTopic()
-        .equals(other.getTopic());
+    result = result && getData()
+        .equals(other.getData());
     return result;
   }
 
@@ -207,13 +158,11 @@ public  final class Snapshot extends
     }
     int hash = 41;
     hash = (19 * hash) + getDescriptorForType().hashCode();
-    hash = (37 * hash) + DATA_FIELD_NUMBER;
-    hash = (53 * hash) + getData().hashCode();
     hash = (37 * hash) + ID_FIELD_NUMBER;
     hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
         getId());
-    hash = (37 * hash) + TOPIC_FIELD_NUMBER;
-    hash = (53 * hash) + getTopic().hashCode();
+    hash = (37 * hash) + DATA_FIELD_NUMBER;
+    hash = (53 * hash) + getData().hashCode();
     hash = (29 * hash) + unknownFields.hashCode();
     memoizedHashCode = hash;
     return hash;
@@ -332,11 +281,9 @@ public  final class Snapshot extends
     }
     public Builder clear() {
       super.clear();
-      data_ = com.google.protobuf.ByteString.EMPTY;
-
       id_ = 0L;
 
-      topic_ = "";
+      data_ = com.google.protobuf.ByteString.EMPTY;
 
       return this;
     }
@@ -360,9 +307,8 @@ public  final class Snapshot extends
 
     public com.github.ylgrgyq.replicator.proto.Snapshot buildPartial() {
       com.github.ylgrgyq.replicator.proto.Snapshot result = new com.github.ylgrgyq.replicator.proto.Snapshot(this);
-      result.data_ = data_;
       result.id_ = id_;
-      result.topic_ = topic_;
+      result.data_ = data_;
       onBuilt();
       return result;
     }
@@ -404,15 +350,11 @@ public  final class Snapshot extends
 
     public Builder mergeFrom(com.github.ylgrgyq.replicator.proto.Snapshot other) {
       if (other == com.github.ylgrgyq.replicator.proto.Snapshot.getDefaultInstance()) return this;
-      if (other.getData() != com.google.protobuf.ByteString.EMPTY) {
-        setData(other.getData());
-      }
       if (other.getId() != 0L) {
         setId(other.getId());
       }
-      if (!other.getTopic().isEmpty()) {
-        topic_ = other.topic_;
-        onChanged();
+      if (other.getData() != com.google.protobuf.ByteString.EMPTY) {
+        setData(other.getData());
       }
       onChanged();
       return this;
@@ -440,15 +382,41 @@ public  final class Snapshot extends
       return this;
     }
 
+    private long id_ ;
+    /**
+     * <code>optional int64 id = 1;</code>
+     */
+    public long getId() {
+      return id_;
+    }
+    /**
+     * <code>optional int64 id = 1;</code>
+     */
+    public Builder setId(long value) {
+      
+      id_ = value;
+      onChanged();
+      return this;
+    }
+    /**
+     * <code>optional int64 id = 1;</code>
+     */
+    public Builder clearId() {
+      
+      id_ = 0L;
+      onChanged();
+      return this;
+    }
+
     private com.google.protobuf.ByteString data_ = com.google.protobuf.ByteString.EMPTY;
     /**
-     * <code>optional bytes data = 1;</code>
+     * <code>optional bytes data = 2;</code>
      */
     public com.google.protobuf.ByteString getData() {
       return data_;
     }
     /**
-     * <code>optional bytes data = 1;</code>
+     * <code>optional bytes data = 2;</code>
      */
     public Builder setData(com.google.protobuf.ByteString value) {
       if (value == null) {
@@ -460,106 +428,11 @@ public  final class Snapshot extends
       return this;
     }
     /**
-     * <code>optional bytes data = 1;</code>
+     * <code>optional bytes data = 2;</code>
      */
     public Builder clearData() {
       
       data_ = getDefaultInstance().getData();
-      onChanged();
-      return this;
-    }
-
-    private long id_ ;
-    /**
-     * <code>optional int64 id = 2;</code>
-     */
-    public long getId() {
-      return id_;
-    }
-    /**
-     * <code>optional int64 id = 2;</code>
-     */
-    public Builder setId(long value) {
-      
-      id_ = value;
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>optional int64 id = 2;</code>
-     */
-    public Builder clearId() {
-      
-      id_ = 0L;
-      onChanged();
-      return this;
-    }
-
-    private java.lang.Object topic_ = "";
-    /**
-     * <code>optional string topic = 3;</code>
-     */
-    public java.lang.String getTopic() {
-      java.lang.Object ref = topic_;
-      if (!(ref instanceof java.lang.String)) {
-        com.google.protobuf.ByteString bs =
-            (com.google.protobuf.ByteString) ref;
-        java.lang.String s = bs.toStringUtf8();
-        topic_ = s;
-        return s;
-      } else {
-        return (java.lang.String) ref;
-      }
-    }
-    /**
-     * <code>optional string topic = 3;</code>
-     */
-    public com.google.protobuf.ByteString
-        getTopicBytes() {
-      java.lang.Object ref = topic_;
-      if (ref instanceof String) {
-        com.google.protobuf.ByteString b = 
-            com.google.protobuf.ByteString.copyFromUtf8(
-                (java.lang.String) ref);
-        topic_ = b;
-        return b;
-      } else {
-        return (com.google.protobuf.ByteString) ref;
-      }
-    }
-    /**
-     * <code>optional string topic = 3;</code>
-     */
-    public Builder setTopic(
-        java.lang.String value) {
-      if (value == null) {
-    throw new NullPointerException();
-  }
-  
-      topic_ = value;
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>optional string topic = 3;</code>
-     */
-    public Builder clearTopic() {
-      
-      topic_ = getDefaultInstance().getTopic();
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>optional string topic = 3;</code>
-     */
-    public Builder setTopicBytes(
-        com.google.protobuf.ByteString value) {
-      if (value == null) {
-    throw new NullPointerException();
-  }
-  checkByteStringIsUtf8(value);
-      
-      topic_ = value;
       onChanged();
       return this;
     }
