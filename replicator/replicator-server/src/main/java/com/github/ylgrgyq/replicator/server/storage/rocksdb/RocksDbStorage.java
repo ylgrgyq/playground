@@ -1,5 +1,6 @@
 package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
+import com.github.ylgrgyq.replicator.common.Bits;
 import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.server.Preconditions;
 import com.github.ylgrgyq.replicator.server.ReplicatorException;

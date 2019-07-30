@@ -22,7 +22,7 @@
  *
  *
  */
-package com.github.ylgrgyq.replicator.client;
+package com.github.ylgrgyq.replicator.common;
 
 public class Bits {
     public static int getInt(byte[] b, int off) {

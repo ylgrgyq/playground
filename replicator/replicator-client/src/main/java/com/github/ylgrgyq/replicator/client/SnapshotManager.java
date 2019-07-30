@@ -1,6 +1,7 @@
 package com.github.ylgrgyq.replicator.client;
 
 import com.github.ylgrgyq.replicator.client.connection.websocket.ReplicatorClientHandler;
+import com.github.ylgrgyq.replicator.common.Bits;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -10,6 +11,7 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -20,11 +22,13 @@ public class SnapshotManager {
 
     private final Path storagePath;
     private final ReplicatorClientOptions options;
-    private Snapshot lastSnapshot;
+    private volatile Snapshot lastSnapshot;
+    private AtomicBoolean purgingOldSnapshots;
 
     public SnapshotManager(ReplicatorClientOptions options) throws IOException {
         this.options = options;
         this.storagePath = options.getSnapshotStoragePath();
+        this.purgingOldSnapshots = new AtomicBoolean(false);
 
         if (storagePath != null) {
             final File dir = this.storagePath.toFile();
@@ -41,6 +45,13 @@ public class SnapshotManager {
 
     public void storeSnapshot(Snapshot snapshot) throws IOException {
         if (storagePath == null || options.getMaxSnapshotToKeep() == 0) {
+            return;
+        }
+
+        Snapshot last = lastSnapshot;
+        if (last != null && snapshot.getId() <= lastSnapshot.getId()) {
+            logger.warn("Trying to store outdated snapshot. Last snapshot id: {}, new snapshot id: {}",
+                    last.getId(), snapshot.getId());
             return;
         }
 
@@ -103,7 +114,7 @@ public class SnapshotManager {
         }
     }
 
-    public void loadLastSnapshot() throws IOException {
+    private void loadLastSnapshot() throws IOException {
         if (storagePath == null) {
             return;
         }
@@ -155,14 +166,11 @@ public class SnapshotManager {
         }
     }
 
-    private void purgeSnapshots(){
-        try {
-            purgeSnapshots(listAllAvailableSnapshotPath(true));
-        } catch (IOException ex) {
-            logger.error("Purge expired snapshots failed", ex);
-        }
-    }
-
+    /**
+     * Purge exceed snapshots. Can only be called with the protect of purgingOldSnapshots or in Constructor.
+     *
+     * @param availableSnapshots current snapshot paths
+     */
     private void purgeSnapshots(List<Path> availableSnapshots) {
         if (availableSnapshots.size() > options.getMaxSnapshotToKeep()) {
             List<Path> pathsToPurge = availableSnapshots.subList(options.getMaxSnapshotToKeep(), availableSnapshots.size());
@@ -172,6 +180,18 @@ public class SnapshotManager {
                 } catch (IOException ex) {
                     logger.warn("Delete old snapshot file: {} failed", path.toString());
                 }
+            }
+        }
+    }
+
+    private void purgeSnapshots() {
+        if (purgingOldSnapshots.compareAndSet(false, true)) {
+            try {
+                purgeSnapshots(listAllAvailableSnapshotPath(true));
+            } catch (IOException ex) {
+                logger.error("Purge expired snapshots failed", ex);
+            } finally {
+                purgingOldSnapshots.set(false);
             }
         }
     }

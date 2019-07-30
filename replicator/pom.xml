@@ -17,6 +17,7 @@
         <module>replicator-client</module>
         <module>replicator-example</module>
         <module>replicator-proto</module>
+        <module>replicator-common</module>
     </modules>
 
     <properties>
@@ -38,6 +39,11 @@
             <dependency>
                 <groupId>${project.groupId}</groupId>
                 <artifactId>replicator-proto</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>replicator-common</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

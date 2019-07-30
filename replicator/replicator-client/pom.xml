@@ -20,6 +20,10 @@
             <groupId>${project.groupId}</groupId>
             <artifactId>replicator-proto</artifactId>
         </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>replicator-common</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>io.netty</groupId>
