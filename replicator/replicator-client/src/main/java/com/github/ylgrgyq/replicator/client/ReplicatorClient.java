@@ -43,8 +43,6 @@ public class ReplicatorClient {
         this.stop = false;
         this.stateMachineCaller = new StateMachineCaller(stateMachine, this);
         this.snapshotManager = new SnapshotManager(options);
-
-        this.snapshotManager.loadLastSnapshot();
     }
 
     public CompletableFuture<Void> start() {

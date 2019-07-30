@@ -8,39 +8,43 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.file.*;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class SnapshotManager {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorClientHandler.class);
 
     private static final String SNAPSHOT_FILE_PREFIX = "replicator_snapshot_";
-    private String path;
-    private ReplicatorClientOptions options;
+
+    private final Path storagePath;
+    private final ReplicatorClientOptions options;
     private Snapshot lastSnapshot;
 
     public SnapshotManager(ReplicatorClientOptions options) throws IOException {
         this.options = options;
-        this.path = options.getSnapshotStoragePath();
+        this.storagePath = options.getSnapshotStoragePath();
 
-        if (path != null) {
-            final File dir = new File(this.path);
+        if (storagePath != null) {
+            final File dir = this.storagePath.toFile();
             if (dir.exists() && !dir.isDirectory()) {
-                throw new IllegalStateException("Invalid snapshot storage path, it's a regular file: " + this.path);
+                throw new IllegalStateException("Invalid snapshot storage path, it's a regular file: " + this.storagePath);
             }
 
-            FileUtils.forceMkdir(new File(this.path));
+            FileUtils.forceMkdir(dir);
+            loadLastSnapshot();
         } else {
             logger.warn("No snapshot storage path provided, snapshot will not be saved persistently");
         }
     }
 
     public void storeSnapshot(Snapshot snapshot) throws IOException {
-        if (path == null) {
+        if (storagePath == null || options.getMaxSnapshotToKeep() == 0) {
             return;
         }
 
-        File tmpFile = new File(path + File.separator + SNAPSHOT_FILE_PREFIX + snapshot.getId() + ".tmp");
+        File tmpFile = new File(storagePath + File.separator + SNAPSHOT_FILE_PREFIX + snapshot.getId() + ".tmp");
         try (FileOutputStream fOut = new FileOutputStream(tmpFile);
              BufferedOutputStream output = new BufferedOutputStream(fOut)) {
             byte[] lenBytes = new byte[4];
@@ -55,10 +59,12 @@ public class SnapshotManager {
             }
         }
 
-        File destFile = new File(path + File.separator + SNAPSHOT_FILE_PREFIX + snapshot.getId());
+        File destFile = new File(storagePath + File.separator + SNAPSHOT_FILE_PREFIX + snapshot.getId());
         atomicRenameFile(tmpFile.toPath(), destFile.toPath());
 
         lastSnapshot = snapshot;
+
+        purgeSnapshots();
     }
 
     private void atomicRenameFile(Path tmpFilePath, Path destFilePath) throws IOException {
@@ -98,63 +104,86 @@ public class SnapshotManager {
     }
 
     public void loadLastSnapshot() throws IOException {
-        if (path == null) {
+        if (storagePath == null) {
             return;
         }
 
-        Path lastSnapshotPath = searchLastSnapshotPath();
-        if (lastSnapshotPath != null) {
-            lastSnapshot = readSnapshot(lastSnapshotPath);
+        List<Path> availableSnapshots = listAllAvailableSnapshotPath(true);
+        if (!availableSnapshots.isEmpty()) {
+            Path lastSnapshotPath = availableSnapshots.get(0);
+            if (lastSnapshotPath != null) {
+                lastSnapshot = loadSnapshotOnPath(lastSnapshotPath);
 
-            logger.info("Found last snapshot on path {} with id {}", lastSnapshotPath, lastSnapshot.getId());
+                logger.info("Found last snapshot on path {} with id {}", lastSnapshotPath, lastSnapshot.getId());
+            }
+
+            purgeSnapshots(availableSnapshots);
         }
     }
 
-    private Path searchLastSnapshotPath() throws IOException{
-        Path storageDirPath = Paths.get(path);
-        return Files.list(storageDirPath)
-                .filter(p -> p.getFileName().startsWith(SNAPSHOT_FILE_PREFIX))
-                .collect(Collectors.toMap((Path p) -> {
-                            try {
-                                String id = p.getFileName().toString().substring(SNAPSHOT_FILE_PREFIX.length());
-                                return Long.valueOf(id);
-                            } catch (NumberFormatException ex) {
-                                return 0L;
+    public List<Path> listAllAvailableSnapshotPath(boolean sort) throws IOException {
+        Stream<Path> paths = Files.list(storagePath)
+                .filter(p -> p.getFileName().toString().startsWith(SNAPSHOT_FILE_PREFIX));
+        if (sort) {
+            return paths
+                    .collect(Collectors.toMap((Path p) -> {
+                                try {
+                                    String id = p.getFileName().toString().substring(SNAPSHOT_FILE_PREFIX.length());
+                                    return Long.valueOf(id);
+                                } catch (NumberFormatException ex) {
+                                    return 0L;
+                                }
                             }
+                            ,
+                            v -> v
+                    ))
+                    .entrySet()
+                    .stream()
+                    .sorted((o1, o2) -> {
+                        if (o1.getKey() < o2.getKey()) {
+                            return 1;
+                        } else if (o1.getKey().equals(o2.getKey())) {
+                            return 0;
+                        } else {
+                            return -1;
                         }
-                        ,
-                        v -> v
-                ))
-                .entrySet()
-                .stream()
-                .sorted((o1, o2) -> {
-                    if (o1.getKey() < o2.getKey()) {
-                        return -1;
-                    } else if (o1.getKey().equals(o2.getKey())) {
-                        return 0;
-                    } else {
-                        return 1;
-                    }
-                })
-                .map(Map.Entry::getValue)
-                .findFirst()
-                .orElse(null);
+                    })
+                    .map(Map.Entry::getValue)
+                    .collect(Collectors.toList());
+        } else {
+            return paths.collect(Collectors.toList());
+        }
     }
 
-    private Snapshot readSnapshot(Path filePath) throws IOException {
-        File file = new File(this.path);
+    private void purgeSnapshots(){
+        try {
+            purgeSnapshots(listAllAvailableSnapshotPath(true));
+        } catch (IOException ex) {
+            logger.error("Purge expired snapshots failed", ex);
+        }
+    }
+
+    private void purgeSnapshots(List<Path> availableSnapshots) {
+        if (availableSnapshots.size() > options.getMaxSnapshotToKeep()) {
+            List<Path> pathsToPurge = availableSnapshots.subList(options.getMaxSnapshotToKeep(), availableSnapshots.size());
+            for (Path path : pathsToPurge) {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException ex) {
+                    logger.warn("Delete old snapshot file: {} failed", path.toString());
+                }
+            }
+        }
+    }
+
+    public Snapshot loadSnapshotOnPath(Path filePath) throws IOException {
+        File file = filePath.toFile();
 
         assert file.exists() : filePath;
 
         byte[] lenBytes = new byte[4];
         try (FileInputStream fin = new FileInputStream(file);
              BufferedInputStream input = new BufferedInputStream(fin)) {
-            readBytes(lenBytes, input);
-            int len = Bits.getInt(lenBytes, 0);
-            if (len <= 0) {
-                throw new IOException("Invalid topic.");
-            }
-
             readBytes(lenBytes, input);
             int msgLen = Bits.getInt(lenBytes, 0);
             byte[] msgBytes = new byte[msgLen];

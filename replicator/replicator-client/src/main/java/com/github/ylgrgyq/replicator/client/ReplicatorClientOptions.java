@@ -1,11 +1,13 @@
 package com.github.ylgrgyq.replicator.client;
 
 import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 public class ReplicatorClientOptions {
-    private final String snapshotStoragePath;
+    private final Path snapshotStoragePath;
     private final int port;
     private final String host;
     private final long reconnectDelaySeconds;
@@ -14,6 +16,7 @@ public class ReplicatorClientOptions {
     private final int pingIntervalSec;
     private final int connectionTimeoutMillis;
     private final boolean saveSnapshotSynchronously;
+    private final int maxSnapshotToKeep;
 
     private ReplicatorClientOptions(ReplicatorClientOptionsBuilder builder) {
         this.uri = builder.uri;
@@ -25,6 +28,7 @@ public class ReplicatorClientOptions {
         this.connectionTimeoutMillis = builder.connectionTimeoutMillis == null ? 5000 : builder.connectionTimeoutMillis;
         this.snapshotStoragePath = builder.snapshotStoragePath;
         this.saveSnapshotSynchronously = builder.saveSnapshotSynchronously == null ? false : builder.saveSnapshotSynchronously;
+        this.maxSnapshotToKeep = builder.maxSnapshotToKeep == null ? 5 : builder.maxSnapshotToKeep;
     }
 
     public int getPort() {
@@ -55,12 +59,16 @@ public class ReplicatorClientOptions {
         return connectionTimeoutMillis;
     }
 
-    public String getSnapshotStoragePath() {
+    public Path getSnapshotStoragePath() {
         return snapshotStoragePath;
     }
 
     public boolean isSaveSnapshotSynchronously() {
         return saveSnapshotSynchronously;
+    }
+
+    public int getMaxSnapshotToKeep() {
+        return maxSnapshotToKeep;
     }
 
     public static ReplicatorClientOptionsBuilder builder() {
@@ -73,8 +81,9 @@ public class ReplicatorClientOptions {
         private Integer pendingFlushLogsLowWaterMark;
         private Integer pingIntervalSec;
         private Integer connectionTimeoutMillis;
-        private String snapshotStoragePath;
+        private Path snapshotStoragePath;
         private Boolean saveSnapshotSynchronously;
+        private Integer maxSnapshotToKeep;
 
         public ReplicatorClientOptionsBuilder setReconnectDelay(long reconnectDelay, TimeUnit unit) {
             Preconditions.checkArgument(reconnectDelay > 0);
@@ -112,10 +121,24 @@ public class ReplicatorClientOptions {
             return this;
         }
 
-        public ReplicatorClientOptionsBuilder setSnapshotStoragePath(String snapshotStoragePath) {
+        public ReplicatorClientOptionsBuilder setSnapshotStoragePath(Path snapshotStoragePath) {
             Objects.requireNonNull(snapshotStoragePath);
 
             this.snapshotStoragePath = snapshotStoragePath;
+            return this;
+        }
+
+        public ReplicatorClientOptionsBuilder setSnapshotStoragePath(String snapshotStoragePath) {
+            Objects.requireNonNull(snapshotStoragePath);
+
+            this.snapshotStoragePath = Paths.get(snapshotStoragePath);
+            return this;
+        }
+
+        public ReplicatorClientOptionsBuilder setMaxSnapshotToKeep(int maxSnapshotToKeep) {
+            Preconditions.checkArgument(maxSnapshotToKeep >= 0);
+
+            this.maxSnapshotToKeep = maxSnapshotToKeep;
             return this;
         }
 
