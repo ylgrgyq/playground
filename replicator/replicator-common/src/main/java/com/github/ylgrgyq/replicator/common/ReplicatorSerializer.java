@@ -1,5 +1,7 @@
 package com.github.ylgrgyq.replicator.common;
 
+import com.github.ylgrgyq.replicator.common.exception.CodecException;
+import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 import com.github.ylgrgyq.replicator.proto.*;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
@@ -15,7 +17,7 @@ public class ReplicatorSerializer implements Serializer {
     }
 
     @Override
-    public <T extends RequestCommand> boolean deserialize(T cmd) throws CodecException{
+    public <T extends RequestCommand> boolean deserialize(T cmd) throws CodecException {
         try {
             byte[] content = cmd.getContent();
 

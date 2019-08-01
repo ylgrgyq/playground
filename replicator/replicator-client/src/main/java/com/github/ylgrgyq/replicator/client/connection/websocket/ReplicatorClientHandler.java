@@ -12,7 +12,6 @@ import com.github.ylgrgyq.replicator.proto.*;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.websocketx.WebSocketClientProtocolHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +62,7 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Remotin
                 if (errorInfo.getErrorCode() == 10001) {
                     requestSnapshot(ctx.channel());
                 } else {
-                    logger.error("got error", errorInfo);
+                    logger.error("Got error from server: {}", errorInfo);
                 }
                 break;
         }

@@ -1,5 +1,7 @@
 package com.github.ylgrgyq.replicator.common;
 
+import com.github.ylgrgyq.replicator.common.exception.CodecException;
+
 public interface Serializer {
     <T extends RequestCommand> boolean serialize(T cmd) throws CodecException;
 

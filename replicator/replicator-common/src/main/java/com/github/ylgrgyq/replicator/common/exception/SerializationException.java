@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.common;
+package com.github.ylgrgyq.replicator.common.exception;
 
 public class SerializationException extends CodecException {
     /**
