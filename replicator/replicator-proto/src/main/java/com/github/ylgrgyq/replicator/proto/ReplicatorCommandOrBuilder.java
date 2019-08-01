@@ -8,24 +8,6 @@ public interface ReplicatorCommandOrBuilder extends
     com.google.protobuf.MessageOrBuilder {
 
   /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
-   */
-  int getTypeValue();
-  /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
-   */
-  com.github.ylgrgyq.replicator.proto.CommandType getType();
-
-  /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
-   */
-  int getMsgTypeValue();
-  /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
-   */
-  com.github.ylgrgyq.replicator.proto.MessageType getMsgType();
-
-  /**
    * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
    */
   com.github.ylgrgyq.replicator.proto.HandshakeRequest getHandshakeRequest();

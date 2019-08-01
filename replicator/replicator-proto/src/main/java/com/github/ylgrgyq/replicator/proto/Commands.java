@@ -99,30 +99,23 @@ public final class Commands {
       "t\030\001 \001(\0132-.com.github.ylgrgyq.replicator." +
       "proto.Snapshot\"F\n\005Error\022=\n\005error\030\001 \001(\0132." +
       ".com.github.ylgrgyq.replicator.proto.Err" +
-      "orInfo\"\377\005\n\021ReplicatorCommand\022>\n\004type\030\001 \001" +
-      "(\01620.com.github.ylgrgyq.replicator.proto" +
-      ".CommandType\022B\n\010msg_type\030\002 \001(\01620.com.git" +
-      "hub.ylgrgyq.replicator.proto.MessageType",
-      "\022R\n\021handshake_request\030\003 \001(\01325.com.github" +
-      ".ylgrgyq.replicator.proto.HandshakeReque" +
-      "stH\000\022S\n\022fetch_logs_request\030\004 \001(\01325.com.g" +
-      "ithub.ylgrgyq.replicator.proto.FetchLogs" +
-      "RequestH\000\022[\n\026fetch_snapshot_request\030\005 \001(" +
-      "\01329.com.github.ylgrgyq.replicator.proto." +
-      "FetchSnapshotRequestH\000\022T\n\022handshake_resp" +
-      "onse\030\006 \001(\01326.com.github.ylgrgyq.replicat" +
-      "or.proto.HandshakeResponseH\001\022U\n\023fetch_lo" +
-      "gs_response\030\007 \001(\01326.com.github.ylgrgyq.r",
-      "eplicator.proto.FetchLogsResponseH\001\022]\n\027f" +
-      "etch_snapshot_response\030\010 \001(\0132:.com.githu" +
-      "b.ylgrgyq.replicator.proto.FetchSnapshot" +
-      "ResponseH\001\022=\n\005error\030\t \001(\0132..com.github.y" +
-      "lgrgyq.replicator.proto.ErrorInfoB\t\n\007req" +
-      "uestB\n\n\010response*X\n\013CommandType\022\013\n\007UNKNO" +
-      "WN\020\000\022\r\n\tHANDSHAKE\020\001\022\016\n\nFETCH_LOGS\020\002\022\022\n\016F" +
-      "ETCH_SNAPSHOT\020\003\022\t\n\005ERROR\020\004*5\n\013MessageTyp" +
-      "e\022\013\n\007ONE_WAY\020\000\022\013\n\007REQUEST\020\001\022\014\n\010RESPONSE\020" +
-      "\002B\002P\001b\006proto3"
+      "orInfo\"\373\004\n\021ReplicatorCommand\022R\n\021handshak" +
+      "e_request\030\003 \001(\01325.com.github.ylgrgyq.rep" +
+      "licator.proto.HandshakeRequestH\000\022S\n\022fetc" +
+      "h_logs_request\030\004 \001(\01325.com.github.ylgrgy",
+      "q.replicator.proto.FetchLogsRequestH\000\022[\n" +
+      "\026fetch_snapshot_request\030\005 \001(\01329.com.gith" +
+      "ub.ylgrgyq.replicator.proto.FetchSnapsho" +
+      "tRequestH\000\022T\n\022handshake_response\030\006 \001(\01326" +
+      ".com.github.ylgrgyq.replicator.proto.Han" +
+      "dshakeResponseH\001\022U\n\023fetch_logs_response\030" +
+      "\007 \001(\01326.com.github.ylgrgyq.replicator.pr" +
+      "oto.FetchLogsResponseH\001\022]\n\027fetch_snapsho" +
+      "t_response\030\010 \001(\0132:.com.github.ylgrgyq.re" +
+      "plicator.proto.FetchSnapshotResponseH\001\022=",
+      "\n\005error\030\t \001(\0132..com.github.ylgrgyq.repli" +
+      "cator.proto.ErrorInfoB\t\n\007requestB\n\n\010resp" +
+      "onseB\002P\001b\006proto3"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
         new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
@@ -207,7 +200,7 @@ public final class Commands {
     internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_descriptor,
-        new java.lang.String[] { "Type", "MsgType", "HandshakeRequest", "FetchLogsRequest", "FetchSnapshotRequest", "HandshakeResponse", "FetchLogsResponse", "FetchSnapshotResponse", "Error", "Request", "Response", });
+        new java.lang.String[] { "HandshakeRequest", "FetchLogsRequest", "FetchSnapshotRequest", "HandshakeResponse", "FetchLogsResponse", "FetchSnapshotResponse", "Error", "Request", "Response", });
   }
 
   // @@protoc_insertion_point(outer_class_scope)

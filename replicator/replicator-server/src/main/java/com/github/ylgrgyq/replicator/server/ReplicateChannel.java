@@ -1,11 +1,8 @@
 package com.github.ylgrgyq.replicator.server;
 
-import com.github.ylgrgyq.replicator.proto.BatchLogEntries;
-import com.github.ylgrgyq.replicator.proto.Snapshot;
+import com.github.ylgrgyq.replicator.common.RemotingCommand;
 
 public interface ReplicateChannel {
-    void writeSyncLog(BatchLogEntries log);
-    void writeSnapshot(Snapshot snapshot);
     void writeError(ReplicatorError error);
-    void writeHandshakeResult();
+    void writeRemoting(RemotingCommand cmd);
 }

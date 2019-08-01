@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.server;
 
-import com.github.ylgrgyq.replicator.server.connection.websocket.ReplicatorDecoder;
-import com.github.ylgrgyq.replicator.server.connection.websocket.ReplicatorEncoder;
+import com.github.ylgrgyq.replicator.common.ReplicatorDecoder;
+import com.github.ylgrgyq.replicator.common.ReplicatorEncoder;
 import com.github.ylgrgyq.replicator.server.connection.websocket.ReplicatorServerHandler;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceGroups;
@@ -16,10 +16,6 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpServerCodec;
-import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,13 +48,9 @@ public class ReplicatorServerImpl implements ReplicatorServer {
             protected void initChannel(SocketChannel serverChannel) {
                 ChannelPipeline pipeline = serverChannel.pipeline();
 
+                pipeline.addLast(new ReplicatorEncoder());
+                pipeline.addLast(new ReplicatorDecoder());
                 pipeline.addLast(new IdleStateHandler(options.getConnectionReadTimeoutSecs(), 0, 0));
-                pipeline.addLast(new HttpServerCodec());
-                pipeline.addLast(new HttpObjectAggregator(65536));
-                pipeline.addLast(new WebSocketServerCompressionHandler());
-                pipeline.addLast(new WebSocketServerProtocolHandler("/", null, true));
-                pipeline.addLast(ReplicatorEncoder.INSTANCE);
-                pipeline.addLast(ReplicatorDecoder.INSTANCE);
                 pipeline.addLast(new ReplicatorServerHandler(groups));
             }
         });

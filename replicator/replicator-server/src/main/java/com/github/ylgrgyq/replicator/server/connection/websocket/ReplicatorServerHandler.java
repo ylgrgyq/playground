@@ -1,7 +1,10 @@
 package com.github.ylgrgyq.replicator.server.connection.websocket;
 
-import com.github.ylgrgyq.replicator.proto.ReplicatorCommand;
-import com.github.ylgrgyq.replicator.server.*;
+import com.github.ylgrgyq.replicator.common.RemotingCommand;
+import com.github.ylgrgyq.replicator.proto.HandshakeRequest;
+import com.github.ylgrgyq.replicator.server.Replica;
+import com.github.ylgrgyq.replicator.server.ReplicatorError;
+import com.github.ylgrgyq.replicator.server.ReplicatorException;
 import com.github.ylgrgyq.replicator.server.sequence.Sequence;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceGroups;
 import io.netty.channel.ChannelHandlerContext;
@@ -10,7 +13,7 @@ import io.netty.handler.timeout.IdleStateEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ReplicatorServerHandler extends SimpleChannelInboundHandler<ReplicatorCommand> {
+public class ReplicatorServerHandler extends SimpleChannelInboundHandler<RemotingCommand> {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorServerHandler.class);
     private SequenceGroups groups;
     private Replica replica;
@@ -28,27 +31,27 @@ public class ReplicatorServerHandler extends SimpleChannelInboundHandler<Replica
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, ReplicatorCommand cmd) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand cmd) throws Exception {
         try {
-            switch (cmd.getType()) {
+            switch (cmd.getMessageType()) {
                 case HANDSHAKE:
-                    String topic = cmd.getHandshakeRequest().getTopic();
+                    HandshakeRequest handshake = cmd.getBody();
+                    String topic = handshake.getTopic();
+
+                    logger.info("handshake on topic: {} {}", topic, cmd);
 
                     Sequence seq = groups.getSequence(topic);
                     if (seq == null) {
                         channel.writeError(ReplicatorError.ETOPIC_NOT_FOUND);
                     }
 
-                    replica.onStart(topic, seq);
+                    replica.onStart(topic, seq, cmd);
                     break;
                 case FETCH_LOGS:
-                    long fromIndex = cmd.getFetchLogsRequest().getFromId();
-                    int limit = cmd.getFetchLogsRequest().getLimit();
-
-                    replica.handleSyncLogs(fromIndex, limit);
+                    replica.handleSyncLogs(cmd);
                     break;
                 case FETCH_SNAPSHOT:
-                    replica.handleSyncSnapshot();
+                    replica.handleFetchSnapshot(cmd);
                     break;
             }
         } catch (ReplicatorException ex) {

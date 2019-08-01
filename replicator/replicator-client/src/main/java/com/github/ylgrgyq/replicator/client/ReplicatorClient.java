@@ -1,8 +1,8 @@
 package com.github.ylgrgyq.replicator.client;
 
 import com.github.ylgrgyq.replicator.client.connection.websocket.ReplicatorClientHandler;
-import com.github.ylgrgyq.replicator.client.connection.websocket.ReplicatorDecoder;
-import com.github.ylgrgyq.replicator.client.connection.websocket.ReplicatorEncoder;
+import com.github.ylgrgyq.replicator.common.ReplicatorDecoder;
+import com.github.ylgrgyq.replicator.common.ReplicatorEncoder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -60,7 +60,7 @@ public class ReplicatorClient {
     private CompletableFuture<Void> connect(){
         CompletableFuture<Void> future = new CompletableFuture<>();
 
-        URI uri = options.getUri();
+//        URI uri = options.getUri();
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.channel(NioSocketChannel.class);
         bootstrap.group(group);
@@ -70,14 +70,9 @@ public class ReplicatorClient {
             protected void initChannel(SocketChannel channel) {
                 ChannelPipeline pipeline = channel.pipeline();
 
+                pipeline.addLast(new ReplicatorEncoder());
+                pipeline.addLast(new ReplicatorDecoder());
                 pipeline.addLast(new IdleStateHandler(options.getPingIntervalSec(), 0, 0));
-                pipeline.addLast(new HttpClientCodec());
-                pipeline.addLast(new HttpObjectAggregator(65536));
-                pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
-                pipeline.addLast(new WebSocketClientProtocolHandler(uri, WebSocketVersion.V13, null, true,
-                        new DefaultHttpHeaders(), 65536));
-                pipeline.addLast(ReplicatorEncoder.INSTANCE);
-                pipeline.addLast(ReplicatorDecoder.INSTANCE);
                 pipeline.addLast(new ReplicatorClientHandler(topic, snapshotManager, stateMachineCaller, options));
             }
         });

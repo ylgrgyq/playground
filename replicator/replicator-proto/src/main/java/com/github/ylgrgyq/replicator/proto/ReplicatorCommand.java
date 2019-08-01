@@ -15,8 +15,6 @@ public  final class ReplicatorCommand extends
     super(builder);
   }
   private ReplicatorCommand() {
-    type_ = 0;
-    msgType_ = 0;
   }
 
   @java.lang.Override
@@ -42,18 +40,6 @@ public  final class ReplicatorCommand extends
             if (!input.skipField(tag)) {
               done = true;
             }
-            break;
-          }
-          case 8: {
-            int rawValue = input.readEnum();
-
-            type_ = rawValue;
-            break;
-          }
-          case 16: {
-            int rawValue = input.readEnum();
-
-            msgType_ = rawValue;
             break;
           }
           case 26: {
@@ -256,38 +242,6 @@ public  final class ReplicatorCommand extends
         responseCase_);
   }
 
-  public static final int TYPE_FIELD_NUMBER = 1;
-  private int type_;
-  /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
-   */
-  public int getTypeValue() {
-    return type_;
-  }
-  /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
-   */
-  public com.github.ylgrgyq.replicator.proto.CommandType getType() {
-    com.github.ylgrgyq.replicator.proto.CommandType result = com.github.ylgrgyq.replicator.proto.CommandType.valueOf(type_);
-    return result == null ? com.github.ylgrgyq.replicator.proto.CommandType.UNRECOGNIZED : result;
-  }
-
-  public static final int MSG_TYPE_FIELD_NUMBER = 2;
-  private int msgType_;
-  /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
-   */
-  public int getMsgTypeValue() {
-    return msgType_;
-  }
-  /**
-   * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
-   */
-  public com.github.ylgrgyq.replicator.proto.MessageType getMsgType() {
-    com.github.ylgrgyq.replicator.proto.MessageType result = com.github.ylgrgyq.replicator.proto.MessageType.valueOf(msgType_);
-    return result == null ? com.github.ylgrgyq.replicator.proto.MessageType.UNRECOGNIZED : result;
-  }
-
   public static final int HANDSHAKE_REQUEST_FIELD_NUMBER = 3;
   /**
    * <code>optional .com.github.ylgrgyq.replicator.proto.HandshakeRequest handshake_request = 3;</code>
@@ -441,12 +395,6 @@ public  final class ReplicatorCommand extends
 
   public void writeTo(com.google.protobuf.CodedOutputStream output)
                       throws java.io.IOException {
-    if (type_ != com.github.ylgrgyq.replicator.proto.CommandType.UNKNOWN.getNumber()) {
-      output.writeEnum(1, type_);
-    }
-    if (msgType_ != com.github.ylgrgyq.replicator.proto.MessageType.ONE_WAY.getNumber()) {
-      output.writeEnum(2, msgType_);
-    }
     if (requestCase_ == 3) {
       output.writeMessage(3, (com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_);
     }
@@ -475,14 +423,6 @@ public  final class ReplicatorCommand extends
     if (size != -1) return size;
 
     size = 0;
-    if (type_ != com.github.ylgrgyq.replicator.proto.CommandType.UNKNOWN.getNumber()) {
-      size += com.google.protobuf.CodedOutputStream
-        .computeEnumSize(1, type_);
-    }
-    if (msgType_ != com.github.ylgrgyq.replicator.proto.MessageType.ONE_WAY.getNumber()) {
-      size += com.google.protobuf.CodedOutputStream
-        .computeEnumSize(2, msgType_);
-    }
     if (requestCase_ == 3) {
       size += com.google.protobuf.CodedOutputStream
         .computeMessageSize(3, (com.github.ylgrgyq.replicator.proto.HandshakeRequest) request_);
@@ -527,8 +467,6 @@ public  final class ReplicatorCommand extends
     com.github.ylgrgyq.replicator.proto.ReplicatorCommand other = (com.github.ylgrgyq.replicator.proto.ReplicatorCommand) obj;
 
     boolean result = true;
-    result = result && type_ == other.type_;
-    result = result && msgType_ == other.msgType_;
     result = result && (hasError() == other.hasError());
     if (hasError()) {
       result = result && getError()
@@ -582,10 +520,6 @@ public  final class ReplicatorCommand extends
     }
     int hash = 41;
     hash = (19 * hash) + getDescriptorForType().hashCode();
-    hash = (37 * hash) + TYPE_FIELD_NUMBER;
-    hash = (53 * hash) + type_;
-    hash = (37 * hash) + MSG_TYPE_FIELD_NUMBER;
-    hash = (53 * hash) + msgType_;
     if (hasError()) {
       hash = (37 * hash) + ERROR_FIELD_NUMBER;
       hash = (53 * hash) + getError().hashCode();
@@ -740,10 +674,6 @@ public  final class ReplicatorCommand extends
     }
     public Builder clear() {
       super.clear();
-      type_ = 0;
-
-      msgType_ = 0;
-
       if (errorBuilder_ == null) {
         error_ = null;
       } else {
@@ -776,8 +706,6 @@ public  final class ReplicatorCommand extends
 
     public com.github.ylgrgyq.replicator.proto.ReplicatorCommand buildPartial() {
       com.github.ylgrgyq.replicator.proto.ReplicatorCommand result = new com.github.ylgrgyq.replicator.proto.ReplicatorCommand(this);
-      result.type_ = type_;
-      result.msgType_ = msgType_;
       if (requestCase_ == 3) {
         if (handshakeRequestBuilder_ == null) {
           result.request_ = request_;
@@ -868,12 +796,6 @@ public  final class ReplicatorCommand extends
 
     public Builder mergeFrom(com.github.ylgrgyq.replicator.proto.ReplicatorCommand other) {
       if (other == com.github.ylgrgyq.replicator.proto.ReplicatorCommand.getDefaultInstance()) return this;
-      if (other.type_ != 0) {
-        setTypeValue(other.getTypeValue());
-      }
-      if (other.msgType_ != 0) {
-        setMsgTypeValue(other.getMsgTypeValue());
-      }
       if (other.hasError()) {
         mergeError(other.getError());
       }
@@ -966,94 +888,6 @@ public  final class ReplicatorCommand extends
       return this;
     }
 
-
-    private int type_ = 0;
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
-     */
-    public int getTypeValue() {
-      return type_;
-    }
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
-     */
-    public Builder setTypeValue(int value) {
-      type_ = value;
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
-     */
-    public com.github.ylgrgyq.replicator.proto.CommandType getType() {
-      com.github.ylgrgyq.replicator.proto.CommandType result = com.github.ylgrgyq.replicator.proto.CommandType.valueOf(type_);
-      return result == null ? com.github.ylgrgyq.replicator.proto.CommandType.UNRECOGNIZED : result;
-    }
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
-     */
-    public Builder setType(com.github.ylgrgyq.replicator.proto.CommandType value) {
-      if (value == null) {
-        throw new NullPointerException();
-      }
-      
-      type_ = value.getNumber();
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.CommandType type = 1;</code>
-     */
-    public Builder clearType() {
-      
-      type_ = 0;
-      onChanged();
-      return this;
-    }
-
-    private int msgType_ = 0;
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
-     */
-    public int getMsgTypeValue() {
-      return msgType_;
-    }
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
-     */
-    public Builder setMsgTypeValue(int value) {
-      msgType_ = value;
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
-     */
-    public com.github.ylgrgyq.replicator.proto.MessageType getMsgType() {
-      com.github.ylgrgyq.replicator.proto.MessageType result = com.github.ylgrgyq.replicator.proto.MessageType.valueOf(msgType_);
-      return result == null ? com.github.ylgrgyq.replicator.proto.MessageType.UNRECOGNIZED : result;
-    }
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
-     */
-    public Builder setMsgType(com.github.ylgrgyq.replicator.proto.MessageType value) {
-      if (value == null) {
-        throw new NullPointerException();
-      }
-      
-      msgType_ = value.getNumber();
-      onChanged();
-      return this;
-    }
-    /**
-     * <code>optional .com.github.ylgrgyq.replicator.proto.MessageType msg_type = 2;</code>
-     */
-    public Builder clearMsgType() {
-      
-      msgType_ = 0;
-      onChanged();
-      return this;
-    }
 
     private com.google.protobuf.SingleFieldBuilderV3<
         com.github.ylgrgyq.replicator.proto.HandshakeRequest, com.github.ylgrgyq.replicator.proto.HandshakeRequest.Builder, com.github.ylgrgyq.replicator.proto.HandshakeRequestOrBuilder> handshakeRequestBuilder_;

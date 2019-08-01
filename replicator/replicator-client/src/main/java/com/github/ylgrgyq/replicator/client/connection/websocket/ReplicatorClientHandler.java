@@ -4,6 +4,10 @@ import com.github.ylgrgyq.replicator.client.ReplicatorClientOptions;
 import com.github.ylgrgyq.replicator.client.ReplicatorException;
 import com.github.ylgrgyq.replicator.client.SnapshotManager;
 import com.github.ylgrgyq.replicator.client.StateMachineCaller;
+import com.github.ylgrgyq.replicator.common.CommandFactory;
+import com.github.ylgrgyq.replicator.common.MessageType;
+import com.github.ylgrgyq.replicator.common.RemotingCommand;
+import com.github.ylgrgyq.replicator.common.RequestCommand;
 import com.github.ylgrgyq.replicator.proto.*;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -18,7 +22,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-public class ReplicatorClientHandler extends SimpleChannelInboundHandler<ReplicatorCommand> {
+public class ReplicatorClientHandler extends SimpleChannelInboundHandler<RemotingCommand> {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorClientHandler.class);
 
     private final String topic;
@@ -41,21 +45,21 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, ReplicatorCommand cmd) {
-        switch (cmd.getType()) {
+    protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand cmd) {
+        switch (cmd.getMessageType()) {
             case HANDSHAKE:
                 handleHandshakeResp(ctx);
                 break;
             case FETCH_LOGS:
-                BatchLogEntries logs = cmd.getFetchLogsResponse().getLogs();
-                handleSyncLogs(ctx, logs);
+                handleFetchLogs(ctx, cmd);
                 break;
             case FETCH_SNAPSHOT:
-                Snapshot snapshot = cmd.getFetchSnapshotResponse().getSnapshot();
+                FetchSnapshotResponse response = cmd.getBody();
+                Snapshot snapshot = response.getSnapshot();
                 handleApplySnapshot(ctx, snapshot);
                 break;
             case ERROR:
-                ErrorInfo errorInfo = cmd.getError();
+                ErrorInfo errorInfo = cmd.getBody();
                 if (errorInfo.getErrorCode() == 10001) {
                     requestSnapshot(ctx.channel());
                 } else {
@@ -75,16 +79,19 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     }
 
     private void requestSnapshot(Channel ch) {
-        ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
-        get.setMsgType(MessageType.REQUEST);
-        get.setType(CommandType.FETCH_SNAPSHOT);
+        RequestCommand req = CommandFactory.createRequest();
+        req.setMessageType(MessageType.FETCH_SNAPSHOT);
 
-        ch.writeAndFlush(get.build());
+
+        ch.writeAndFlush(req);
     }
 
-    private void handleSyncLogs(ChannelHandlerContext ctx, BatchLogEntries logs) {
-        List<LogEntry> entryList = logs.getEntriesList();
+    private void handleFetchLogs(ChannelHandlerContext ctx, RemotingCommand cmd) {
+        FetchLogsResponse req = cmd.getBody();
+        BatchLogEntries logs = req.getLogs();
 
+        List<LogEntry> entryList = logs.getEntriesList();
+        logger.info("handle fetch logs {}", entryList);
         if (!entryList.isEmpty()) {
             LogEntry firstEntry = entryList.get(0);
             LogEntry lastEntry = entryList.get(entryList.size() - 1);
@@ -137,17 +144,17 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
             return;
         }
 
-        ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
-        get.setMsgType(MessageType.REQUEST);
-        get.setType(CommandType.FETCH_LOGS);
+        RequestCommand req = CommandFactory.createRequest();
+        req.setMessageType(MessageType.FETCH_LOGS);
 
-        FetchLogsRequest req = FetchLogsRequest.newBuilder()
+        FetchLogsRequest fetchLogs = FetchLogsRequest.newBuilder()
                 .setFromId(fromId)
                 .setLimit(100)
                 .build();
-        get.setFetchLogsRequest(req);
 
-        ch.writeAndFlush(get.build());
+        req.setRequestObject(fetchLogs);
+
+        ch.writeAndFlush(req);
     }
 
     private void handleApplySnapshot(ChannelHandlerContext ctx, Snapshot snapshot) {
@@ -194,21 +201,23 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Replica
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
         if (evt instanceof IdleStateEvent) {
             requestLogs(ctx.channel(), topic, lastId);
-        } else if (evt == WebSocketClientProtocolHandler.ClientHandshakeStateEvent.HANDSHAKE_COMPLETE) {
-            handshake(ctx.channel(), topic);
         }
     }
 
-    public void handshake(Channel ch, String topic) {
-        ReplicatorCommand.Builder get = ReplicatorCommand.newBuilder();
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) {
+        handshake(ctx.channel(), topic);
+    }
 
+    public void handshake(Channel ch, String topic) {
+        RequestCommand req = CommandFactory.createRequest();
+        req.setMessageType(MessageType.HANDSHAKE);
         HandshakeRequest request = HandshakeRequest.newBuilder()
                 .setTopic(topic)
                 .build();
-        get.setType(CommandType.HANDSHAKE);
-        get.setMsgType(MessageType.REQUEST);
-        get.setHandshakeRequest(request);
 
-        ch.writeAndFlush(get.build());
+        req.setRequestObject(request);
+
+        ch.writeAndFlush(req);
     }
 }
