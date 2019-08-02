@@ -1,5 +1,6 @@
 package com.github.ylgrgyq.replicator.example.client;
 
+import com.github.ylgrgyq.replicator.client.ReplicatorClientImpl;
 import com.github.ylgrgyq.replicator.client.ReplicatorClientOptions;
 import com.github.ylgrgyq.replicator.client.StateMachine;
 import org.slf4j.Logger;
@@ -23,10 +24,10 @@ public class ReplicatorClient {
         ReplicatorClientOptions options = ReplicatorClientOptions
                 .builder()
                 .setSnapshotStoragePath(storagePath)
-                .setMaxSnapshotToKeep(5)
+                .setMaxSnapshotsToKeep(0)
                 .setUri(new URI("ws://localhost:8888"))
                 .build();
-        com.github.ylgrgyq.replicator.client.ReplicatorClient client = new com.github.ylgrgyq.replicator.client.ReplicatorClient("hahaha", new StateMachine() {
+        ReplicatorClientImpl client = new ReplicatorClientImpl("hahaha", new StateMachine() {
             @Override
             public void apply(List<byte[]> logs) {
                 List<String> logsInStr = logs.stream().map(bs -> new String(bs, StandardCharsets.UTF_8)).collect(Collectors.toList());

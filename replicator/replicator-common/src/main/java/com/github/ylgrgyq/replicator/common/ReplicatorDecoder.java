@@ -84,8 +84,8 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
             command.setMessageVersion(msgVersion);
             command.setContent(content);
 
-            logger.info("request {}", msgTypeCode, content);
             serializer.deserialize(command);
+            logger.info("receive request {} {}", MessageType.findMessageTypeByCode(msgTypeCode), command.getBody());
 
             out.add(command);
         } else {
@@ -115,9 +115,9 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
             command.setMessageType(MessageType.findMessageTypeByCode(msgTypeCode));
             command.setMessageVersion(msgVersion);
             command.setContent(content);
-            logger.info("response {}", msgTypeCode, content);
 
             serializer.deserialize(command);
+            logger.info("response {} {}", MessageType.findMessageTypeByCode(msgTypeCode), command.getBody());
 
             out.add(command);
         } else {

@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.client;
+package com.github.ylgrgyq.replicator.common;
 
 public final class Preconditions {
     public static <T> T checkNotNull(T reference) {

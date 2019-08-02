@@ -2,8 +2,6 @@ package com.github.ylgrgyq.replicator.client;
 
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.google.protobuf.ByteString;
-import org.apache.commons.io.FileUtils;
-import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -29,7 +27,7 @@ public class SnapshotManagerTest {
 
         options = ReplicatorClientOptions.builder()
                 .setSnapshotStoragePath(storagePath)
-                .setMaxSnapshotToKeep(10)
+                .setMaxSnapshotsToKeep(10)
                 .setUri(new URI("ws://localhost:8888"))
                 .build();
 
@@ -99,7 +97,7 @@ public class SnapshotManagerTest {
 
         ReplicatorClientOptions options = ReplicatorClientOptions.builder()
                 .setSnapshotStoragePath(storagePath)
-                .setMaxSnapshotToKeep(5)
+                .setMaxSnapshotsToKeep(5)
                 .setUri(new URI("ws://localhost:8888"))
                 .build();
         manager = new SnapshotManager(options);

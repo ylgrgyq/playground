@@ -36,12 +36,15 @@ public class Replica implements ReplicateRequestHandler {
     }
 
     @Override
-    public void handleSyncLogs(RemotingCommand cmd) {
+    public void handleFetchLogs(RemotingCommand cmd) {
         if (!checkHandshakeState()) {
             return;
         }
 
         FetchLogsRequest fetchLogs = cmd.getBody();
+
+        logger.info("Got fetch logs request: {}", fetchLogs);
+
         long fromIndex = fetchLogs.getFromId();
         int limit = fetchLogs.getLimit();
 
@@ -66,12 +69,15 @@ public class Replica implements ReplicateRequestHandler {
             return;
         }
 
+        logger.info("Got fetch snapshot request");
+
         Snapshot snapshot = seq.getLastSnapshot();
-        ResponseCommand res = CommandFactory.createResponse((RequestCommand)cmd);
 
         FetchSnapshotResponse r = FetchSnapshotResponse.newBuilder()
                 .setSnapshot(snapshot)
                 .build();
+
+        ResponseCommand res = CommandFactory.createResponse((RequestCommand)cmd);
         res.setContent(r.toByteArray());
 
         logger.debug("send snapshot resp {}", r);

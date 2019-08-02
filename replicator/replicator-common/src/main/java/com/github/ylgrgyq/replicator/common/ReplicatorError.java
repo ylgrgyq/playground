@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.server;
+package com.github.ylgrgyq.replicator.common;
 
 public enum ReplicatorError {
     UNKNOWN(-1, "Unknown error"),

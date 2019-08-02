@@ -1,5 +1,7 @@
 package com.github.ylgrgyq.replicator.client;
 
+import com.github.ylgrgyq.replicator.common.Preconditions;
+
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,7 +18,7 @@ public class ReplicatorClientOptions {
     private final int pingIntervalSec;
     private final int connectionTimeoutMillis;
     private final boolean saveSnapshotSynchronously;
-    private final int maxSnapshotToKeep;
+    private final int maxSnapshotsToKeep;
 
     private ReplicatorClientOptions(ReplicatorClientOptionsBuilder builder) {
         this.uri = builder.uri;
@@ -28,7 +30,7 @@ public class ReplicatorClientOptions {
         this.connectionTimeoutMillis = builder.connectionTimeoutMillis == null ? 5000 : builder.connectionTimeoutMillis;
         this.snapshotStoragePath = builder.snapshotStoragePath;
         this.saveSnapshotSynchronously = builder.saveSnapshotSynchronously == null ? false : builder.saveSnapshotSynchronously;
-        this.maxSnapshotToKeep = builder.maxSnapshotToKeep == null ? 5 : builder.maxSnapshotToKeep;
+        this.maxSnapshotsToKeep = builder.maxSnapshotsToKeep == null ? 5 : builder.maxSnapshotsToKeep;
     }
 
     public int getPort() {
@@ -67,8 +69,8 @@ public class ReplicatorClientOptions {
         return saveSnapshotSynchronously;
     }
 
-    public int getMaxSnapshotToKeep() {
-        return maxSnapshotToKeep;
+    public int getMaxSnapshotsToKeep() {
+        return maxSnapshotsToKeep;
     }
 
     public static ReplicatorClientOptionsBuilder builder() {
@@ -83,7 +85,7 @@ public class ReplicatorClientOptions {
         private Integer connectionTimeoutMillis;
         private Path snapshotStoragePath;
         private Boolean saveSnapshotSynchronously;
-        private Integer maxSnapshotToKeep;
+        private Integer maxSnapshotsToKeep;
 
         public ReplicatorClientOptionsBuilder setReconnectDelay(long reconnectDelay, TimeUnit unit) {
             Preconditions.checkArgument(reconnectDelay > 0);
@@ -135,10 +137,10 @@ public class ReplicatorClientOptions {
             return this;
         }
 
-        public ReplicatorClientOptionsBuilder setMaxSnapshotToKeep(int maxSnapshotToKeep) {
-            Preconditions.checkArgument(maxSnapshotToKeep >= 0);
+        public ReplicatorClientOptionsBuilder setMaxSnapshotsToKeep(int maxSnapshotsToKeep) {
+            Preconditions.checkArgument(maxSnapshotsToKeep >= 0);
 
-            this.maxSnapshotToKeep = maxSnapshotToKeep;
+            this.maxSnapshotsToKeep = maxSnapshotsToKeep;
             return this;
         }
 

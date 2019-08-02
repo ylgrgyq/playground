@@ -1,5 +1,7 @@
 package com.github.ylgrgyq.replicator.client;
 
+import com.github.ylgrgyq.replicator.common.ReplicatorError;
+import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,13 +16,13 @@ public class StateMachineCaller {
 
     private final StateMachine stateMachine;
     private final BlockingQueue<Job> jobQueue;
-    private final ReplicatorClient client;
+    private final ReplicatorClientImpl client;
     private volatile boolean stop;
     private CompletableFuture<Void> terminationFuture;
     private Job shutdownJob;
 
 
-    StateMachineCaller(StateMachine stateMachine, ReplicatorClient client) {
+    StateMachineCaller(StateMachine stateMachine, ReplicatorClientImpl client) {
         this.stop = false;
         this.stateMachine = stateMachine;
         this.client = client;

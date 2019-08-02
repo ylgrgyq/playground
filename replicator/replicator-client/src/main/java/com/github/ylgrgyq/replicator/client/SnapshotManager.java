@@ -1,6 +1,5 @@
 package com.github.ylgrgyq.replicator.client;
 
-import com.github.ylgrgyq.replicator.client.connection.websocket.ReplicatorClientHandler;
 import com.github.ylgrgyq.replicator.common.Bits;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import org.apache.commons.io.FileUtils;
@@ -16,7 +15,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SnapshotManager {
-    private static final Logger logger = LoggerFactory.getLogger(ReplicatorClientHandler.class);
+    private static final Logger logger = LoggerFactory.getLogger(SnapshotManager.class);
 
     private static final String SNAPSHOT_FILE_PREFIX = "replicator_snapshot_";
 
@@ -37,6 +36,7 @@ public class SnapshotManager {
             }
 
             FileUtils.forceMkdir(dir);
+            purgeSnapshots();
             loadLastSnapshot();
         } else {
             logger.warn("No snapshot storage path provided, snapshot will not be saved persistently");
@@ -44,7 +44,7 @@ public class SnapshotManager {
     }
 
     public void storeSnapshot(Snapshot snapshot) throws IOException {
-        if (storagePath == null || options.getMaxSnapshotToKeep() == 0) {
+        if (storagePath == null || options.getMaxSnapshotsToKeep() == 0) {
             return;
         }
 
@@ -127,8 +127,6 @@ public class SnapshotManager {
 
                 logger.info("Found last snapshot on path {} with id {}", lastSnapshotPath, lastSnapshot.getId());
             }
-
-            purgeSnapshots(availableSnapshots);
         }
     }
 
@@ -172,8 +170,8 @@ public class SnapshotManager {
      * @param availableSnapshots current snapshot paths
      */
     private void purgeSnapshots(List<Path> availableSnapshots) {
-        if (availableSnapshots.size() > options.getMaxSnapshotToKeep()) {
-            List<Path> pathsToPurge = availableSnapshots.subList(options.getMaxSnapshotToKeep(), availableSnapshots.size());
+        if (availableSnapshots.size() > options.getMaxSnapshotsToKeep()) {
+            List<Path> pathsToPurge = availableSnapshots.subList(options.getMaxSnapshotsToKeep(), availableSnapshots.size());
             for (Path path : pathsToPurge) {
                 try {
                     Files.deleteIfExists(path);

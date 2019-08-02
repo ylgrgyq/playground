@@ -1,6 +1,4 @@
-package com.github.ylgrgyq.replicator.server;
-
-import com.github.ylgrgyq.replicator.common.RemotingCommand;
+package com.github.ylgrgyq.replicator.common;
 
 public interface ReplicateChannel {
     void writeError(ReplicatorError error);

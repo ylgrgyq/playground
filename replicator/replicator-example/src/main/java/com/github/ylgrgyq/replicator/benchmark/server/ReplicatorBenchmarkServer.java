@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.benchmark.server;
 
-import com.github.ylgrgyq.replicator.server.ReplicatorException;
+import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.server.ReplicatorServer;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;

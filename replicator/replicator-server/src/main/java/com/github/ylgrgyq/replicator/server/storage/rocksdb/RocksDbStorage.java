@@ -1,9 +1,9 @@
 package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
 import com.github.ylgrgyq.replicator.common.Bits;
+import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.server.Preconditions;
-import com.github.ylgrgyq.replicator.server.ReplicatorException;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;

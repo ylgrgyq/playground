@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.server.connection.websocket;
+package com.github.ylgrgyq.replicator.client;
 
 import com.github.ylgrgyq.replicator.common.*;
 import com.github.ylgrgyq.replicator.proto.ErrorInfo;
@@ -6,7 +6,7 @@ import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class NettyReplicateChannel implements ReplicateChannel {
+public class NettyReplicateChannel implements ReplicateChannel{
     private static final Logger logger = LoggerFactory.getLogger(NettyReplicateChannel.class);
 
     private Channel socket;
@@ -15,12 +15,10 @@ public class NettyReplicateChannel implements ReplicateChannel {
     }
 
 
-    @Override
     public void writeRemoting(RemotingCommand cmd) {
         socket.writeAndFlush(cmd);
     }
 
-    @Override
     public void writeError(ReplicatorError error) {
         RequestCommand req = CommandFactory.createRequest();
         req.setMessageType(MessageType.ERROR);

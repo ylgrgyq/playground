@@ -1,10 +1,10 @@
 package com.github.ylgrgyq.replicator.server.connection.websocket;
 
 import com.github.ylgrgyq.replicator.common.RemotingCommand;
+import com.github.ylgrgyq.replicator.common.ReplicatorError;
+import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.proto.HandshakeRequest;
 import com.github.ylgrgyq.replicator.server.Replica;
-import com.github.ylgrgyq.replicator.server.ReplicatorError;
-import com.github.ylgrgyq.replicator.server.ReplicatorException;
 import com.github.ylgrgyq.replicator.server.sequence.Sequence;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceGroups;
 import io.netty.channel.ChannelHandlerContext;
@@ -48,7 +48,7 @@ public class ReplicatorServerHandler extends SimpleChannelInboundHandler<Remotin
                     replica.onStart(topic, seq, cmd);
                     break;
                 case FETCH_LOGS:
-                    replica.handleSyncLogs(cmd);
+                    replica.handleFetchLogs(cmd);
                     break;
                 case FETCH_SNAPSHOT:
                     replica.handleFetchSnapshot(cmd);
