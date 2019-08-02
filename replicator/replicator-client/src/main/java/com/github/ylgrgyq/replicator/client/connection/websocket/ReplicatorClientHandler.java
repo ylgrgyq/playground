@@ -24,7 +24,7 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Remotin
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         if (cause instanceof ReplicatorException) {
             logger.error("Replicator error", ((ReplicatorException) cause).getError());
         } else {

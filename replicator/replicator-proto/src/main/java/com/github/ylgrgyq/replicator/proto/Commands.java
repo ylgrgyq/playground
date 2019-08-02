@@ -69,11 +69,6 @@ public final class Commands {
   static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_com_github_ylgrgyq_replicator_proto_Error_fieldAccessorTable;
-  static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_descriptor;
-  static final 
-    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -99,23 +94,7 @@ public final class Commands {
       "t\030\001 \001(\0132-.com.github.ylgrgyq.replicator." +
       "proto.Snapshot\"F\n\005Error\022=\n\005error\030\001 \001(\0132." +
       ".com.github.ylgrgyq.replicator.proto.Err" +
-      "orInfo\"\373\004\n\021ReplicatorCommand\022R\n\021handshak" +
-      "e_request\030\003 \001(\01325.com.github.ylgrgyq.rep" +
-      "licator.proto.HandshakeRequestH\000\022S\n\022fetc" +
-      "h_logs_request\030\004 \001(\01325.com.github.ylgrgy",
-      "q.replicator.proto.FetchLogsRequestH\000\022[\n" +
-      "\026fetch_snapshot_request\030\005 \001(\01329.com.gith" +
-      "ub.ylgrgyq.replicator.proto.FetchSnapsho" +
-      "tRequestH\000\022T\n\022handshake_response\030\006 \001(\01326" +
-      ".com.github.ylgrgyq.replicator.proto.Han" +
-      "dshakeResponseH\001\022U\n\023fetch_logs_response\030" +
-      "\007 \001(\01326.com.github.ylgrgyq.replicator.pr" +
-      "oto.FetchLogsResponseH\001\022]\n\027fetch_snapsho" +
-      "t_response\030\010 \001(\0132:.com.github.ylgrgyq.re" +
-      "plicator.proto.FetchSnapshotResponseH\001\022=",
-      "\n\005error\030\t \001(\0132..com.github.ylgrgyq.repli" +
-      "cator.proto.ErrorInfoB\t\n\007requestB\n\n\010resp" +
-      "onseB\002P\001b\006proto3"
+      "orInfoB\002P\001b\006proto3"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
         new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
@@ -195,12 +174,6 @@ public final class Commands {
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_com_github_ylgrgyq_replicator_proto_Error_descriptor,
         new java.lang.String[] { "Error", });
-    internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_descriptor =
-      getDescriptor().getMessageTypes().get(11);
-    internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_com_github_ylgrgyq_replicator_proto_ReplicatorCommand_descriptor,
-        new java.lang.String[] { "HandshakeRequest", "FetchLogsRequest", "FetchSnapshotRequest", "HandshakeResponse", "FetchLogsResponse", "FetchSnapshotResponse", "Error", "Request", "Response", });
   }
 
   // @@protoc_insertion_point(outer_class_scope)

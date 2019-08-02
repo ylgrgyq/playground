@@ -47,35 +47,3 @@ message FetchSnapshotResponse {
 message Error {
     ErrorInfo error = 1;
 }
-
-//enum CommandType {
-//    UNKNOWN = 0;
-//    HANDSHAKE = 1;
-//    FETCH_LOGS = 2;
-//    FETCH_SNAPSHOT = 3;
-//    ERROR = 4;
-//}
-//
-//enum MessageType {
-//    ONE_WAY = 0;
-//    REQUEST = 1;
-//    RESPONSE = 2;
-//}
-
-message ReplicatorCommand {
-//    CommandType type = 1;
-//    MessageType msg_type = 2;
-    oneof request {
-        HandshakeRequest handshake_request = 3;
-        FetchLogsRequest fetch_logs_request = 4;
-        FetchSnapshotRequest fetch_snapshot_request = 5;
-    }
-
-    oneof response {
-        HandshakeResponse handshake_response = 6;
-        FetchLogsResponse fetch_logs_response = 7;
-        FetchSnapshotResponse fetch_snapshot_response = 8;
-    }
-
-    ErrorInfo error = 9;
-}
