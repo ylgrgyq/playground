@@ -10,62 +10,62 @@ import java.util.Objects;
 public class CommandProcessor implements Processor<RemotingCommand> {
     private static final Logger logger = LoggerFactory.getLogger("processor");
 
-    private Map<MessageType, Processor<? super RequestCommand>> requestProcessor;
-    private Map<MessageType, Processor<? super ResponseCommand>> responseProcessor;
-    private Processor<? super RequestCommand> defaultRequestProcessor;
-    private Processor<? super ResponseCommand> defaultResponseProcessor;
+    private Map<MessageType, Processor<?>> requestProcessor;
+    private Map<MessageType, Processor<?>> responseProcessor;
+    private Processor<?> defaultRequestProcessor;
+    private Processor<?> defaultResponseProcessor;
 
     public CommandProcessor() {
         this.requestProcessor = new HashMap<>();
         this.responseProcessor = new HashMap<>();
-        this.defaultRequestProcessor = cmd ->
-                logger.warn("No processor available to process request: %s with type: %s", cmd, cmd.getMessageType());
-        this.defaultResponseProcessor = cmd ->
-                logger.warn("No processor available to process response: %s with type: %s", cmd, cmd.getMessageType());
+        this.defaultRequestProcessor = (ctx, obj) ->
+                logger.warn("No processor available to process request: {} with type: {}", ctx, ctx.getMessageType());
+        this.defaultResponseProcessor = (ctx, obj) ->
+                logger.warn("No processor available to process response: {} with type: {}", ctx, ctx.getMessageType());
     }
 
-    public void registerRequestProcessor(MessageType type, Processor<RequestCommand> processor) {
+    public void registerRequestProcessor(MessageType type, Processor<?> processor) {
         Objects.requireNonNull(type);
         Objects.requireNonNull(processor);
 
         requestProcessor.put(type, processor);
     }
 
-    public void registerResponseProcessor(MessageType type, Processor<ResponseCommand> processor) {
+    public void registerResponseProcessor(MessageType type, Processor<?> processor) {
         Objects.requireNonNull(type);
         Objects.requireNonNull(processor);
 
         responseProcessor.put(type, processor);
     }
 
-    public void registerDefaultRequestProcessor(Processor<RequestCommand> processor) {
+    public void registerDefaultRequestProcessor(Processor<?> processor) {
         Objects.requireNonNull(processor);
         defaultRequestProcessor = processor;
     }
 
-    public void registerDefaultResponseProcessor(Processor<ResponseCommand> processor) {
+    public void registerDefaultResponseProcessor(Processor<?> processor) {
         Objects.requireNonNull(processor);
         defaultResponseProcessor = processor;
     }
 
     @Override
-    public void process(RemotingCommand cmd) {
+    public void process(Context ctx, RemotingCommand cmd) {
         switch (cmd.getCommandType()) {
             case REQUEST:
             case ONE_WAY:
-                Processor<? super RequestCommand> reqProcessor = requestProcessor.get(cmd.getMessageType());
+                Processor<?> reqProcessor = requestProcessor.get(cmd.getMessageType());
                 if (reqProcessor != null) {
-                    reqProcessor.process((RequestCommand) cmd);
+                    reqProcessor.process(ctx, cmd.getBody());
                 } else {
-                    defaultRequestProcessor.process((RequestCommand) cmd);
+                    defaultRequestProcessor.process(ctx, cmd.getBody());
                 }
                 break;
             case RESPONSE:
-                Processor<? super ResponseCommand> resProcessor = responseProcessor.get(cmd.getMessageType());
+                Processor<?> resProcessor = responseProcessor.get(cmd.getMessageType());
                 if (resProcessor != null) {
-                    resProcessor.process((ResponseCommand) cmd);
+                    resProcessor.process(ctx, cmd.getBody());
                 } else {
-                    defaultResponseProcessor.process((ResponseCommand) cmd);
+                    defaultResponseProcessor.process(ctx, cmd.getBody());
                 }
                 break;
         }

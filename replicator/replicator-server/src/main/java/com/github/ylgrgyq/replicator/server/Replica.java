@@ -24,7 +24,7 @@ public class Replica implements ReplicateRequestHandler {
 
     @Override
     public void onStart(String topic, Sequence seq, RemotingCommand cmd) {
-        ResponseCommand res = CommandFactory.createResponse((RequestCommand)cmd);
+        ResponseCommand res = CommandFactory.createResponse(cmd);
         this.topic = topic;
         this.seq = seq;
         handshaked.set(true);

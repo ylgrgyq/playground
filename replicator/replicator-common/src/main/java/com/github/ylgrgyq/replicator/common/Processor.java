@@ -1,5 +1,5 @@
 package com.github.ylgrgyq.replicator.common;
 
-public interface Processor<T extends RemotingCommand> {
-    void process(T cmd);
+public interface Processor<T> {
+    void process(Context ctx, T cmd);
 }

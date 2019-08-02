@@ -20,6 +20,7 @@ import java.util.stream.Collectors;
 
 public class ReplicatorClientImpl implements ReplicatorClient {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorClientImpl.class);
+    private static NamedThreadFactory workerFactory = new NamedThreadFactory("ReplicatorClientWorker");
 
     private final ReplicatorClientOptions options;
     private final EventLoopGroup group;
@@ -46,7 +47,7 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         this.suspend = false;
         this.stateMachineCaller = new StateMachineCaller(stateMachine, this);
         this.processor = new CommandProcessor();
-        this.worker = new Thread(new Worker());
+        this.worker = workerFactory.newThread(new Worker());
         registerProcessors();
 
         worker.start();
@@ -135,6 +136,7 @@ public class ReplicatorClientImpl implements ReplicatorClient {
             return;
         }
         stop = true;
+        taskQueue.offer(new WakeUpTask());
         worker.join();
 
         if (remotingChannel != null) {
@@ -182,8 +184,7 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         processor.registerResponseProcessor(MessageType.HANDSHAKE, new HandshakeResponseProcessor());
         processor.registerResponseProcessor(MessageType.FETCH_LOGS, new FetchLogsResponseProcessor());
         processor.registerResponseProcessor(MessageType.FETCH_SNAPSHOT, new FetchSnapshotResponseProcessor());
-        processor.registerResponseProcessor(MessageType.ERROR, cmd -> {
-            ErrorInfo errorInfo = cmd.getBody();
+        processor.registerResponseProcessor(MessageType.ERROR, (Context ctx, ErrorInfo errorInfo) -> {
             if (errorInfo.getErrorCode() == 10001) {
                 requestSnapshot();
             } else {
@@ -220,7 +221,8 @@ public class ReplicatorClientImpl implements ReplicatorClient {
 
         @Override
         public void run() {
-            processor.process(cmd);
+            Context context = new RemotingContext(remotingChannel, cmd);
+            processor.process(context, cmd);
         }
     }
 
@@ -255,6 +257,22 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
+    private class WakeUpTask extends Task {
+        @Override
+        public long getDelay(TimeUnit unit) {
+            return 0;
+        }
+
+        @Override
+        public int compareTo(Delayed o) {
+            return -1;
+        }
+
+        @Override
+        public void run() {
+        }
+    }
+
     private class Worker implements Runnable {
         @Override
         public void run() {
@@ -272,9 +290,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class HandshakeResponseProcessor implements Processor<ResponseCommand> {
+    private class HandshakeResponseProcessor implements Processor<FetchSnapshotResponse> {
         @Override
-        public void process(ResponseCommand cmd) {
+        public void process(Context ctx, FetchSnapshotResponse cmd) {
             Snapshot lastSnapshot = snapshotManager.getLastSnapshot();
             if (lastSnapshot != null && lastSnapshot.getId() > lastId) {
                 handleApplySnapshot(lastSnapshot);
@@ -284,10 +302,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class FetchLogsResponseProcessor implements Processor<ResponseCommand> {
+    private class FetchLogsResponseProcessor implements Processor<FetchLogsResponse> {
         @Override
-        public void process(ResponseCommand cmd) {
-            FetchLogsResponse req = cmd.getBody();
+        public void process(Context ctx, FetchLogsResponse req) {
             BatchLogEntries logs = req.getLogs();
 
             List<com.github.ylgrgyq.replicator.proto.LogEntry> entryList = logs.getEntriesList();
@@ -318,10 +335,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class FetchSnapshotResponseProcessor implements Processor<ResponseCommand> {
+    private class FetchSnapshotResponseProcessor implements Processor<FetchSnapshotResponse> {
         @Override
-        public void process(ResponseCommand cmd) {
-            FetchSnapshotResponse response = cmd.getBody();
+        public void process(Context ctx, FetchSnapshotResponse response) {
             Snapshot snapshot = response.getSnapshot();
             handleApplySnapshot(snapshot);
         }
