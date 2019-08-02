@@ -2,7 +2,7 @@ package com.github.ylgrgyq.replicator.server;
 
 import com.github.ylgrgyq.replicator.common.ReplicatorDecoder;
 import com.github.ylgrgyq.replicator.common.ReplicatorEncoder;
-import com.github.ylgrgyq.replicator.server.connection.websocket.ReplicatorServerHandler;
+import com.github.ylgrgyq.replicator.server.connection.tcp.ReplicatorServerHandler;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceGroups;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;

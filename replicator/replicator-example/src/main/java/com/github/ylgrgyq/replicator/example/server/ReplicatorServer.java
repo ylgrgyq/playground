@@ -3,7 +3,7 @@ package com.github.ylgrgyq.replicator.example.server;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
-import com.github.ylgrgyq.replicator.server.connection.websocket.NettyReplicateChannel;
+import com.github.ylgrgyq.replicator.server.connection.tcp.NettyReplicateChannel;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.StorageOptions;

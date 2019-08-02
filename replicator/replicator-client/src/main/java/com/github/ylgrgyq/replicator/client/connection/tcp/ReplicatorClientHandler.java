@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.client.connection.websocket;
+package com.github.ylgrgyq.replicator.client.connection.tcp;
 
 import com.github.ylgrgyq.replicator.client.*;
 import com.github.ylgrgyq.replicator.common.*;
