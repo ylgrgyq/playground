@@ -27,7 +27,7 @@ public class ReplicatorClientImpl implements ReplicatorClient {
     private final String topic;
     private final StateMachineCaller stateMachineCaller;
     private final SnapshotManager snapshotManager;
-    private final CommandProcessor processor;
+    private final CommandProcessor<RemotingContext> processor;
     private final BlockingQueue<Task> taskQueue = new DelayQueue<>();
     private final Thread worker;
 
@@ -46,7 +46,7 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         this.snapshotManager = new SnapshotManager(options);
         this.suspend = false;
         this.stateMachineCaller = new StateMachineCaller(stateMachine, this);
-        this.processor = new CommandProcessor();
+        this.processor = new CommandProcessor<>();
         this.worker = workerFactory.newThread(new Worker());
         registerProcessors();
 
@@ -221,7 +221,7 @@ public class ReplicatorClientImpl implements ReplicatorClient {
 
         @Override
         public void run() {
-            Context context = new RemotingContext(remotingChannel, cmd);
+            RemotingContext context = new RemotingContext(remotingChannel, cmd);
             processor.process(context, cmd);
         }
     }
@@ -290,9 +290,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class HandshakeResponseProcessor implements Processor<FetchSnapshotResponse> {
+    private class HandshakeResponseProcessor implements Processor<RemotingContext, FetchSnapshotResponse> {
         @Override
-        public void process(Context ctx, FetchSnapshotResponse cmd) {
+        public void process(RemotingContext ctx, FetchSnapshotResponse cmd) {
             Snapshot lastSnapshot = snapshotManager.getLastSnapshot();
             if (lastSnapshot != null && lastSnapshot.getId() > lastId) {
                 handleApplySnapshot(lastSnapshot);
@@ -302,9 +302,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class FetchLogsResponseProcessor implements Processor<FetchLogsResponse> {
+    private class FetchLogsResponseProcessor implements Processor<RemotingContext, FetchLogsResponse> {
         @Override
-        public void process(Context ctx, FetchLogsResponse req) {
+        public void process(RemotingContext ctx, FetchLogsResponse req) {
             BatchLogEntries logs = req.getLogs();
 
             List<com.github.ylgrgyq.replicator.proto.LogEntry> entryList = logs.getEntriesList();
@@ -335,9 +335,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class FetchSnapshotResponseProcessor implements Processor<FetchSnapshotResponse> {
+    private class FetchSnapshotResponseProcessor implements Processor<RemotingContext, FetchSnapshotResponse> {
         @Override
-        public void process(Context ctx, FetchSnapshotResponse response) {
+        public void process(RemotingContext ctx, FetchSnapshotResponse response) {
             Snapshot snapshot = response.getSnapshot();
             handleApplySnapshot(snapshot);
         }

@@ -10,7 +10,7 @@ public class RemotingContext implements Context{
     }
 
     @Override
-    public MessageType getMessageType() {
+    public MessageType getRemotingCommandMessageType() {
         return command.getMessageType();
     }
 
@@ -21,5 +21,7 @@ public class RemotingContext implements Context{
         channel.writeRemoting(resp);
     }
 
-
+    protected ReplicateChannel getChannel() {
+        return channel;
+    }
 }

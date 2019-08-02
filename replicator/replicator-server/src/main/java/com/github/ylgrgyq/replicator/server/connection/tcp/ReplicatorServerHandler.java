@@ -4,9 +4,8 @@ import com.github.ylgrgyq.replicator.common.NettyReplicateChannel;
 import com.github.ylgrgyq.replicator.common.RemotingCommand;
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
-import com.github.ylgrgyq.replicator.proto.HandshakeRequest;
 import com.github.ylgrgyq.replicator.server.Replica;
-import com.github.ylgrgyq.replicator.server.sequence.Sequence;
+import com.github.ylgrgyq.replicator.server.ReplicatorServer;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceGroups;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -16,12 +15,12 @@ import org.slf4j.LoggerFactory;
 
 public class ReplicatorServerHandler extends SimpleChannelInboundHandler<RemotingCommand> {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorServerHandler.class);
-    private SequenceGroups groups;
+    private final ReplicatorServer server;
     private Replica replica;
     private NettyReplicateChannel channel;
 
-    public ReplicatorServerHandler(SequenceGroups groups) {
-        this.groups = groups;
+    public ReplicatorServerHandler(ReplicatorServer server) {
+        this.server = server;
     }
 
     @Override
@@ -33,31 +32,7 @@ public class ReplicatorServerHandler extends SimpleChannelInboundHandler<Remotin
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand cmd) throws Exception {
-        try {
-            switch (cmd.getMessageType()) {
-                case HANDSHAKE:
-                    HandshakeRequest handshake = cmd.getBody();
-                    String topic = handshake.getTopic();
-
-                    logger.info("handshake on topic: {} {}", topic, cmd);
-
-                    Sequence seq = groups.getSequence(topic);
-                    if (seq == null) {
-                        channel.writeError(ReplicatorError.ETOPIC_NOT_FOUND);
-                    }
-
-                    replica.onStart(topic, seq, cmd);
-                    break;
-                case FETCH_LOGS:
-                    replica.handleFetchLogs(cmd);
-                    break;
-                case FETCH_SNAPSHOT:
-                    replica.handleFetchSnapshot(cmd);
-                    break;
-            }
-        } catch (ReplicatorException ex) {
-            channel.writeError(ex.getError());
-        }
+        server.onReceiveRemotingMsg(channel, replica, cmd);
     }
 
     @Override

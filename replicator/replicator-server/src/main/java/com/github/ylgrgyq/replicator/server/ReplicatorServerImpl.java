@@ -1,12 +1,11 @@
 package com.github.ylgrgyq.replicator.server;
 
-import com.github.ylgrgyq.replicator.common.ReplicatorDecoder;
-import com.github.ylgrgyq.replicator.common.ReplicatorEncoder;
+import com.github.ylgrgyq.replicator.common.*;
+import com.github.ylgrgyq.replicator.proto.FetchLogsRequest;
+import com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest;
+import com.github.ylgrgyq.replicator.proto.HandshakeRequest;
 import com.github.ylgrgyq.replicator.server.connection.tcp.ReplicatorServerHandler;
-import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
-import com.github.ylgrgyq.replicator.server.sequence.SequenceGroups;
-import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
-import com.github.ylgrgyq.replicator.server.sequence.SequenceReader;
+import com.github.ylgrgyq.replicator.server.sequence.*;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
 import com.github.ylgrgyq.replicator.server.storage.StorageFactory;
 import com.github.ylgrgyq.replicator.server.storage.StorageHandle;
@@ -28,6 +27,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
     private EventLoopGroup bossGroup;
     private EventLoopGroup workerGroup;
     private Storage<? extends StorageHandle> storage;
+    private CommandProcessor<ReplicatorRemotingContext> processor;
 
     public ReplicatorServerImpl(ReplicatorServerOptions options) throws InterruptedException {
         this.groups = new SequenceGroups(options);
@@ -35,8 +35,16 @@ public class ReplicatorServerImpl implements ReplicatorServer {
         this.bossGroup = options.getBossEventLoopGroup();
         this.workerGroup = options.getWorkerEventLoopGroup();
         this.storage = StorageFactory.createStorage(options.getStorageOptions());
+        this.processor = new CommandProcessor<>();
 
+        registerProcessors();
         initServer();
+    }
+
+    private void registerProcessors() {
+        processor.registerRequestProcessor(MessageType.HANDSHAKE, new HandshakeRequestProcessor());
+        processor.registerRequestProcessor(MessageType.FETCH_LOGS, new FetchLogsRequestProcessor());
+        processor.registerRequestProcessor(MessageType.FETCH_SNAPSHOT, new FetchSnapshotRequestProcessor());
     }
 
     private void initServer() throws InterruptedException {
@@ -51,11 +59,17 @@ public class ReplicatorServerImpl implements ReplicatorServer {
                 pipeline.addLast(new ReplicatorEncoder());
                 pipeline.addLast(new ReplicatorDecoder());
                 pipeline.addLast(new IdleStateHandler(options.getConnectionReadTimeoutSecs(), 0, 0));
-                pipeline.addLast(new ReplicatorServerHandler(groups));
+                pipeline.addLast(new ReplicatorServerHandler(ReplicatorServerImpl.this));
             }
         });
 
         bootstrap.bind(options.getHost(), options.getPort()).sync();
+    }
+
+    @Override
+    public void onReceiveRemotingMsg(ReplicateChannel channel, Replica replica, RemotingCommand cmd) {
+        ReplicatorRemotingContext ctx = new ReplicatorRemotingContext(channel, cmd, replica);
+        processor.process(ctx, cmd);
     }
 
     @Override
@@ -90,5 +104,33 @@ public class ReplicatorServerImpl implements ReplicatorServer {
         }
 
         storage.shutdown();
+    }
+
+    private class HandshakeRequestProcessor implements Processor<ReplicatorRemotingContext, HandshakeRequest> {
+        @Override
+        public void process(ReplicatorRemotingContext ctx, HandshakeRequest handshake) {
+            String topic = handshake.getTopic();
+
+            Sequence seq = groups.getSequence(topic);
+            if (seq == null) {
+                ctx.sendError(ReplicatorError.ETOPIC_NOT_FOUND);
+            }
+
+            ctx.getReplica().onStart(ctx, topic, seq);
+        }
+    }
+
+    private class FetchLogsRequestProcessor implements  Processor<ReplicatorRemotingContext, FetchLogsRequest> {
+        @Override
+        public void process(ReplicatorRemotingContext ctx, FetchLogsRequest cmd) {
+            ctx.getReplica().handleFetchLogs(ctx, cmd);
+        }
+    }
+
+    private class FetchSnapshotRequestProcessor implements Processor<ReplicatorRemotingContext, FetchSnapshotRequest> {
+        @Override
+        public void process(ReplicatorRemotingContext ctx, FetchSnapshotRequest cmd) {
+            ctx.getReplica().handleFetchSnapshot(ctx);
+        }
     }
 }

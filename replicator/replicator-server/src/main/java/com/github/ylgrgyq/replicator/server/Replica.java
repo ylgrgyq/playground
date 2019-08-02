@@ -23,25 +23,21 @@ public class Replica implements ReplicateRequestHandler {
     }
 
     @Override
-    public void onStart(String topic, Sequence seq, RemotingCommand cmd) {
-        ResponseCommand res = CommandFactory.createResponse(cmd);
+    public void onStart(ReplicatorRemotingContext ctx, String topic, Sequence seq) {
         this.topic = topic;
         this.seq = seq;
         handshaked.set(true);
 
         HandshakeResponse handshake = HandshakeResponse.newBuilder().build();
-        res.setResponseObject(handshake);
 
-        channel.writeRemoting(res);
+        ctx.sendResponse(handshake);
     }
 
     @Override
-    public void handleFetchLogs(RemotingCommand cmd) {
+    public void handleFetchLogs(ReplicatorRemotingContext ctx, FetchLogsRequest fetchLogs) {
         if (!checkHandshakeState()) {
             return;
         }
-
-        FetchLogsRequest fetchLogs = cmd.getBody();
 
         logger.debug("Got fetch logs request: {}", fetchLogs);
 
@@ -49,22 +45,16 @@ public class Replica implements ReplicateRequestHandler {
         int limit = fetchLogs.getLimit();
 
         BatchLogEntries log = seq.getLogs(fromIndex, limit);
-
-        ResponseCommand res = CommandFactory.createResponse((RequestCommand) cmd);
-        res.setMessageType(MessageType.FETCH_LOGS);
-
         FetchLogsResponse r = FetchLogsResponse.newBuilder()
                 .setLogs(log)
                 .build();
 
-        res.setContent(r.toByteArray());
-
         logger.debug("send get resp {} {}", r);
-        channel.writeRemoting(res);
+        ctx.sendResponse(r);
     }
 
     @Override
-    public void handleFetchSnapshot(RemotingCommand cmd) {
+    public void handleFetchSnapshot(ReplicatorRemotingContext ctx) {
         if (!checkHandshakeState()) {
             return;
         }
@@ -72,18 +62,13 @@ public class Replica implements ReplicateRequestHandler {
         logger.info("Got fetch snapshot request");
 
         Snapshot snapshot = seq.getLastSnapshot();
-
         FetchSnapshotResponse r = FetchSnapshotResponse.newBuilder()
                 .setSnapshot(snapshot)
                 .build();
 
-        ResponseCommand res = CommandFactory.createResponse((RequestCommand)cmd);
-        res.setContent(r.toByteArray());
-
         logger.debug("send snapshot resp {}", r);
 
-
-        channel.writeRemoting(res);
+        ctx.sendResponse(r);
     }
 
     @Override

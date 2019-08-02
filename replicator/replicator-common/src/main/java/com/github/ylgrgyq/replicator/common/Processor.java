@@ -1,5 +1,5 @@
 package com.github.ylgrgyq.replicator.common;
 
-public interface Processor<T> {
-    void process(Context ctx, T cmd);
+public interface Processor<C, T> {
+    void process(C ctx, T cmd);
 }
