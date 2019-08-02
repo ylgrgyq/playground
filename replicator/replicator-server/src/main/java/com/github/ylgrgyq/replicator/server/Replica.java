@@ -43,7 +43,7 @@ public class Replica implements ReplicateRequestHandler {
 
         FetchLogsRequest fetchLogs = cmd.getBody();
 
-        logger.info("Got fetch logs request: {}", fetchLogs);
+        logger.debug("Got fetch logs request: {}", fetchLogs);
 
         long fromIndex = fetchLogs.getFromId();
         int limit = fetchLogs.getLimit();
@@ -59,7 +59,7 @@ public class Replica implements ReplicateRequestHandler {
 
         res.setContent(r.toByteArray());
 
-        logger.info("send get resp {} {}", r);
+        logger.debug("send get resp {} {}", r);
         channel.writeRemoting(res);
     }
 

@@ -19,6 +19,7 @@ public class ReplicatorClientOptions {
     private final int connectionTimeoutMillis;
     private final boolean saveSnapshotSynchronously;
     private final int maxSnapshotsToKeep;
+    private final int fetchLogsBatchSize;
 
     private ReplicatorClientOptions(ReplicatorClientOptionsBuilder builder) {
         this.uri = builder.uri;
@@ -31,6 +32,7 @@ public class ReplicatorClientOptions {
         this.snapshotStoragePath = builder.snapshotStoragePath;
         this.saveSnapshotSynchronously = builder.saveSnapshotSynchronously == null ? false : builder.saveSnapshotSynchronously;
         this.maxSnapshotsToKeep = builder.maxSnapshotsToKeep == null ? 5 : builder.maxSnapshotsToKeep;
+        this.fetchLogsBatchSize = builder.fetchLogsBatchSize == null ? 100 : builder.fetchLogsBatchSize;
     }
 
     public int getPort() {
@@ -73,6 +75,10 @@ public class ReplicatorClientOptions {
         return maxSnapshotsToKeep;
     }
 
+    public int getFetchLogsBatchSize() {
+        return fetchLogsBatchSize;
+    }
+
     public static ReplicatorClientOptionsBuilder builder() {
         return new ReplicatorClientOptionsBuilder();
     }
@@ -86,6 +92,7 @@ public class ReplicatorClientOptions {
         private Path snapshotStoragePath;
         private Boolean saveSnapshotSynchronously;
         private Integer maxSnapshotsToKeep;
+        private Integer fetchLogsBatchSize;
 
         public ReplicatorClientOptionsBuilder setReconnectDelay(long reconnectDelay, TimeUnit unit) {
             Preconditions.checkArgument(reconnectDelay > 0);
@@ -146,6 +153,11 @@ public class ReplicatorClientOptions {
 
         public ReplicatorClientOptionsBuilder setSaveSnapshotSynchronously(boolean saveSnapshotSynchronously) {
             this.saveSnapshotSynchronously = saveSnapshotSynchronously;
+            return this;
+        }
+
+        public ReplicatorClientOptionsBuilder setFetchLogsBatchSize(int fetchLogsBatchSize) {
+            this.fetchLogsBatchSize = fetchLogsBatchSize;
             return this;
         }
 

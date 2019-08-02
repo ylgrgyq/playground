@@ -51,7 +51,7 @@ public class ReplicatorServer {
                                             , StandardCharsets.UTF_8))
                                     .build();
                         })
-                        .setGenerateSnapshotInterval(3, TimeUnit.SECONDS)
+                        .setGenerateSnapshotInterval(30, TimeUnit.SECONDS)
                         .build();
                 SequenceAppender appender = server.createSequence("hahaha", sequenceOptions);
                 for (; nexId.get() < 1000L; nexId.incrementAndGet()) {

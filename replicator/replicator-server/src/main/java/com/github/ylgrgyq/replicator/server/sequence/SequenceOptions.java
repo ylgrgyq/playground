@@ -12,7 +12,7 @@ public final class SequenceOptions {
     private final long generateSnapshotIntervalSecs;
 
     private SequenceOptions(SequenceOptionsBuilder builder) {
-        this.generateSnapshotIntervalSecs = builder.generateSnapshotIntervalSecs == null ? 10 : builder.generateSnapshotIntervalSecs;
+        this.generateSnapshotIntervalSecs = builder.generateSnapshotIntervalSecs == null ? 30 : builder.generateSnapshotIntervalSecs;
         this.snapshotGenerator = builder.snapshotGenerator;
     }
 

@@ -184,9 +184,7 @@ public class ReplicatorClientImpl implements ReplicatorClient {
 
     @Override
     public void onRetryFetchLogs() {
-        taskQueue.offer(new DelayedTask(() ->
-                requestLogs(lastId)
-        ));
+        taskQueue.offer(new DelayedTask(this::requestLogs));
     }
 
     @Override
@@ -371,10 +369,12 @@ public class ReplicatorClientImpl implements ReplicatorClient {
                                                 suspend = false;
                                             }
                                             lastId = snapshotId;
-                                            requestLogs(lastId);
+                                            requestLogs();
                                         }));
                             }
                         });
+            } else {
+                requestLogs();
             }
         } catch (IOException ex) {
             logger.error("Apply snapshot with id: {} failed", snapshot.getId());
@@ -398,20 +398,20 @@ public class ReplicatorClientImpl implements ReplicatorClient {
                                         suspend = false;
                                     }
                                     assert pendingApplyLogsRequestCount >= 0 : pendingApplyLogsRequestCount;
-                                    requestLogs(lastId);
+                                    requestLogs();
                                 }));
                     }
                 });
     }
 
-    private void requestLogs(long fromId) {
+    private void requestLogs() {
         if (suspend) {
             return;
         }
 
         FetchLogsRequest fetchLogs = FetchLogsRequest.newBuilder()
-                .setFromId(fromId)
-                .setLimit(100)
+                .setFromId(lastId)
+                .setLimit(options.getFetchLogsBatchSize())
                 .build();
 
         RequestCommand req = CommandFactory.createRequest();

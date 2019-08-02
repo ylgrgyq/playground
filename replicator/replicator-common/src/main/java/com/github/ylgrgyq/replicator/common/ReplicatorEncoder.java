@@ -36,11 +36,15 @@ public class ReplicatorEncoder extends MessageToByteEncoder<RemotingCommand> {
             switch (msg.getCommandType()) {
                 case REQUEST:
                 case ONE_WAY:
-                    logger.info("Send request {} {}", msg.getMessageType().name(), msg.getBody());
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Send request {} {}", msg.getMessageType().name(), msg.getBody());
+                    }
                     serializer.serialize((RequestCommand) msg);
                     break;
                 case RESPONSE:
-                    logger.info("Send response {} {}", msg.getMessageType().name(), msg.getBody());
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("Send response {} {}", msg.getMessageType().name(), msg.getBody());
+                    }
                     serializer.serialize((ResponseCommand) msg);
                     break;
             }
