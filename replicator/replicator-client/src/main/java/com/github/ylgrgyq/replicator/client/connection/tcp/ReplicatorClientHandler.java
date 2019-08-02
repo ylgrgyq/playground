@@ -35,13 +35,13 @@ public class ReplicatorClientHandler extends SimpleChannelInboundHandler<Remotin
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
         if (evt instanceof IdleStateEvent) {
-            client.onRetryFetchLogs();
+            client.onReceiveRemotingMsgTimeout();
         }
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
-        client.onChannelActive(new NettyReplicateChannel(ctx.channel()));
+        client.onStart(new NettyReplicateChannel(ctx.channel()));
 
     }
 }

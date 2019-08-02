@@ -1,15 +1,14 @@
 package com.github.ylgrgyq.replicator.client;
 
 import com.github.ylgrgyq.replicator.common.RemotingCommand;
-
-import java.util.concurrent.CompletableFuture;
+import com.github.ylgrgyq.replicator.common.ReplicateChannel;
 
 public interface ReplicatorClient {
-    CompletableFuture<Void> start();
-    CompletableFuture<Void> shutdown();
-    void onChannelActive(NettyReplicateChannel channel);
-    void onRetryFetchLogs();
+    void onStart(ReplicateChannel channel);
+
+    void onReceiveRemotingMsgTimeout();
+
     void onReceiveRemotingMsg(RemotingCommand cmd);
 
-
+    void shutdown() throws Exception;
 }

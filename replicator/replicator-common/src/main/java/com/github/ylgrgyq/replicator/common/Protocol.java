@@ -20,4 +20,10 @@ public class Protocol {
     public static int getResponseHeaderLength() {
         return Protocol.RESPONSE_HEADER_LEN;
     }
+
+    public static Serializer serializer = new ReplicatorSerializer();
+
+    public static Serializer getSerializer() {
+        return serializer;
+    }
 }

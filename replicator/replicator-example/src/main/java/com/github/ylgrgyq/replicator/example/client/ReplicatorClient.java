@@ -10,7 +10,6 @@ import java.io.File;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
@@ -45,20 +44,13 @@ public class ReplicatorClient {
             }
         }, options);
 
-
-        CompletableFuture<Void> f = client.start();
-        f.exceptionally(t -> {
-            logger.error("connect to server failed", t);
-            return null;
-        });
-
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
-                client.shutdown().get();
+                client.shutdown();
                 logger.info("client shutdown");
             } catch (InterruptedException ex) {
                 logger.error("Client graceful shutdown was interrupted");
-            } catch (ExecutionException ex) {
+            } catch (Exception ex) {
                 logger.error("Client graceful shutdown got unexpected exception", ex);
             }
         }));

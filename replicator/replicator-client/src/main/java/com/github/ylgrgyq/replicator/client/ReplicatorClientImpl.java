@@ -23,48 +23,41 @@ public class ReplicatorClientImpl implements ReplicatorClient {
 
     private final ReplicatorClientOptions options;
     private final EventLoopGroup group;
+    private final String topic;
+    private final StateMachineCaller stateMachineCaller;
+    private final SnapshotManager snapshotManager;
+    private final CommandProcessor processor;
+    private final BlockingQueue<Task> taskQueue = new DelayQueue<>();
+    private final Thread worker;
+
     private volatile boolean stop;
-    private Channel channel;
-    private String topic;
-    private StateMachineCaller stateMachineCaller;
-    private CompletableFuture<Void> terminationFuture;
-    private SnapshotManager snapshotManager;
-    private CommandProcessor processor;
     private volatile long lastId;
     private volatile boolean suspend;
+    private volatile ReplicateChannel remotingChannel;
     private int pendingApplyLogsRequestCount;
-    private NettyReplicateChannel remotingChannel;
-    private BlockingQueue<Task> taskQueue = new DelayQueue<>();
-    private Thread worker;
 
-
-    public ReplicatorClientImpl(String topic, StateMachine stateMachine, ReplicatorClientOptions options) throws IOException {
-        super();
+    public ReplicatorClientImpl(String topic, StateMachine stateMachine, ReplicatorClientOptions options)
+            throws IOException, InterruptedException {
         this.topic = topic;
         this.options = options;
         this.group = new NioEventLoopGroup();
         this.stop = false;
-        this.stateMachineCaller = new StateMachineCaller(stateMachine, this);
         this.snapshotManager = new SnapshotManager(options);
-
         this.suspend = false;
+        this.stateMachineCaller = new StateMachineCaller(stateMachine, this);
         this.processor = new CommandProcessor();
         this.worker = new Thread(new Worker());
         registerProcessors();
-    }
-
-    @Override
-    public CompletableFuture<Void> start() {
-        if (stop) {
-            CompletableFuture<Void> f = new CompletableFuture<>();
-            f.completeExceptionally(new ReplicatorException(ReplicatorError.ECLIENT_ALREADY_SHUTDOWN));
-            return f;
-        }
 
         worker.start();
-        stateMachineCaller.start();
 
-        return connect();
+        CompletableFuture<Void> future = connect();
+        // wait first connection success
+        try {
+            future.get();
+        } catch (ExecutionException ex) {
+            throw new ReplicatorException(ex);
+        }
     }
 
     private CompletableFuture<Void> connect() {
@@ -90,7 +83,7 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         logger.info("start connecting to {}:{}...", options.getHost(), options.getPort());
         bootstrap.connect(options.getHost(), options.getPort()).addListener((ChannelFuture f) -> {
             if (f.isSuccess()) {
-                channel = f.channel();
+                Channel channel = f.channel();
                 channel.closeFuture().addListener(closeFuture -> {
                     logger.info("connection with {}:{} broken.", options.getHost(), options.getPort());
 
@@ -137,39 +130,28 @@ public class ReplicatorClientImpl implements ReplicatorClient {
     }
 
     @Override
-    public synchronized CompletableFuture<Void> shutdown() {
+    public void shutdown() throws Exception {
         if (stop) {
-            return terminationFuture;
+            return;
         }
-
         stop = true;
-        terminationFuture = new CompletableFuture<>();
+        worker.join();
 
-        if (channel != null) {
-            channel.close();
+        if (remotingChannel != null) {
+            remotingChannel.close();
         }
-        group.shutdownGracefully();
-        group.terminationFuture().addListener(f -> {
-            if (f.isSuccess()) {
-                stateMachineCaller.shutdown()
-                        .whenComplete((ret, ex) -> {
-                            if (ex != null) {
-                                terminationFuture.completeExceptionally(ex);
-                            } else {
-                                terminationFuture.complete(null);
-                            }
-                        });
-            } else {
-                terminationFuture.completeExceptionally(f.cause());
-            }
-        });
 
-        return terminationFuture;
+        group.shutdownGracefully();
+        stateMachineCaller.shutdown();
     }
 
     @Override
-    public void onChannelActive(NettyReplicateChannel channel) {
-        this.remotingChannel = channel;
+    public void onStart(ReplicateChannel channel) {
+        if (remotingChannel != null) {
+            remotingChannel.close();
+        }
+
+        remotingChannel = channel;
 
         RequestCommand req = CommandFactory.createRequest();
         req.setMessageType(MessageType.HANDSHAKE);
@@ -183,13 +165,17 @@ public class ReplicatorClientImpl implements ReplicatorClient {
     }
 
     @Override
-    public void onRetryFetchLogs() {
-        taskQueue.offer(new DelayedTask(this::requestLogs));
+    public void onReceiveRemotingMsgTimeout() {
+        if (!stop) {
+            taskQueue.offer(new DelayedTask(this::requestLogs));
+        }
     }
 
     @Override
     public void onReceiveRemotingMsg(RemotingCommand cmd) {
-        taskQueue.offer(new ProcessRemotingCommandTask(cmd));
+        if (!stop) {
+            taskQueue.offer(new ProcessRemotingCommandTask(cmd));
+        }
     }
 
     private void registerProcessors() {
@@ -405,7 +391,7 @@ public class ReplicatorClientImpl implements ReplicatorClient {
     }
 
     private void requestLogs() {
-        if (suspend) {
+        if (suspend || stop) {
             return;
         }
 

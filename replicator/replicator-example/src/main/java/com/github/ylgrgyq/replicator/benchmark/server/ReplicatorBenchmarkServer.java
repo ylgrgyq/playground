@@ -4,7 +4,6 @@ import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.server.ReplicatorServer;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
-import com.github.ylgrgyq.replicator.server.connection.tcp.NettyReplicateChannel;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.StorageOptions;
@@ -17,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
 public class ReplicatorBenchmarkServer {
-    private static final Logger logger = LoggerFactory.getLogger(NettyReplicateChannel.class);
+    private static final Logger logger = LoggerFactory.getLogger(ReplicatorBenchmarkServer.class);
 
     public static void main(String[] args) throws Exception {
         String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +

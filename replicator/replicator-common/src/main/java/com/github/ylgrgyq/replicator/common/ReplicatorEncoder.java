@@ -9,12 +9,6 @@ import org.slf4j.LoggerFactory;
 public class ReplicatorEncoder extends MessageToByteEncoder<RemotingCommand> {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorEncoder.class);
 
-    private Serializer serializer;
-
-    public ReplicatorEncoder() {
-        this.serializer = new ReplicatorSerializer();
-    }
-
     @Override
     protected void encode(ChannelHandlerContext ctx, RemotingCommand msg, ByteBuf out) throws Exception {
         try {
@@ -39,13 +33,13 @@ public class ReplicatorEncoder extends MessageToByteEncoder<RemotingCommand> {
                     if (logger.isDebugEnabled()) {
                         logger.debug("Send request {} {}", msg.getMessageType().name(), msg.getBody());
                     }
-                    serializer.serialize((RequestCommand) msg);
+                    Protocol.getSerializer().serialize((RequestCommand) msg);
                     break;
                 case RESPONSE:
                     if (logger.isDebugEnabled()) {
                         logger.debug("Send response {} {}", msg.getMessageType().name(), msg.getBody());
                     }
-                    serializer.serialize((ResponseCommand) msg);
+                    Protocol.getSerializer().serialize((ResponseCommand) msg);
                     break;
             }
 

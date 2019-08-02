@@ -43,6 +43,9 @@ public class ReplicatorSerializer implements Serializer {
                         req = FetchSnapshotRequest.parseFrom(content);
                     }
                     break;
+                default:
+                    cmd.setMessageType(MessageType.UNKNOWN);
+                    break;
             }
 
             cmd.setRequestObject(req);

@@ -1,6 +1,5 @@
-package com.github.ylgrgyq.replicator.client;
+package com.github.ylgrgyq.replicator.common;
 
-import com.github.ylgrgyq.replicator.common.*;
 import com.github.ylgrgyq.replicator.proto.ErrorInfo;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
@@ -32,5 +31,12 @@ public class NettyReplicateChannel implements ReplicateChannel{
 
         logger.debug("send error {}", errorInfo);
         socket.writeAndFlush(req);
+    }
+
+    @Override
+    public void close() {
+        if (socket.isActive()) {
+            socket.close();
+        }
     }
 }

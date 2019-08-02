@@ -29,20 +29,15 @@ public class ReplicatorBenchmarkClient {
         long logsCount = 1000000;
         for (int i = 1; i <= 5; ++i) {
             TestingStateMachine stateMachine = new TestingStateMachine(logsCount);
-            ReplicatorClientImpl client = new ReplicatorClientImpl("benchmark", stateMachine, options);
             long start = System.nanoTime();
-            CompletableFuture<Void> f = client.start();
-            f.exceptionally(t -> {
-                logger.error("connect to server failed", t);
-                return null;
-            });
+            ReplicatorClientImpl client = new ReplicatorClientImpl("benchmark", stateMachine, options);
 
             stateMachine.waitComplete();
             long duration = System.nanoTime() - start;
             logger.info("Test finished for the {} round.", i);
             logger.info("Synced {} logs in {} milliseconds.", logsCount, TimeUnit.NANOSECONDS.toMillis(duration));
 
-            client.shutdown().get();
+            client.shutdown();
 
             Thread.sleep(2000);
 

@@ -3,7 +3,6 @@ package com.github.ylgrgyq.replicator.example.server;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
-import com.github.ylgrgyq.replicator.server.connection.tcp.NettyReplicateChannel;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.StorageOptions;
@@ -19,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class ReplicatorServer {
-    private static final Logger logger = LoggerFactory.getLogger(NettyReplicateChannel.class);
+    private static final Logger logger = LoggerFactory.getLogger(ReplicatorServer.class);
 
     public static void main(String[] args) throws Exception {
         String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +

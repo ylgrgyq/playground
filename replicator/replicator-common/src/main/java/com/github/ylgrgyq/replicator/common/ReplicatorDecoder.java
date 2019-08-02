@@ -15,12 +15,6 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
 
     private static final int lessLen = Math.min(Protocol.getResponseHeaderLength(), Protocol.getRequestHeaderLength());
 
-    private Serializer serializer;
-
-    public ReplicatorDecoder() {
-        this.serializer = new ReplicatorSerializer();
-    }
-
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
         // the less length between response header and request header
@@ -84,7 +78,7 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
             command.setMessageVersion(msgVersion);
             command.setContent(content);
 
-            serializer.deserialize(command);
+            Protocol.getSerializer().deserialize(command);
             if (logger.isDebugEnabled()) {
                 logger.info("receive request {} {}", MessageType.findMessageTypeByCode(msgTypeCode), command.getBody());
             }
@@ -118,7 +112,7 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
             command.setMessageVersion(msgVersion);
             command.setContent(content);
 
-            serializer.deserialize(command);
+            Protocol.getSerializer().deserialize(command);
             if (logger.isDebugEnabled()) {
                 logger.info("response {} {}", MessageType.findMessageTypeByCode(msgTypeCode), command.getBody());
             }

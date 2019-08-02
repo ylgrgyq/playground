@@ -7,9 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class StateMachineCaller {
     private static final Logger logger = LoggerFactory.getLogger(StateMachineCaller.class);
@@ -17,17 +17,32 @@ public class StateMachineCaller {
     private final StateMachine stateMachine;
     private final BlockingQueue<Job> jobQueue;
     private final ReplicatorClientImpl client;
+    private final Thread worker;
     private volatile boolean stop;
-    private CompletableFuture<Void> terminationFuture;
-    private Job shutdownJob;
-
 
     StateMachineCaller(StateMachine stateMachine, ReplicatorClientImpl client) {
         this.stop = false;
         this.stateMachine = stateMachine;
         this.client = client;
-        this.jobQueue = new ArrayBlockingQueue<>(1000);
+        this.jobQueue = new LinkedBlockingQueue<>();
+        this.worker = new Thread(() -> {
+            while (!stop) {
+                try {
+                    Job job = jobQueue.take();
+                    try {
+                        job.run();
+                        job.success();
+                    } catch (Throwable ex) {
+                        handleExecuteJobFailed(job, ex);
+                    }
+                } catch (Exception ex) {
+                    logger.error("got unexpected exception while running job");
+                }
+            }
+        });
 
+        this.worker.setName("State-Machine-Caller-Worker");
+        this.worker.start();
     }
 
     public CompletableFuture<Void> applySnapshot(Snapshot snapshot) {
@@ -58,7 +73,7 @@ public class StateMachineCaller {
         return future;
     }
 
-    CompletableFuture<Void> resetStateMachine(){
+    CompletableFuture<Void> resetStateMachine() {
         CompletableFuture<Void> future = new CompletableFuture<>();
 
         if (stop) {
@@ -72,73 +87,25 @@ public class StateMachineCaller {
         return future;
     }
 
-    void start() {
-        Thread woker = new Thread(() -> {
-            while (!stop) {
-                try {
-                    Job job = jobQueue.take();
-                    try {
-                        job.run();
-                        job.success();
-                    } catch (Throwable ex) {
-                        handleExecuteJobFailed(job, ex);
-                    }
-                } catch (Exception ex) {
-                    logger.error("got unexpected exception while running job");
-                }
-            }
-        });
-
-        woker.setName("State-Machine-Caller-Worker");
-        woker.start();
-    }
-
-    private void handleExecuteJobFailed(Job job, Throwable t) {
+    private void handleExecuteJobFailed(Job job, Throwable t) throws Exception {
         logger.error("process job failed", t);
-        shutdown();
+        stop = true;
         job.fail(new ReplicatorException(ReplicatorError.ESTATEMACHINE_EXECUTION_ERROR, t));
-        while ((job = jobQueue.poll()) != null) {
-            if (job != shutdownJob) {
-                job.fail(new ReplicatorException(ReplicatorError.ECLIENT_ALREADY_SHUTDOWN));
-            } else {
-                job.success();
-                assert jobQueue.isEmpty();
-            }
-        }
         client.shutdown();
     }
 
-    synchronized CompletableFuture<Void> shutdown() {
+    void shutdown() throws InterruptedException {
         if (stop) {
-            return terminationFuture;
+            return;
         }
-
-        terminationFuture = new CompletableFuture<>();
 
         stop = true;
 
-        shutdownJob = new ReplicatorClientInternalJob(() -> {
-            // do nothing. Because it is only used as a mark which
-            // indicate every job before is executed. So we can
-            // shutdown safely.
-        }, terminationFuture);
+        jobQueue.offer(new ReplicatorClientInternalJob(() -> {
+            // do nothing. it is only used to wake up worker thread.
+        }, new CompletableFuture<>()));
 
-        if (!jobQueue.offer(shutdownJob)) {
-            Thread shutdownHelper = new Thread(() -> {
-                do {
-                    logger.warn("State machine queue is too busy. Try shutdown one second later.");
-                    try {
-                        Thread.sleep(1000);
-                    } catch (Exception ex) {
-                        // ignore
-                    }
-                } while (!jobQueue.offer(shutdownJob));
-            });
-            shutdownHelper.setName("State-Machine-Caller-Shutdown-Helper");
-            shutdownHelper.start();
-        }
-
-        return terminationFuture;
+        worker.join();
     }
 
     private class Job implements Runnable {
