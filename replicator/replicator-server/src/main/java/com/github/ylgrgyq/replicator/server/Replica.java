@@ -1,9 +1,9 @@
 package com.github.ylgrgyq.replicator.server;
 
-import com.github.ylgrgyq.replicator.common.*;
-import com.github.ylgrgyq.replicator.common.MessageType;
+import com.github.ylgrgyq.replicator.common.ReplicateChannel;
+import com.github.ylgrgyq.replicator.common.ReplicatorError;
 import com.github.ylgrgyq.replicator.proto.*;
-import com.github.ylgrgyq.replicator.server.sequence.Sequence;
+import com.github.ylgrgyq.replicator.server.sequence.SequenceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,8 +14,7 @@ public class Replica implements ReplicateRequestHandler {
 
     private AtomicBoolean handshaked;
     private ReplicateChannel channel;
-    private Sequence seq;
-    private String topic;
+    private SequenceImpl seq;
 
     public Replica(ReplicateChannel channel) {
         this.channel = channel;
@@ -23,8 +22,7 @@ public class Replica implements ReplicateRequestHandler {
     }
 
     @Override
-    public void onStart(ReplicatorRemotingContext ctx, String topic, Sequence seq) {
-        this.topic = topic;
+    public void onStart(ReplicatorRemotingContext ctx, SequenceImpl seq) {
         this.seq = seq;
         handshaked.set(true);
 

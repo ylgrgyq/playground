@@ -28,6 +28,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
     private EventLoopGroup workerGroup;
     private Storage<? extends StorageHandle> storage;
     private CommandProcessor<ReplicatorRemotingContext> processor;
+    private volatile boolean stop;
 
     public ReplicatorServerImpl(ReplicatorServerOptions options) throws InterruptedException {
         this.groups = new SequenceGroups(options);
@@ -59,6 +60,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
                 pipeline.addLast(new ReplicatorEncoder());
                 pipeline.addLast(new ReplicatorDecoder());
                 pipeline.addLast(new IdleStateHandler(options.getConnectionReadTimeoutSecs(), 0, 0));
+
                 pipeline.addLast(new ReplicatorServerHandler(ReplicatorServerImpl.this));
             }
         });
@@ -67,7 +69,11 @@ public class ReplicatorServerImpl implements ReplicatorServer {
     }
 
     @Override
-    public void onReceiveRemotingMsg(ReplicateChannel channel, Replica replica, RemotingCommand cmd) {
+    public void onReceiveRemotingCommand(ReplicateChannel channel, Replica replica, RemotingCommand cmd) {
+        if (stop) {
+            return;
+        }
+
         ReplicatorRemotingContext ctx = new ReplicatorRemotingContext(channel, cmd, replica);
         processor.process(ctx, cmd);
     }
@@ -88,7 +94,13 @@ public class ReplicatorServerImpl implements ReplicatorServer {
     }
 
     @Override
-    public void shutdown() throws InterruptedException{
+    public synchronized void shutdown() throws InterruptedException{
+        if (stop) {
+            return;
+        }
+
+        stop = true;
+
         if (options.shouldShutdownBossEventLoopGroup()) {
             bossGroup.shutdownGracefully();
         }
@@ -111,12 +123,12 @@ public class ReplicatorServerImpl implements ReplicatorServer {
         public void process(ReplicatorRemotingContext ctx, HandshakeRequest handshake) {
             String topic = handshake.getTopic();
 
-            Sequence seq = groups.getSequence(topic);
+            SequenceImpl seq = groups.getSequence(topic);
             if (seq == null) {
                 ctx.sendError(ReplicatorError.ETOPIC_NOT_FOUND);
             }
 
-            ctx.getReplica().onStart(ctx, topic, seq);
+            ctx.getReplica().onStart(ctx, seq);
         }
     }
 

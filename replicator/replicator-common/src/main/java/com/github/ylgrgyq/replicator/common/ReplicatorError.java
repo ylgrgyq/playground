@@ -19,6 +19,7 @@ public enum ReplicatorError {
 
     EINTERNAL_ERROR(10009, "Internal error"),
 
+    EALREADY_SHUTDOWN(10010, "Service already shutdown")
     ;
 
 

@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ScheduledExecutorService;
 
 public class SequenceGroups {
-    private final ConcurrentMap<String, Sequence> topicToSource;
+    private final ConcurrentMap<String, SequenceImpl> topicToSource;
     private final ReplicatorServerOptions replicatorServerOptions;
 
     public SequenceGroups(ReplicatorServerOptions replicatorServerOptions) {
@@ -19,8 +19,8 @@ public class SequenceGroups {
         this.replicatorServerOptions = replicatorServerOptions;
     }
 
-    public Sequence getOrCreateSequence(String topic, Storage<? extends StorageHandle> storage, SequenceOptions options) {
-        Sequence sequence = topicToSource.get(topic);
+    public SequenceImpl getOrCreateSequence(String topic, Storage<? extends StorageHandle> storage, SequenceOptions options) {
+        SequenceImpl sequence = topicToSource.get(topic);
         if (sequence == null) {
             synchronized (this) {
                 sequence = topicToSource.get(topic);
@@ -34,27 +34,27 @@ public class SequenceGroups {
         return sequence;
     }
 
-    private Sequence createSequence(String topic, Storage<? extends StorageHandle> storage, SequenceOptions options){
+    private SequenceImpl createSequence(String topic, Storage<? extends StorageHandle> storage, SequenceOptions options){
         SequenceStorage sequenceStorage = storage.createSequenceStorage(topic, options);
         ScheduledExecutorService executor = replicatorServerOptions.getWorkerScheduledExecutor();
-        return new Sequence(topic, executor, sequenceStorage, options);
+        return new SequenceImpl(executor, sequenceStorage, options);
     }
 
     public synchronized void dropSequence(String topic) {
-        Sequence seq = topicToSource.remove(topic);
+        SequenceImpl seq = topicToSource.remove(topic);
         if (seq != null) {
             seq.drop();
 
         }
     }
 
-    public Sequence getSequence(String topic) {
+    public SequenceImpl getSequence(String topic) {
         return topicToSource.get(topic);
     }
 
     public void shutdownAllSequences() throws InterruptedException {
-        for (Map.Entry<String, Sequence> entry : topicToSource.entrySet()){
-            Sequence seq = entry.getValue();
+        for (Map.Entry<String, SequenceImpl> entry : topicToSource.entrySet()){
+            SequenceImpl seq = entry.getValue();
             seq.shutdown();
         }
     }

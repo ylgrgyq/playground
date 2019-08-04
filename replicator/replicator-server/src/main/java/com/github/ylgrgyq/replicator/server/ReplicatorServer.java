@@ -7,7 +7,7 @@ import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceReader;
 
 public interface ReplicatorServer {
-    void onReceiveRemotingMsg(ReplicateChannel channel, Replica replica, RemotingCommand cmd);
+    void onReceiveRemotingCommand(ReplicateChannel channel, Replica replica, RemotingCommand cmd);
     SequenceAppender createSequence(String topic, SequenceOptions options);
     SequenceReader getSequenceReader(String topic);
     void dropSequence(String topic);

@@ -6,7 +6,6 @@ import com.github.ylgrgyq.replicator.common.ReplicatorError;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.server.Replica;
 import com.github.ylgrgyq.replicator.server.ReplicatorServer;
-import com.github.ylgrgyq.replicator.server.sequence.SequenceGroups;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.timeout.IdleStateEvent;
@@ -32,7 +31,7 @@ public class ReplicatorServerHandler extends SimpleChannelInboundHandler<Remotin
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, RemotingCommand cmd) throws Exception {
-        server.onReceiveRemotingMsg(channel, replica, cmd);
+        server.onReceiveRemotingCommand(channel, replica, cmd);
     }
 
     @Override
