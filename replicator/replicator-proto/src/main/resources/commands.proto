@@ -16,23 +16,6 @@ message Snapshot {
     bytes data = 2;
 }
 
-message ErrorInfo {
-    int32 error_code = 1;
-    string error_msg = 2;
-}
-
-message HandshakeRequest{
-    string topic = 1;
-}
-
-message HandshakeResponse {
-}
-
-message FetchLogsRequest {
-    int64 fromId = 1;
-    int32 limit = 2;
-}
-
 message FetchLogsResponse {
     BatchLogEntries logs = 1;
 }
@@ -44,6 +27,3 @@ message FetchSnapshotResponse {
     Snapshot snapshot = 1;
 }
 
-message Error {
-    ErrorInfo error = 1;
-}

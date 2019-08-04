@@ -2,6 +2,8 @@ package com.github.ylgrgyq.replicator.server;
 
 import com.github.ylgrgyq.replicator.common.ReplicateChannel;
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
+import com.github.ylgrgyq.replicator.common.protocol.v1.FetchLogsRequestCommand;
+import com.github.ylgrgyq.replicator.common.protocol.v1.HandshakeResponseCommand;
 import com.github.ylgrgyq.replicator.proto.*;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceImpl;
 import org.slf4j.Logger;
@@ -26,13 +28,13 @@ public class Replica implements ReplicateRequestHandler {
         this.seq = seq;
         handshaked.set(true);
 
-        HandshakeResponse handshake = HandshakeResponse.newBuilder().build();
+        HandshakeResponseCommand handshake = new HandshakeResponseCommand();
 
         ctx.sendResponse(handshake);
     }
 
     @Override
-    public void handleFetchLogs(ReplicatorRemotingContext ctx, FetchLogsRequest fetchLogs) {
+    public void handleFetchLogs(ReplicatorRemotingContext ctx, FetchLogsRequestCommand fetchLogs) {
         if (!checkHandshakeState()) {
             return;
         }

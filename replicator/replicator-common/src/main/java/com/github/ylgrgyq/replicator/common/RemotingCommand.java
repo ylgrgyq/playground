@@ -5,6 +5,9 @@ import com.github.ylgrgyq.replicator.common.exception.SerializationException;
 import com.github.ylgrgyq.replicator.common.protocol.v1.CommandType;
 import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 public abstract class RemotingCommand {
     private final CommandType commandType;
     private final MessageType messageType;
@@ -63,4 +66,25 @@ public abstract class RemotingCommand {
     public abstract void serialize() throws SerializationException;
 
     public abstract void deserialize() throws DeserializationException;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        RemotingCommand that = (RemotingCommand) o;
+        return getMessageVersion() == that.getMessageVersion() &&
+                getCommandType() == that.getCommandType() &&
+                getMessageType() == that.getMessageType();
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getCommandType(), getMessageType(), getMessageVersion());
+    }
+
+    @Override
+    public String toString() {
+        return ", messageVersion=" + messageVersion +
+                ", contentLength=" + contentLength;
+    }
 }

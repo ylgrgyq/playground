@@ -1,6 +1,5 @@
 package com.github.ylgrgyq.replicator.common.protocol.v1;
 
-import com.github.ylgrgyq.replicator.common.CommandFactory;
 import com.github.ylgrgyq.replicator.common.RemotingCommand;
 import com.github.ylgrgyq.replicator.common.RequestCommand;
 import com.github.ylgrgyq.replicator.common.ResponseCommand;

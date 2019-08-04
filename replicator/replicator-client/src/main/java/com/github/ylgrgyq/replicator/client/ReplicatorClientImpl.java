@@ -3,10 +3,7 @@ package com.github.ylgrgyq.replicator.client;
 import com.github.ylgrgyq.replicator.client.connection.tcp.ReplicatorClientHandler;
 import com.github.ylgrgyq.replicator.common.*;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
-import com.github.ylgrgyq.replicator.common.protocol.v1.CommandFactoryManager;
-import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
-import com.github.ylgrgyq.replicator.common.protocol.v1.ReplicatorDecoder;
-import com.github.ylgrgyq.replicator.common.protocol.v1.ReplicatorEncoder;
+import com.github.ylgrgyq.replicator.common.protocol.v1.*;
 import com.github.ylgrgyq.replicator.proto.*;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
@@ -159,13 +156,10 @@ public class ReplicatorClientImpl implements ReplicatorClient {
 
         remotingChannel = channel;
 
-        HandshakeRequest request = HandshakeRequest.newBuilder()
-                .setTopic(topic)
-                .build();
-        RequestCommand req = CommandFactoryManager.createRequest(MessageType.HANDSHAKE);
-        req.setRequestObject(request);
+        HandshakeRequestCommand request = new HandshakeRequestCommand();
+        request.setTopic(topic);
 
-        remotingChannel.writeRemoting(req);
+        remotingChannel.writeRemoting(request);
     }
 
     @Override
@@ -186,7 +180,7 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         processor.registerResponseProcessor(MessageType.HANDSHAKE, new HandshakeResponseProcessor());
         processor.registerResponseProcessor(MessageType.FETCH_LOGS, new FetchLogsResponseProcessor());
         processor.registerResponseProcessor(MessageType.FETCH_SNAPSHOT, new FetchSnapshotResponseProcessor());
-        processor.registerOnewayCommandProcessor(MessageType.ERROR, (Context ctx, ErrorInfo errorInfo) -> {
+        processor.registerOnewayCommandProcessor(MessageType.ERROR, (Context ctx, ErrorCommand errorInfo) -> {
             if (errorInfo.getErrorCode() == 10001) {
                 requestSnapshot();
             } else {
@@ -412,14 +406,10 @@ public class ReplicatorClientImpl implements ReplicatorClient {
             return;
         }
 
-        FetchLogsRequest fetchLogs = FetchLogsRequest.newBuilder()
-                .setFromId(lastId)
-                .setLimit(options.getFetchLogsBatchSize())
-                .build();
+        FetchLogsRequestCommand fetchLogs = new FetchLogsRequestCommand();
+        fetchLogs.setFromId(lastId);
+        fetchLogs.setLimit(options.getFetchLogsBatchSize());
 
-        RequestCommand req = CommandFactoryManager.createRequest(MessageType.FETCH_LOGS);
-        req.setRequestObject(fetchLogs);
-
-        remotingChannel.writeRemoting(req);
+        remotingChannel.writeRemoting(fetchLogs);
     }
 }

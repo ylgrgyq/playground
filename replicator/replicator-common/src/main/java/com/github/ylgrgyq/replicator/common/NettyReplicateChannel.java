@@ -1,8 +1,6 @@
 package com.github.ylgrgyq.replicator.common;
 
-import com.github.ylgrgyq.replicator.common.protocol.v1.CommandFactoryManager;
-import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
-import com.github.ylgrgyq.replicator.proto.ErrorInfo;
+import com.github.ylgrgyq.replicator.common.protocol.v1.ErrorCommand;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,16 +19,12 @@ public class NettyReplicateChannel implements ReplicateChannel{
     }
 
     public void writeError(ReplicatorError error) {
-        RequestCommand req = CommandFactoryManager.createRequest(MessageType.ERROR);
+        ErrorCommand errorCommand = new ErrorCommand();
+        errorCommand.setErrorCode(error.getErrorCode());
+        errorCommand.setErrorMsg(error.getMsg());
 
-        ErrorInfo.Builder errorInfo = ErrorInfo.newBuilder();
-        errorInfo.setErrorCode(error.getErrorCode());
-        errorInfo.setErrorMsg(error.getMsg());
-
-        req.setContent(errorInfo.build().toByteArray());
-
-        logger.debug("send error {}", errorInfo);
-        socket.writeAndFlush(req);
+        logger.debug("send error {}", errorCommand);
+        socket.writeAndFlush(errorCommand);
     }
 
     @Override
