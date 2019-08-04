@@ -1,5 +1,7 @@
 package com.github.ylgrgyq.replicator.common;
 
+import com.github.ylgrgyq.replicator.common.protocol.v1.CommandFactoryManager;
+import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
 import com.github.ylgrgyq.replicator.proto.ErrorInfo;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
@@ -19,9 +21,7 @@ public class NettyReplicateChannel implements ReplicateChannel{
     }
 
     public void writeError(ReplicatorError error) {
-        RequestCommand req = CommandFactory.createRequest();
-        req.setMessageType(MessageType.ERROR);
-        req.setCommandType(CommandType.ONE_WAY);
+        RequestCommand req = CommandFactoryManager.createRequest(MessageType.ERROR);
 
         ErrorInfo.Builder errorInfo = ErrorInfo.newBuilder();
         errorInfo.setErrorCode(error.getErrorCode());

@@ -1,5 +1,6 @@
 package com.github.ylgrgyq.replicator.common;
 
+import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,6 +26,13 @@ public class CommandProcessor<T extends Context> implements Processor<T, Remotin
     }
 
     public void registerRequestProcessor(MessageType type, Processor<? super T, ?> processor) {
+        Objects.requireNonNull(type);
+        Objects.requireNonNull(processor);
+
+        requestProcessor.put(type, processor);
+    }
+
+    public void registerOnewayCommandProcessor(MessageType type, Processor<? super T, ?> processor) {
         Objects.requireNonNull(type);
         Objects.requireNonNull(processor);
 

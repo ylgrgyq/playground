@@ -1,13 +1,16 @@
 package com.github.ylgrgyq.replicator.common;
 
-public class RequestCommand extends RemotingCommand{
+import com.github.ylgrgyq.replicator.common.protocol.v1.CommandType;
+import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
 
-    public RequestCommand() {
-        super(CommandType.REQUEST);
+public abstract class RequestCommand extends RemotingCommand {
+
+    protected RequestCommand(MessageType type, byte defaultMsgVersion) {
+        super(CommandType.REQUEST, type, defaultMsgVersion);
     }
 
-    protected RequestCommand(CommandType type) {
-        super(type);
+    protected RequestCommand(CommandType commandType, MessageType msgType, byte msgVersion) {
+        super(commandType, msgType, msgVersion);
     }
 
     public <T> T getRequestObject() {
@@ -16,15 +19,5 @@ public class RequestCommand extends RemotingCommand{
 
     public void setRequestObject(Object requestObject) {
         setBody(requestObject);
-    }
-
-    @Override
-    void serialize() {
-
-    }
-
-    @Override
-    void deserialize() {
-
     }
 }

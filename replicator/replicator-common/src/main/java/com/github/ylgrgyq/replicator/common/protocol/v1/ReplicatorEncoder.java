@@ -1,5 +1,6 @@
-package com.github.ylgrgyq.replicator.common;
+package com.github.ylgrgyq.replicator.common.protocol.v1;
 
+import com.github.ylgrgyq.replicator.common.RemotingCommand;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
@@ -26,23 +27,7 @@ public class ReplicatorEncoder extends MessageToByteEncoder<RemotingCommand> {
             out.writeByte(msg.getCommandType().getCode());
             out.writeByte(msg.getMessageType().getCode());
             out.writeByte(MessageType.VERSION);
-
-            switch (msg.getCommandType()) {
-                case REQUEST:
-                case ONE_WAY:
-                    if (logger.isDebugEnabled()) {
-                        logger.debug("Send request {} {}", msg.getMessageType().name(), msg.getBody());
-                    }
-                    Protocol.getSerializer().serialize((RequestCommand) msg);
-                    break;
-                case RESPONSE:
-                    if (logger.isDebugEnabled()) {
-                        logger.debug("Send response {} {}", msg.getMessageType().name(), msg.getBody());
-                    }
-                    Protocol.getSerializer().serialize((ResponseCommand) msg);
-                    break;
-            }
-
+            msg.serialize();
             out.writeInt(msg.getContentLength());
             if (msg.getContentLength() > 0) {
                 out.writeBytes(msg.getContent());

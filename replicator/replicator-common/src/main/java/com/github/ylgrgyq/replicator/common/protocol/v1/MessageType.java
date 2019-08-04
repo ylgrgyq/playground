@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.common;
+package com.github.ylgrgyq.replicator.common.protocol.v1;
 
 public enum MessageType {
     UNKNOWN((byte) 0),

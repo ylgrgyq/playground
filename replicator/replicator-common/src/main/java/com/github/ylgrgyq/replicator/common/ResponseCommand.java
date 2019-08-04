@@ -1,10 +1,11 @@
 package com.github.ylgrgyq.replicator.common;
 
-public class ResponseCommand extends RemotingCommand{
-    private Object responseObject;
+import com.github.ylgrgyq.replicator.common.protocol.v1.CommandType;
+import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
 
-    public ResponseCommand() {
-        super(CommandType.RESPONSE);
+public abstract class ResponseCommand extends RemotingCommand {
+    protected ResponseCommand(MessageType type, byte defaultMsgVersion) {
+        super(CommandType.RESPONSE, type, defaultMsgVersion);
     }
 
     public <T> T getResponseObject() {
@@ -13,15 +14,5 @@ public class ResponseCommand extends RemotingCommand{
 
     public void setResponseObject(Object responseObject) {
         setBody(responseObject);
-    }
-
-    @Override
-    void serialize() {
-
-    }
-
-    @Override
-    void deserialize() {
-
     }
 }

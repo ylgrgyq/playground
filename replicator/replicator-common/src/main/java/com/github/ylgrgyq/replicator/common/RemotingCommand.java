@@ -1,32 +1,31 @@
 package com.github.ylgrgyq.replicator.common;
 
-public abstract class RemotingCommand {
-    private CommandType commandType;
-    private MessageType messageType;
-    private byte messageVersion;
+import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
+import com.github.ylgrgyq.replicator.common.exception.SerializationException;
+import com.github.ylgrgyq.replicator.common.protocol.v1.CommandType;
+import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
 
+public abstract class RemotingCommand {
+    private final CommandType commandType;
+    private final MessageType messageType;
+
+    private byte messageVersion;
     private byte[] content;
     private int contentLength;
     private Object body;
 
-    protected RemotingCommand(CommandType commandType) {
+    protected RemotingCommand(CommandType commandType, MessageType msgType, byte defaultMsgVersion) {
         this.commandType = commandType;
+        this.messageType = msgType;
+        this.messageVersion = defaultMsgVersion;
     }
 
     public CommandType getCommandType() {
         return commandType;
     }
 
-    public void setCommandType(CommandType commandType) {
-        this.commandType = commandType;
-    }
-
     public MessageType getMessageType() {
         return messageType;
-    }
-
-    public void setMessageType(MessageType messageType) {
-        this.messageType = messageType;
     }
 
     public byte getMessageVersion() {
@@ -61,7 +60,7 @@ public abstract class RemotingCommand {
         this.body = body;
     }
 
-    abstract void serialize();
+    public abstract void serialize() throws SerializationException;
 
-    abstract void deserialize() ;
+    public abstract void deserialize() throws DeserializationException;
 }

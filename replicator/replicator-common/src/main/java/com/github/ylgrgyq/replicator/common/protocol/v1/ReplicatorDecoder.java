@@ -1,5 +1,7 @@
-package com.github.ylgrgyq.replicator.common;
+package com.github.ylgrgyq.replicator.common.protocol.v1;
 
+import com.github.ylgrgyq.replicator.common.CommandFactory;
+import com.github.ylgrgyq.replicator.common.RemotingCommand;
 import com.github.ylgrgyq.replicator.common.exception.CodecException;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -26,7 +28,7 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
             in.readByte(); // protocol version
             byte commandType = in.readByte(); // command type
             if (commandType == CommandType.REQUEST.getCode() || commandType == CommandType.ONE_WAY.getCode()) {
-                decodeRequest(commandType, in, out);
+                decodeRequest(in, out);
             } else if (commandType == CommandType.RESPONSE.getCode()) {
                 decodeResponse(in, out);
             } else {
@@ -55,7 +57,7 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
         }
     }
 
-    private void decodeRequest(byte commandType, ByteBuf in, List<Object> out) throws CodecException {
+    private void decodeRequest(ByteBuf in, List<Object> out) throws CodecException {
         if (in.readableBytes() >= Protocol.getRequestHeaderLength() - 3) {
             byte msgTypeCode = in.readByte();
             byte msgVersion = in.readByte();
@@ -72,13 +74,12 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
                 return;
             }
 
-            RequestCommand command = new RequestCommand();
-            command.setCommandType(CommandType.REQUEST.getCode() == commandType ? CommandType.REQUEST : CommandType.ONE_WAY);
-            command.setMessageType(MessageType.findMessageTypeByCode(msgTypeCode));
+            CommandFactory factory = getRequestCommandFactory(msgTypeCode);
+            RemotingCommand command = factory.createCommand();
             command.setMessageVersion(msgVersion);
             command.setContent(content);
+            command.deserialize();
 
-            Protocol.getSerializer().deserialize(command);
             if (logger.isDebugEnabled()) {
                 logger.info("receive request {} {}", MessageType.findMessageTypeByCode(msgTypeCode), command.getBody());
             }
@@ -107,12 +108,12 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
                 return;
             }
 
-            ResponseCommand command = new ResponseCommand();
-            command.setMessageType(MessageType.findMessageTypeByCode(msgTypeCode));
+            CommandFactory factory = getResponseCommandFactory(msgTypeCode);
+            RemotingCommand command = factory.createCommand();
             command.setMessageVersion(msgVersion);
             command.setContent(content);
+            command.deserialize();
 
-            Protocol.getSerializer().deserialize(command);
             if (logger.isDebugEnabled()) {
                 logger.info("response {} {}", MessageType.findMessageTypeByCode(msgTypeCode), command.getBody());
             }
@@ -121,5 +122,41 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
         } else {
             in.resetReaderIndex();
         }
+    }
+
+    private CommandFactory getRequestCommandFactory(byte msgTypeCode) {
+        MessageType msgType = getMessageType(msgTypeCode);
+
+        CommandFactory factory = CommandFactoryManager.getRequestCommandFactory(msgType);
+        if (factory == null) {
+            String emsg = "No request command factory registered for message type: " + msgType.name();
+            logger.error(emsg);
+            throw new RuntimeException(emsg);
+        }
+
+        return factory;
+    }
+
+    private CommandFactory getResponseCommandFactory(byte msgTypeCode) {
+        MessageType msgType = getMessageType(msgTypeCode);
+
+        CommandFactory factory = CommandFactoryManager.getResponseCommandFactory(msgType);
+        if (factory == null) {
+            String emsg = "No response command factory registered for message type: " + msgType.name();
+            logger.error(emsg);
+            throw new RuntimeException(emsg);
+        }
+
+        return factory;
+    }
+
+    private MessageType getMessageType(byte msgTypeCode) {
+        MessageType msgType = MessageType.findMessageTypeByCode(msgTypeCode);
+        if (msgType == null) {
+            String emsg = "Unknown message type for message type code: " + msgTypeCode;
+            logger.error(emsg);
+            throw new RuntimeException(emsg);
+        }
+        return msgType;
     }
 }

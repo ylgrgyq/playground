@@ -3,12 +3,15 @@ package com.github.ylgrgyq.replicator.client.connection.tcp;
 import com.github.ylgrgyq.replicator.client.*;
 import com.github.ylgrgyq.replicator.common.*;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
+import com.github.ylgrgyq.replicator.common.RemotingCommand;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.timeout.IdleStateEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@ChannelHandler.Sharable
 public class ReplicatorClientHandler extends SimpleChannelInboundHandler<RemotingCommand> {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorClientHandler.class);
 

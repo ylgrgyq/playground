@@ -1,5 +1,8 @@
 package com.github.ylgrgyq.replicator.common;
 
+import com.github.ylgrgyq.replicator.common.protocol.v1.CommandFactoryManager;
+import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
+
 public class RemotingContext implements Context{
     private ReplicateChannel channel;
     private RemotingCommand command;
@@ -16,7 +19,7 @@ public class RemotingContext implements Context{
 
     @Override
     public void sendResponse(Object responseObject) {
-        ResponseCommand resp = CommandFactory.createResponse(command);
+        ResponseCommand resp = CommandFactoryManager.createResponse(command);
         resp.setResponseObject(responseObject);
         channel.writeRemoting(resp);
     }

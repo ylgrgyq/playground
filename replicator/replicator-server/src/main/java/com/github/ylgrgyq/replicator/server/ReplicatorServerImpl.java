@@ -1,6 +1,9 @@
 package com.github.ylgrgyq.replicator.server;
 
 import com.github.ylgrgyq.replicator.common.*;
+import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
+import com.github.ylgrgyq.replicator.common.protocol.v1.ReplicatorDecoder;
+import com.github.ylgrgyq.replicator.common.protocol.v1.ReplicatorEncoder;
 import com.github.ylgrgyq.replicator.proto.FetchLogsRequest;
 import com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest;
 import com.github.ylgrgyq.replicator.proto.HandshakeRequest;
