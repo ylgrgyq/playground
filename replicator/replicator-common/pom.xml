@@ -17,11 +17,6 @@
             <artifactId>replicator-proto</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.reflections</groupId>
-            <artifactId>reflections</artifactId>
-            <version>0.9.11</version>
-        </dependency>
-        <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
         </dependency>

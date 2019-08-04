@@ -1,23 +1,18 @@
 package com.github.ylgrgyq.replicator.common.protocol.v1;
 
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
-import com.github.ylgrgyq.replicator.common.exception.SerializationException;
 import com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 
 @CommandFactoryManager.AutoLoad
 public final class FetchSnapshotRequestCommand extends RequestCommandV1 {
-    static {
-        CommandFactoryManager.registerRequestCommand(MessageType.FETCH_SNAPSHOT, FetchSnapshotRequestCommand::new);
-    }
-
-    public FetchSnapshotRequestCommand() {
+    FetchSnapshotRequestCommand() {
         super(MessageType.FETCH_SNAPSHOT);
     }
 
     @Override
-    public void serialize() throws SerializationException {
+    public void serialize() {
         Message req = getRequestObject();
         if (req != null) {
             setContent(req.toByteArray());

@@ -2,6 +2,8 @@ package com.github.ylgrgyq.replicator.common.protocol.v1;
 
 import com.github.ylgrgyq.replicator.common.CommandFactory;
 import com.github.ylgrgyq.replicator.common.RemotingCommand;
+import com.github.ylgrgyq.replicator.common.RequestCommand;
+import com.github.ylgrgyq.replicator.common.ResponseCommand;
 import com.github.ylgrgyq.replicator.common.exception.CodecException;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -74,8 +76,7 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
                 return;
             }
 
-            CommandFactory factory = getRequestCommandFactory(msgTypeCode);
-            RemotingCommand command = factory.createCommand();
+            RemotingCommand command = getRequestCommandFactory(msgTypeCode);
             command.setMessageVersion(msgVersion);
             command.setContent(content);
             command.deserialize();
@@ -108,8 +109,7 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
                 return;
             }
 
-            CommandFactory factory = getResponseCommandFactory(msgTypeCode);
-            RemotingCommand command = factory.createCommand();
+            RemotingCommand command = getResponseCommandFactory(msgTypeCode);
             command.setMessageVersion(msgVersion);
             command.setContent(content);
             command.deserialize();
@@ -124,30 +124,16 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
         }
     }
 
-    private CommandFactory getRequestCommandFactory(byte msgTypeCode) {
+    private RequestCommand getRequestCommandFactory(byte msgTypeCode) {
         MessageType msgType = getMessageType(msgTypeCode);
 
-        CommandFactory factory = CommandFactoryManager.getRequestCommandFactory(msgType);
-        if (factory == null) {
-            String emsg = "No request command factory registered for message type: " + msgType.name();
-            logger.error(emsg);
-            throw new RuntimeException(emsg);
-        }
-
-        return factory;
+        return CommandFactoryManager.createRequest(msgType);
     }
 
-    private CommandFactory getResponseCommandFactory(byte msgTypeCode) {
+    private ResponseCommand getResponseCommandFactory(byte msgTypeCode) {
         MessageType msgType = getMessageType(msgTypeCode);
 
-        CommandFactory factory = CommandFactoryManager.getResponseCommandFactory(msgType);
-        if (factory == null) {
-            String emsg = "No response command factory registered for message type: " + msgType.name();
-            logger.error(emsg);
-            throw new RuntimeException(emsg);
-        }
-
-        return factory;
+        return CommandFactoryManager.createResponse(msgType);
     }
 
     private MessageType getMessageType(byte msgTypeCode) {

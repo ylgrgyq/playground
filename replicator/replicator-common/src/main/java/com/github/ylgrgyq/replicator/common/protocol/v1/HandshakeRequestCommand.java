@@ -1,23 +1,18 @@
 package com.github.ylgrgyq.replicator.common.protocol.v1;
 
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
-import com.github.ylgrgyq.replicator.common.exception.SerializationException;
 import com.github.ylgrgyq.replicator.proto.HandshakeRequest;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 
 @CommandFactoryManager.AutoLoad
 public final class HandshakeRequestCommand extends RequestCommandV1 {
-    static {
-        CommandFactoryManager.registerRequestCommand(MessageType.HANDSHAKE, HandshakeRequestCommand::new);
-    }
-
-    public HandshakeRequestCommand() {
+    HandshakeRequestCommand() {
         super(MessageType.HANDSHAKE);
     }
 
     @Override
-    public void serialize() throws SerializationException {
+    public void serialize() {
         Message req = getRequestObject();
         if (req != null) {
             setContent(req.toByteArray());
