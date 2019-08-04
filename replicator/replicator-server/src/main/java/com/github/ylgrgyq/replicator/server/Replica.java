@@ -71,7 +71,7 @@ public class Replica implements ReplicateRequestHandler {
 
     @Override
     public void onFinish() {
-
+        channel.close();
     }
 
     private boolean checkHandshakeState() {

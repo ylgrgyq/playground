@@ -35,8 +35,6 @@ public class NettyReplicateChannel implements ReplicateChannel{
 
     @Override
     public void close() {
-        if (socket.isActive()) {
-            socket.close();
-        }
+        socket.close();
     }
 }

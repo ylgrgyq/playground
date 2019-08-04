@@ -4,6 +4,7 @@ import com.github.ylgrgyq.replicator.common.*;
 import com.github.ylgrgyq.replicator.proto.FetchLogsRequest;
 import com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest;
 import com.github.ylgrgyq.replicator.proto.HandshakeRequest;
+import com.github.ylgrgyq.replicator.server.connection.tcp.ConnectionManager;
 import com.github.ylgrgyq.replicator.server.connection.tcp.ReplicatorServerHandler;
 import com.github.ylgrgyq.replicator.server.sequence.*;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
@@ -28,6 +29,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
     private EventLoopGroup workerGroup;
     private Storage<? extends StorageHandle> storage;
     private CommandProcessor<ReplicatorRemotingContext> processor;
+    private ConnectionManager connectionManager;
     private volatile boolean stop;
 
     public ReplicatorServerImpl(ReplicatorServerOptions options) throws InterruptedException {
@@ -37,6 +39,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
         this.workerGroup = options.getWorkerEventLoopGroup();
         this.storage = StorageFactory.createStorage(options.getStorageOptions());
         this.processor = new CommandProcessor<>();
+        this.connectionManager = new ConnectionManager();
 
         registerProcessors();
         initServer();
@@ -61,7 +64,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
                 pipeline.addLast(new ReplicatorDecoder());
                 pipeline.addLast(new IdleStateHandler(options.getConnectionReadTimeoutSecs(), 0, 0));
 
-                pipeline.addLast(new ReplicatorServerHandler(ReplicatorServerImpl.this));
+                pipeline.addLast(new ReplicatorServerHandler(ReplicatorServerImpl.this, connectionManager));
             }
         });
 
@@ -100,6 +103,8 @@ public class ReplicatorServerImpl implements ReplicatorServer {
         }
 
         stop = true;
+
+        connectionManager.shutdown();
 
         if (options.shouldShutdownBossEventLoopGroup()) {
             bossGroup.shutdownGracefully();
