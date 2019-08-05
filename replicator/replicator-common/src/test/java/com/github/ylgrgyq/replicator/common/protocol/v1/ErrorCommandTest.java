@@ -9,9 +9,11 @@ public class ErrorCommandTest {
 
     @Test
     public void serializeNormal() throws DeserializationException {
+        String errorMsg = "Hello";
+        int errorCode = 10101;
         ErrorCommand expect = new ErrorCommand();
-        expect.setErrorMsg("Hello");
-        expect.setErrorCode(10101);
+        expect.setErrorMsg(errorMsg);
+        expect.setErrorCode(errorCode);
 
         expect.serialize();
 
@@ -20,12 +22,15 @@ public class ErrorCommandTest {
         actual.deserialize();
 
         assertEquals(expect, actual);
+        assertEquals(errorCode, actual.getErrorCode());
+        assertEquals(errorMsg, actual.getErrorMsg());
     }
 
     @Test
     public void serializeNoErrorMsg() throws DeserializationException {
+        int errorCode = 10101;
         ErrorCommand expect = new ErrorCommand();
-        expect.setErrorCode(10101);
+        expect.setErrorCode(errorCode);
 
         expect.serialize();
 
@@ -34,6 +39,8 @@ public class ErrorCommandTest {
         actual.deserialize();
 
         assertEquals(expect, actual);
+        assertEquals(errorCode, actual.getErrorCode());
+        assertEquals("", actual.getErrorMsg());
     }
 
     @Test

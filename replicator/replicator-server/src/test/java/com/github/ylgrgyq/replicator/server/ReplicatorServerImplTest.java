@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.server;
 
-import com.github.ylgrgyq.replicator.proto.BatchLogEntries;
+import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
@@ -13,6 +13,7 @@ import org.junit.Test;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 
@@ -61,7 +62,7 @@ public class ReplicatorServerImplTest {
         }
 
         SequenceReader reader = server.getSequenceReader(topic);
-        BatchLogEntries logs = reader.getLogs(0, 100);
-        assertEquals(100, logs.getEntriesCount());
+        List<LogEntry> logs = reader.getLogs(0, 100);
+        assertEquals(100, logs.size());
     }
 }

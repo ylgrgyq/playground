@@ -8,13 +8,13 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-public class CommandProcessor<T extends Context> implements Processor<T, RemotingCommand> {
+public class CommandProcessor<CXT extends Context> implements Processor<CXT, RemotingCommand> {
     private static final Logger logger = LoggerFactory.getLogger("processor");
 
-    private Map<MessageType, Processor<? super T, ?>> requestProcessor;
-    private Map<MessageType, Processor<? super T, ?>> responseProcessor;
-    private Processor<? super T, ?> defaultRequestProcessor;
-    private Processor<? super T, ?> defaultResponseProcessor;
+    private Map<MessageType, Processor<? super CXT, ?>> requestProcessor;
+    private Map<MessageType, Processor<? super CXT, ?>> responseProcessor;
+    private Processor<? super CXT, ?> defaultRequestProcessor;
+    private Processor<? super CXT, ?> defaultResponseProcessor;
 
     public CommandProcessor() {
         this.requestProcessor = new HashMap<>();
@@ -25,21 +25,21 @@ public class CommandProcessor<T extends Context> implements Processor<T, Remotin
                 logger.warn("No processor available to process response: {} with type: {}", ctx, ctx.getRemotingCommandMessageType());
     }
 
-    public void registerRequestProcessor(MessageType type, Processor<? super T, ?> processor) {
+    public void registerRequestProcessor(MessageType type, Processor<? super CXT, ?> processor) {
         Objects.requireNonNull(type);
         Objects.requireNonNull(processor);
 
         requestProcessor.put(type, processor);
     }
 
-    public void registerOnewayCommandProcessor(MessageType type, Processor<? super T, ?> processor) {
+    public void registerOnewayCommandProcessor(MessageType type, Processor<? super CXT, ?> processor) {
         Objects.requireNonNull(type);
         Objects.requireNonNull(processor);
 
         requestProcessor.put(type, processor);
     }
 
-    public void registerResponseProcessor(MessageType type, Processor<? super T, ?> processor) {
+    public void registerResponseProcessor(MessageType type, Processor<? super CXT, ?> processor) {
         Objects.requireNonNull(type);
         Objects.requireNonNull(processor);
 
@@ -57,11 +57,11 @@ public class CommandProcessor<T extends Context> implements Processor<T, Remotin
     }
 
     @Override
-    public void process(T ctx, RemotingCommand cmd) {
+    public void process(CXT ctx, RemotingCommand cmd) {
         switch (cmd.getCommandType()) {
             case REQUEST:
             case ONE_WAY:
-                Processor<? super T, ?> reqProcessor = requestProcessor.get(cmd.getMessageType());
+                Processor<? super CXT, ?> reqProcessor = requestProcessor.get(cmd.getMessageType());
                 if (reqProcessor != null) {
                     reqProcessor.process(ctx, cmd.getBody());
                 } else {
@@ -69,7 +69,7 @@ public class CommandProcessor<T extends Context> implements Processor<T, Remotin
                 }
                 break;
             case RESPONSE:
-                Processor<? super T, ?> resProcessor = responseProcessor.get(cmd.getMessageType());
+                Processor<? super CXT, ?> resProcessor = responseProcessor.get(cmd.getMessageType());
                 if (resProcessor != null) {
                     resProcessor.process(ctx, cmd.getBody());
                 } else {

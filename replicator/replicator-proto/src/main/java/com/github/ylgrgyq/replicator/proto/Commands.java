@@ -20,30 +20,10 @@ public final class Commands {
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_fieldAccessorTable;
   static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_descriptor;
-  static final 
-    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_fieldAccessorTable;
-  static final com.google.protobuf.Descriptors.Descriptor
     internal_static_com_github_ylgrgyq_replicator_proto_Snapshot_descriptor;
   static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_com_github_ylgrgyq_replicator_proto_Snapshot_fieldAccessorTable;
-  static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsResponse_descriptor;
-  static final 
-    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsResponse_fieldAccessorTable;
-  static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotRequest_descriptor;
-  static final 
-    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotRequest_fieldAccessorTable;
-  static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotResponse_descriptor;
-  static final 
-    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotResponse_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -55,15 +35,8 @@ public final class Commands {
     java.lang.String[] descriptorData = {
       "\n\016commands.proto\022#com.github.ylgrgyq.rep" +
       "licator.proto\"$\n\010LogEntry\022\n\n\002id\030\001 \001(\003\022\014\n" +
-      "\004data\030\003 \001(\014\"Q\n\017BatchLogEntries\022>\n\007entrie" +
-      "s\030\001 \003(\0132-.com.github.ylgrgyq.replicator." +
-      "proto.LogEntry\"$\n\010Snapshot\022\n\n\002id\030\001 \001(\003\022\014" +
-      "\n\004data\030\002 \001(\014\"W\n\021FetchLogsResponse\022B\n\004log" +
-      "s\030\001 \001(\01324.com.github.ylgrgyq.replicator." +
-      "proto.BatchLogEntries\"\026\n\024FetchSnapshotRe" +
-      "quest\"X\n\025FetchSnapshotResponse\022?\n\010snapsh" +
-      "ot\030\001 \001(\0132-.com.github.ylgrgyq.replicator",
-      ".proto.SnapshotB\002P\001b\006proto3"
+      "\004data\030\003 \001(\014\"$\n\010Snapshot\022\n\n\002id\030\001 \001(\003\022\014\n\004d" +
+      "ata\030\002 \001(\014B\002P\001b\006proto3"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
         new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
@@ -83,36 +56,12 @@ public final class Commands {
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_com_github_ylgrgyq_replicator_proto_LogEntry_descriptor,
         new java.lang.String[] { "Id", "Data", });
-    internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_descriptor =
-      getDescriptor().getMessageTypes().get(1);
-    internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_com_github_ylgrgyq_replicator_proto_BatchLogEntries_descriptor,
-        new java.lang.String[] { "Entries", });
     internal_static_com_github_ylgrgyq_replicator_proto_Snapshot_descriptor =
-      getDescriptor().getMessageTypes().get(2);
+      getDescriptor().getMessageTypes().get(1);
     internal_static_com_github_ylgrgyq_replicator_proto_Snapshot_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_com_github_ylgrgyq_replicator_proto_Snapshot_descriptor,
         new java.lang.String[] { "Id", "Data", });
-    internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsResponse_descriptor =
-      getDescriptor().getMessageTypes().get(3);
-    internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsResponse_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_com_github_ylgrgyq_replicator_proto_FetchLogsResponse_descriptor,
-        new java.lang.String[] { "Logs", });
-    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotRequest_descriptor =
-      getDescriptor().getMessageTypes().get(4);
-    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotRequest_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotRequest_descriptor,
-        new java.lang.String[] { });
-    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotResponse_descriptor =
-      getDescriptor().getMessageTypes().get(5);
-    internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotResponse_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_com_github_ylgrgyq_replicator_proto_FetchSnapshotResponse_descriptor,
-        new java.lang.String[] { "Snapshot", });
   }
 
   // @@protoc_insertion_point(outer_class_scope)

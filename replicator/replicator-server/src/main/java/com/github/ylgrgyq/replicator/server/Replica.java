@@ -3,12 +3,16 @@ package com.github.ylgrgyq.replicator.server;
 import com.github.ylgrgyq.replicator.common.ReplicateChannel;
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
 import com.github.ylgrgyq.replicator.common.protocol.v1.FetchLogsRequestCommand;
+import com.github.ylgrgyq.replicator.common.protocol.v1.FetchLogsResponseCommand;
+import com.github.ylgrgyq.replicator.common.protocol.v1.FetchSnapshotResponseCommand;
 import com.github.ylgrgyq.replicator.common.protocol.v1.HandshakeResponseCommand;
-import com.github.ylgrgyq.replicator.proto.*;
+import com.github.ylgrgyq.replicator.proto.LogEntry;
+import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Replica implements ReplicateRequestHandler {
@@ -44,10 +48,9 @@ public class Replica implements ReplicateRequestHandler {
         long fromIndex = fetchLogs.getFromId();
         int limit = fetchLogs.getLimit();
 
-        BatchLogEntries log = seq.getLogs(fromIndex, limit);
-        FetchLogsResponse r = FetchLogsResponse.newBuilder()
-                .setLogs(log)
-                .build();
+        List<LogEntry> logs = seq.getLogs(fromIndex, limit);
+        FetchLogsResponseCommand r = new FetchLogsResponseCommand();
+        r.setLogs(logs);
 
         logger.debug("send get resp {} {}", r);
         ctx.sendResponse(r);
@@ -62,9 +65,8 @@ public class Replica implements ReplicateRequestHandler {
         logger.info("Got fetch snapshot request");
 
         Snapshot snapshot = seq.getLastSnapshot();
-        FetchSnapshotResponse r = FetchSnapshotResponse.newBuilder()
-                .setSnapshot(snapshot)
-                .build();
+        FetchSnapshotResponseCommand r = new FetchSnapshotResponseCommand();
+        r.setSnapshot(snapshot);
 
         logger.debug("send snapshot resp {}", r);
 

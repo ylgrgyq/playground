@@ -8,9 +8,12 @@ public class FetchLogsRequestCommandTest {
 
     @Test
     public void serialize() throws Exception{
+        long fromId = 1010101;
+        int limit = 10101;
+
         FetchLogsRequestCommand expect = new FetchLogsRequestCommand();
-        expect.setFromId(1010101);
-        expect.setLimit(10101);
+        expect.setFromId(fromId);
+        expect.setLimit(limit);
 
         expect.serialize();
 
@@ -19,5 +22,7 @@ public class FetchLogsRequestCommandTest {
         actual.deserialize();
 
         assertEquals(expect, actual);
+        assertEquals(fromId, actual.getFromId());
+        assertEquals(limit, actual.getLimit());
     }
 }

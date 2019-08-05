@@ -2,7 +2,6 @@ package com.github.ylgrgyq.replicator.server;
 
 import com.github.ylgrgyq.replicator.common.*;
 import com.github.ylgrgyq.replicator.common.protocol.v1.*;
-import com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest;
 import com.github.ylgrgyq.replicator.server.connection.tcp.ConnectionManager;
 import com.github.ylgrgyq.replicator.server.connection.tcp.ReplicatorServerHandler;
 import com.github.ylgrgyq.replicator.server.sequence.*;
@@ -143,9 +142,9 @@ public class ReplicatorServerImpl implements ReplicatorServer {
         }
     }
 
-    private class FetchSnapshotRequestProcessor implements Processor<ReplicatorRemotingContext, FetchSnapshotRequest> {
+    private class FetchSnapshotRequestProcessor implements Processor<ReplicatorRemotingContext, FetchSnapshotRequestCommand> {
         @Override
-        public void process(ReplicatorRemotingContext ctx, FetchSnapshotRequest cmd) {
+        public void process(ReplicatorRemotingContext ctx, FetchSnapshotRequestCommand cmd) {
             ctx.getReplica().handleFetchSnapshot(ctx);
         }
     }

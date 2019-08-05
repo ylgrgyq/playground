@@ -286,9 +286,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class HandshakeResponseProcessor implements Processor<RemotingContext, FetchSnapshotResponse> {
+    private class HandshakeResponseProcessor implements Processor<RemotingContext, FetchSnapshotResponseCommand> {
         @Override
-        public void process(RemotingContext ctx, FetchSnapshotResponse cmd) {
+        public void process(RemotingContext ctx, FetchSnapshotResponseCommand cmd) {
             Snapshot lastSnapshot = snapshotManager.getLastSnapshot();
             if (lastSnapshot != null && lastSnapshot.getId() > lastId) {
                 handleApplySnapshot(lastSnapshot);
@@ -298,12 +298,10 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class FetchLogsResponseProcessor implements Processor<RemotingContext, FetchLogsResponse> {
+    private class FetchLogsResponseProcessor implements Processor<RemotingContext, FetchLogsResponseCommand> {
         @Override
-        public void process(RemotingContext ctx, FetchLogsResponse req) {
-            BatchLogEntries logs = req.getLogs();
-
-            List<com.github.ylgrgyq.replicator.proto.LogEntry> entryList = logs.getEntriesList();
+        public void process(RemotingContext ctx, FetchLogsResponseCommand req) {
+            List<LogEntry> entryList = req.getLogs();
             if (!entryList.isEmpty()) {
                 com.github.ylgrgyq.replicator.proto.LogEntry firstEntry = entryList.get(0);
                 com.github.ylgrgyq.replicator.proto.LogEntry lastEntry = entryList.get(entryList.size() - 1);
@@ -331,9 +329,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class FetchSnapshotResponseProcessor implements Processor<RemotingContext, FetchSnapshotResponse> {
+    private class FetchSnapshotResponseProcessor implements Processor<RemotingContext, FetchSnapshotResponseCommand> {
         @Override
-        public void process(RemotingContext ctx, FetchSnapshotResponse response) {
+        public void process(RemotingContext ctx, FetchSnapshotResponseCommand response) {
             Snapshot snapshot = response.getSnapshot();
             handleApplySnapshot(snapshot);
         }

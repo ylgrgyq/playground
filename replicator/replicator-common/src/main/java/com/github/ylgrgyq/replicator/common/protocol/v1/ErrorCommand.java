@@ -63,8 +63,7 @@ public final class ErrorCommand extends RequestCommandV1 {
         if (content != null && content.length >= MINIMUM_LENGTH) {
             errorCode = Bits.getInt(content, 0);
             int len = Bits.getInt(content, 4);
-            if (content.length >= MINIMUM_LENGTH + len) {
-
+            if (content.length == MINIMUM_LENGTH + len) {
                 byte[] msg = new byte[len];
                 System.arraycopy(content, 8, msg, 0, len);
                 errorMsg = new String(msg);

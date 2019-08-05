@@ -1,36 +1,35 @@
 package com.github.ylgrgyq.replicator.common.protocol.v1;
 
-import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
-import com.github.ylgrgyq.replicator.proto.FetchSnapshotRequest;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Message;
-
 @CommandFactoryManager.AutoLoad
 public final class FetchSnapshotRequestCommand extends RequestCommandV1 {
-    FetchSnapshotRequestCommand() {
+    public FetchSnapshotRequestCommand() {
         super(MessageType.FETCH_SNAPSHOT);
     }
 
     @Override
     public void serialize() {
-        Message req = getRequestObject();
-        if (req != null) {
-            setContent(req.toByteArray());
-        }
     }
 
     @Override
-    public void deserialize() throws DeserializationException {
-        try {
-            byte[] content = getContent();
+    public void deserialize() {
+    }
 
-            if (content != null) {
-                Message req = FetchSnapshotRequest.parseFrom(content);
-                setRequestObject(req);
-            }
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        return super.equals(o);
+    }
 
-        } catch (InvalidProtocolBufferException ex) {
-            throw new DeserializationException("Deserialize request command failed", ex);
-        }
+    @Override
+    public int hashCode() {
+        return super.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        return "FetchSnapshotRequest{" +
+                super.toString() +
+                '}';
     }
 }

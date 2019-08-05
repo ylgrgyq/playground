@@ -2,7 +2,6 @@ package com.github.ylgrgyq.replicator.server.sequence;
 
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
-import com.github.ylgrgyq.replicator.proto.BatchLogEntries;
 import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.server.SnapshotGenerator;
@@ -75,16 +74,12 @@ public class SequenceImpl implements Sequence {
     }
 
     @Override
-    public BatchLogEntries getLogs(long fromId, int limit) {
+    public List<LogEntry> getLogs(long fromId, int limit) {
         if (stop) {
             throw new ReplicatorException(ReplicatorError.EALREADY_SHUTDOWN);
         }
 
-        List<LogEntry> entries = storage.getEntries(fromId, limit);
-
-        BatchLogEntries.Builder builder = BatchLogEntries.newBuilder();
-        builder.addAllEntries(entries);
-        return builder.build();
+        return storage.getEntries(fromId, limit);
     }
 
     @Override

@@ -7,23 +7,8 @@ message LogEntry {
     bytes data = 3;
 }
 
-message BatchLogEntries {
-    repeated LogEntry entries = 1;
-}
-
 message Snapshot {
     int64 id = 1;
     bytes data = 2;
-}
-
-message FetchLogsResponse {
-    BatchLogEntries logs = 1;
-}
-
-message FetchSnapshotRequest {
-}
-
-message FetchSnapshotResponse {
-    Snapshot snapshot = 1;
 }
 
