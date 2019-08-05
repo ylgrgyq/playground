@@ -16,7 +16,9 @@
  */
 package com.github.ylgrgyq.replicator.common.exception;
 
-public class CodecException extends Exception {
+import java.io.IOException;
+
+public class CodecException extends IOException {
     /**
      * Constructor.
      */

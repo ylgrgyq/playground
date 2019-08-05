@@ -1,7 +1,6 @@
 package com.github.ylgrgyq.replicator.client;
 
-import com.github.ylgrgyq.replicator.proto.Snapshot;
-import com.google.protobuf.ByteString;
+import com.github.ylgrgyq.replicator.common.Snapshot;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -36,40 +35,36 @@ public class SnapshotManagerTest {
 
     @Test
     public void storeSnapshot() throws Exception {
-        Snapshot snapshot = Snapshot.newBuilder()
-                .setData(ByteString.copyFrom("Hello".getBytes(StandardCharsets.UTF_8)))
-                .setId(100)
-                .build();
+        Snapshot snapshot = new Snapshot();
+        snapshot.setData("Hello".getBytes(StandardCharsets.UTF_8));
+        snapshot.setId(100);
+
 
         assertNull(manager.getLastSnapshot());
         manager.storeSnapshot(snapshot);
 
-        snapshot = Snapshot.newBuilder()
-                .setData(ByteString.copyFrom("Hello".getBytes(StandardCharsets.UTF_8)))
-                .setId(101)
-                .build();
+        snapshot = new Snapshot();
+        snapshot.setData("Hello".getBytes(StandardCharsets.UTF_8));
+        snapshot.setId(101);
         manager.storeSnapshot(snapshot);
         assertEquals(snapshot, manager.getLastSnapshot());
     }
 
     @Test
     public void loadLastSnapshot() throws Exception {
-        Snapshot snapshot = Snapshot.newBuilder()
-                .setData(ByteString.copyFrom("Hello".getBytes(StandardCharsets.UTF_8)))
-                .setId(100)
-                .build();
+        Snapshot snapshot = new Snapshot();
+        snapshot.setData("Hello".getBytes(StandardCharsets.UTF_8));
+        snapshot.setId(100);
         manager.storeSnapshot(snapshot);
 
-        snapshot = Snapshot.newBuilder()
-                .setData(ByteString.copyFrom("Big".getBytes(StandardCharsets.UTF_8)))
-                .setId(101)
-                .build();
+        snapshot = new Snapshot();
+        snapshot.setData("Big".getBytes(StandardCharsets.UTF_8));
+        snapshot.setId(101);
         manager.storeSnapshot(snapshot);
 
-        snapshot = Snapshot.newBuilder()
-                .setData(ByteString.copyFrom("World".getBytes(StandardCharsets.UTF_8)))
-                .setId(102)
-                .build();
+        snapshot = new Snapshot();
+        snapshot.setData("World".getBytes(StandardCharsets.UTF_8));
+        snapshot.setId(102);
         manager.storeSnapshot(snapshot);
 
         assertEquals(snapshot, manager.getLastSnapshot());
@@ -82,10 +77,9 @@ public class SnapshotManagerTest {
     public void purgeOldSnapshotOnLoad() throws Exception {
         List<Snapshot> storedSnapshot = new ArrayList<>(10);
         for (int i = 0; i < 10; i++) {
-            Snapshot snapshot = Snapshot.newBuilder()
-                    .setData(ByteString.copyFrom(("Hello-" + i).getBytes(StandardCharsets.UTF_8)))
-                    .setId(100 + i)
-                    .build();
+            Snapshot snapshot = new Snapshot();
+            snapshot.setData(("Hello-" + i).getBytes(StandardCharsets.UTF_8));
+            snapshot.setId(100 + i);
             manager.storeSnapshot(snapshot);
             storedSnapshot.add(snapshot);
         }
@@ -123,10 +117,9 @@ public class SnapshotManagerTest {
     public void purgeOldSnapshotOnStore() throws Exception {
         List<Snapshot> storedSnapshot = new ArrayList<>(10);
         for (int i = 0; i < 20; i++) {
-            Snapshot snapshot = Snapshot.newBuilder()
-                    .setData(ByteString.copyFrom(("Hello-" + i).getBytes(StandardCharsets.UTF_8)))
-                    .setId(100 + i)
-                    .build();
+            Snapshot snapshot = new Snapshot();
+            snapshot.setData(("Hello-" + i).getBytes(StandardCharsets.UTF_8));
+            snapshot.setId(100 + i);
             manager.storeSnapshot(snapshot);
             storedSnapshot.add(snapshot);
         }

@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.server.storage;
 
-import com.github.ylgrgyq.replicator.proto.LogEntry;
+import com.github.ylgrgyq.replicator.common.LogEntry;
 
 import java.util.List;
 

@@ -1,21 +1,19 @@
 package com.github.ylgrgyq.replicator.common.protocol.v1;
 
-import com.github.ylgrgyq.replicator.proto.Snapshot;
-import com.google.protobuf.ByteString;
+import com.github.ylgrgyq.replicator.common.Snapshot;
 import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class FetchSnapshotResponseCommandTest {
 
     @Test
     public void serializeNormal() throws Exception{
-        Snapshot expectSnapshot = Snapshot.newBuilder()
-                .setId(1010101)
-                .setData(ByteString.copyFrom("Hello world".getBytes(StandardCharsets.UTF_8)))
-                .build();
+        Snapshot expectSnapshot = new Snapshot();
+        expectSnapshot.setId(1010101);
+        expectSnapshot.setData("Hello world".getBytes(StandardCharsets.UTF_8));
 
         FetchSnapshotResponseCommand expect = new FetchSnapshotResponseCommand();
         expect.setSnapshot(expectSnapshot);

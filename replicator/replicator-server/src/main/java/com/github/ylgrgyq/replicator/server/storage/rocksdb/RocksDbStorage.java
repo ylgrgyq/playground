@@ -1,14 +1,14 @@
 package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
 import com.github.ylgrgyq.replicator.common.Bits;
+import com.github.ylgrgyq.replicator.common.LogEntry;
+import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
-import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.server.Preconditions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
 import com.github.ylgrgyq.replicator.server.storage.StorageOptions;
-import com.google.protobuf.InvalidProtocolBufferException;
 import org.rocksdb.*;
 import org.rocksdb.util.SizeUnit;
 import org.slf4j.Logger;
@@ -16,8 +16,12 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -319,9 +323,10 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
             RocksIterator it = db.newIterator(handle.getColumnFamilyHandle(), totalOrderReadOptions);
             for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
                 try {
-                    LogEntry entry = LogEntry.parseFrom(it.value());
+                    LogEntry entry = new LogEntry();
+                    entry.deserialize(it.value());
                     entries.add(entry);
-                } catch (InvalidProtocolBufferException ex) {
+                } catch (DeserializationException ex) {
                     logger.error("Bad log entry format for id={}", Bits.getLong(it.key(), 0));
                 }
             }

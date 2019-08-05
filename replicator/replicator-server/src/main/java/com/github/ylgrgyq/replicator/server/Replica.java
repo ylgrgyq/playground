@@ -1,13 +1,13 @@
 package com.github.ylgrgyq.replicator.server;
 
+import com.github.ylgrgyq.replicator.common.LogEntry;
 import com.github.ylgrgyq.replicator.common.ReplicateChannel;
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
+import com.github.ylgrgyq.replicator.common.Snapshot;
 import com.github.ylgrgyq.replicator.common.protocol.v1.FetchLogsRequestCommand;
 import com.github.ylgrgyq.replicator.common.protocol.v1.FetchLogsResponseCommand;
 import com.github.ylgrgyq.replicator.common.protocol.v1.FetchSnapshotResponseCommand;
 import com.github.ylgrgyq.replicator.common.protocol.v1.HandshakeResponseCommand;
-import com.github.ylgrgyq.replicator.proto.LogEntry;
-import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

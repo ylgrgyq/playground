@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.server.sequence;
 
-import com.github.ylgrgyq.replicator.proto.LogEntry;
-import com.github.ylgrgyq.replicator.proto.Snapshot;
+import com.github.ylgrgyq.replicator.common.LogEntry;
+import com.github.ylgrgyq.replicator.common.Snapshot;
 
 import java.util.List;
 

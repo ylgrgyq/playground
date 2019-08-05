@@ -1,14 +1,14 @@
 package com.github.ylgrgyq.replicator.common.protocol.v1;
 
 import com.github.ylgrgyq.replicator.common.Bits;
+import com.github.ylgrgyq.replicator.common.LogEntry;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
-import com.github.ylgrgyq.replicator.proto.LogEntry;
-import com.google.protobuf.InvalidProtocolBufferException;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @CommandFactoryManager.AutoLoad
 public final class FetchLogsResponseCommand extends ResponseCommandV1 {
@@ -31,15 +31,18 @@ public final class FetchLogsResponseCommand extends ResponseCommandV1 {
 
     @Override
     public void serialize() {
-        int size = logs.stream().mapToInt(LogEntry::getSerializedSize).sum();
+        List<byte[]> logsInBytes = logs.stream().map(LogEntry::serialize).collect(Collectors.toList());
+
+        int size = logsInBytes.stream().mapToInt(bs -> bs.length).sum();
         byte[] buffer = new byte[Integer.BYTES * logs.size() + size];
 
         int off = 0;
-        for (LogEntry e : logs) {
-            int logSize = e.getSerializedSize();
+
+        for (byte[] bs : logsInBytes) {
+            int logSize = bs.length;
             Bits.putInt(buffer, off, logSize);
             off += 4;
-            System.arraycopy(e.toByteArray(), 0, buffer, off, logSize);
+            System.arraycopy(bs, 0, buffer, off, logSize);
             off += logSize;
         }
 
@@ -66,11 +69,9 @@ public final class FetchLogsResponseCommand extends ResponseCommandV1 {
                 System.arraycopy(content, off, bf, 0, logSize);
                 off += logSize;
 
-                try {
-                    entries.add(LogEntry.parseFrom(bf));
-                } catch (InvalidProtocolBufferException ex) {
-                    throw new DeserializationException();
-                }
+                LogEntry e = new LogEntry();
+                e.deserialize(bf);
+                entries.add(e);
             }
 
             if (!entries.isEmpty()) {

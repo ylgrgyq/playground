@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.client;
 
 import com.github.ylgrgyq.replicator.common.Bits;
-import com.github.ylgrgyq.replicator.proto.Snapshot;
+import com.github.ylgrgyq.replicator.common.Snapshot;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,10 +61,11 @@ public class SnapshotManager {
             byte[] lenBytes = new byte[4];
 
             // msg len + msg
-            int msgLen = snapshot.getSerializedSize();
+            byte[] bs = snapshot.serialize();
+            int msgLen = bs.length;
             Bits.putInt(lenBytes, 0, msgLen);
             output.write(lenBytes);
-            snapshot.writeTo(output);
+            output.write(bs, 0, bs.length);
             if (options.isSaveSnapshotSynchronously()) {
                 fOut.getFD().sync();
             }
@@ -207,7 +208,9 @@ public class SnapshotManager {
             byte[] msgBytes = new byte[msgLen];
             readBytes(msgBytes, input);
 
-            return Snapshot.parseFrom(msgBytes);
+            Snapshot s = new Snapshot();
+            s.deserialize(msgBytes);
+            return s;
         }
     }
 

@@ -1,9 +1,8 @@
 package com.github.ylgrgyq.replicator.common.protocol.v1;
 
 import com.github.ylgrgyq.replicator.common.Bits;
+import com.github.ylgrgyq.replicator.common.Snapshot;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
-import com.github.ylgrgyq.replicator.proto.Snapshot;
-import com.google.protobuf.InvalidProtocolBufferException;
 
 import java.util.Objects;
 
@@ -29,10 +28,11 @@ public final class FetchSnapshotResponseCommand extends ResponseCommandV1 {
     public void serialize() {
         byte[] buffer;
         if (snapshot != null) {
-            int size = snapshot.getSerializedSize();
+            byte[] snapshotInBytes = snapshot.serialize();
+            int size = snapshotInBytes.length;
             buffer = new byte[Integer.BYTES + size];
             Bits.putInt(buffer, 0, size);
-            System.arraycopy(snapshot.toByteArray(), 0, buffer, 4, size);
+            System.arraycopy(snapshotInBytes, 0, buffer, 4, size);
         } else {
             buffer = new byte[Integer.BYTES];
             Bits.putInt(buffer, 0, 0);
@@ -49,11 +49,8 @@ public final class FetchSnapshotResponseCommand extends ResponseCommandV1 {
                 if (size != 0) {
                     byte[] bs = new byte[size];
                     System.arraycopy(content, 4, bs, 0, size);
-                    try {
-                        snapshot = Snapshot.parseFrom(bs);
-                    } catch (InvalidProtocolBufferException ex) {
-                        throw new DeserializationException();
-                    }
+                    snapshot = new Snapshot();
+                    snapshot.deserialize(bs);
                 }
             } else {
                 throw new DeserializationException("Snapshot underflow");

@@ -1,12 +1,11 @@
 package com.github.ylgrgyq.replicator.example.server;
 
-import com.github.ylgrgyq.replicator.proto.Snapshot;
+import com.github.ylgrgyq.replicator.common.Snapshot;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.StorageOptions;
-import com.google.protobuf.ByteString;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,11 +43,10 @@ public class ReplicatorServer {
                 SequenceOptions sequenceOptions = SequenceOptions.builder()
                         .setSnapshotGenerator(() -> {
                             long id = nexId.get();
-                            return Snapshot.newBuilder()
-                                    .setId(id)
-                                    .setData(ByteString.copyFrom(String.format("snapshot before %s", id)
-                                            , StandardCharsets.UTF_8))
-                                    .build();
+                            Snapshot snapshot = new Snapshot();
+                            snapshot.setId(id);
+                            snapshot.setData(String.format("snapshot before %s", id).getBytes(StandardCharsets.UTF_8));
+                            return snapshot;
                         })
                         .setGenerateSnapshotInterval(30, TimeUnit.SECONDS)
                         .build();

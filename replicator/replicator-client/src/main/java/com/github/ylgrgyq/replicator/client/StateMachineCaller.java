@@ -1,8 +1,8 @@
 package com.github.ylgrgyq.replicator.client;
 
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
+import com.github.ylgrgyq.replicator.common.Snapshot;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
-import com.github.ylgrgyq.replicator.proto.Snapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,7 +138,7 @@ public class StateMachineCaller {
     }
 
     private StateMachineJob newApplySnapshotJob(Snapshot snapshot, CompletableFuture<Void> future) {
-        return new StateMachineJob(() -> stateMachine.snapshot(snapshot.toByteArray()), future);
+        return new StateMachineJob(() -> stateMachine.snapshot(snapshot.serialize()), future);
     }
 
     private StateMachineJob newApplyLogsJob(List<byte[]> logs, CompletableFuture<Void> future) {

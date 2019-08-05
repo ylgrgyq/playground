@@ -1,39 +1,42 @@
 package com.github.ylgrgyq.replicator.common.protocol.v1;
 
-import com.github.ylgrgyq.replicator.proto.LogEntry;
-import com.google.protobuf.ByteString;
+import com.github.ylgrgyq.replicator.common.LogEntry;
 import org.junit.Test;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class FetchLogsResponseCommandTest {
 
     @Test
     public void serialize() throws Exception {
         ArrayList<LogEntry> logs = new ArrayList<>();
-        logs.add(LogEntry.newBuilder()
-                .setId(10)
-                .setData(ByteString.copyFrom("Hello".getBytes()))
-                .build());
-        logs.add(LogEntry.newBuilder()
-                .setId(11)
-                .setData(ByteString.copyFrom("world!".getBytes()))
-                .build());
-        logs.add(LogEntry.newBuilder()
-                .setId(15)
-                .setData(ByteString.copyFrom("He".getBytes()))
-                .build());
-        logs.add(LogEntry.newBuilder()
-                .setId(101)
-                .setData(ByteString.copyFrom("'s a good man.".getBytes()))
-                .build());
-        logs.add(LogEntry.newBuilder()
-                .setId(1)
-                .setData(ByteString.copyFrom("Yes".getBytes()))
-                .build());
+        LogEntry e = new LogEntry();
+        e.setId(10);
+        e.setData("Hello".getBytes());
+        logs.add(e);
+
+        e = new LogEntry();
+        e.setId(11);
+        e.setData("world!".getBytes());
+        logs.add(e);
+
+        e = new LogEntry();
+        e.setId(15);
+        e.setData("He".getBytes());
+        logs.add(e);
+
+        e = new LogEntry();
+        e.setId(101);
+        e.setData("'s a good man.".getBytes());
+        logs.add(e);
+
+        e = new LogEntry();
+        e.setId(1);
+        e.setData("Yes".getBytes());
+        logs.add(e);
 
         FetchLogsResponseCommand expect = new FetchLogsResponseCommand();
         expect.setLogs(logs);

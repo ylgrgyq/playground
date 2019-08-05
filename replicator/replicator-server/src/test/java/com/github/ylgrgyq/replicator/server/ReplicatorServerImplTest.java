@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.server;
 
-import com.github.ylgrgyq.replicator.proto.LogEntry;
-import com.github.ylgrgyq.replicator.proto.Snapshot;
+import com.github.ylgrgyq.replicator.common.LogEntry;
+import com.github.ylgrgyq.replicator.common.Snapshot;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceReader;
@@ -49,10 +49,11 @@ public class ReplicatorServerImplTest {
     public void testAppend() {
         String topic = "append_test";
         SequenceOptions sequenceOptions = SequenceOptions.builder()
-                .setSnapshotGenerator(() ->
-                        Snapshot.newBuilder()
-                                .setId(100)
-                                .build()
+                .setSnapshotGenerator(() -> {
+                            Snapshot snapshot = new Snapshot();
+                            snapshot.setId(100);
+                            return snapshot;
+                        }
                 )
                 .build();
         SequenceAppender appender = server.createSequence(topic, sequenceOptions);

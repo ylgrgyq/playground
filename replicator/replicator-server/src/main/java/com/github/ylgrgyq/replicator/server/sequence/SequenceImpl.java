@@ -1,9 +1,9 @@
 package com.github.ylgrgyq.replicator.server.sequence;
 
+import com.github.ylgrgyq.replicator.common.LogEntry;
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
+import com.github.ylgrgyq.replicator.common.Snapshot;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
-import com.github.ylgrgyq.replicator.proto.LogEntry;
-import com.github.ylgrgyq.replicator.proto.Snapshot;
 import com.github.ylgrgyq.replicator.server.SnapshotGenerator;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import org.slf4j.Logger;
@@ -22,9 +22,7 @@ public class SequenceImpl implements Sequence {
     private static final Snapshot emptySnapshot;
 
     static {
-        Snapshot.Builder builder = Snapshot.newBuilder();
-        builder.setId(0);
-        emptySnapshot = builder.build();
+        emptySnapshot = new Snapshot();
     }
 
     private final SequenceStorage storage;

@@ -4,7 +4,6 @@ import com.github.ylgrgyq.replicator.client.connection.tcp.ReplicatorClientHandl
 import com.github.ylgrgyq.replicator.common.*;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.common.protocol.v1.*;
-import com.github.ylgrgyq.replicator.proto.*;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -303,15 +302,15 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         public void process(RemotingContext ctx, FetchLogsResponseCommand req) {
             List<LogEntry> entryList = req.getLogs();
             if (!entryList.isEmpty()) {
-                com.github.ylgrgyq.replicator.proto.LogEntry firstEntry = entryList.get(0);
-                com.github.ylgrgyq.replicator.proto.LogEntry lastEntry = entryList.get(entryList.size() - 1);
+                LogEntry firstEntry = entryList.get(0);
+                LogEntry lastEntry = entryList.get(entryList.size() - 1);
                 if (firstEntry.getId() > lastId + 1) {
                     logger.info("lastId:{} is too far behind sync logs {}", lastId, firstEntry.getId());
                     requestSnapshot();
                 } else if (lastEntry.getId() > lastId) {
                     int i = 0;
                     for (; i < entryList.size(); ++i) {
-                        com.github.ylgrgyq.replicator.proto.LogEntry entry = entryList.get(i);
+                        LogEntry entry = entryList.get(i);
                         if (entry.getId() == lastId + 1) {
                             break;
                         }
@@ -320,7 +319,7 @@ public class ReplicatorClientImpl implements ReplicatorClient {
                     lastId = lastEntry.getId();
                     List<byte[]> logDataList = entryList.subList(i, entryList.size())
                             .stream()
-                            .map(e -> e.getData().toByteArray())
+                            .map(LogEntry::getData)
                             .collect(Collectors.toList());
 
                     handleApplyLogs(logDataList);

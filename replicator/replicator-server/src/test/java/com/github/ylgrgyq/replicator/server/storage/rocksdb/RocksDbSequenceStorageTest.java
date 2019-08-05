@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
+import com.github.ylgrgyq.replicator.common.LogEntry;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
-import com.github.ylgrgyq.replicator.proto.LogEntry;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
@@ -56,7 +56,7 @@ public class RocksDbSequenceStorageTest {
         assertEquals(1, entries.size());
         LogEntry entry = entries.get(0);
         assertEquals(1, entry.getId());
-        assertEquals("1", entry.getData().toStringUtf8());
+        assertEquals("1", new String(entry.getData(), StandardCharsets.UTF_8));
 
         sequenceStorage.append(2, "2".getBytes(StandardCharsets.UTF_8));
         assertEquals(1, sequenceStorage.getFirstLogId());
@@ -91,7 +91,7 @@ public class RocksDbSequenceStorageTest {
         List<LogEntry> entries = sequenceStorage.getEntries(1, 100);
         for (int i = 1; i <= 4; i++) {
             assertEquals(i, entries.get(i - 1).getId());
-            assertEquals("" + i, entries.get(i - 1).getData().toStringUtf8());
+            assertEquals("" + i, new String(entries.get(i - 1).getData(), StandardCharsets.UTF_8));
         }
     }
 
@@ -144,7 +144,7 @@ public class RocksDbSequenceStorageTest {
                 List<LogEntry> entries = sequenceStorage.getEntries(from, limit);
                 assertEquals(Math.min(limit, end - from), entries.size());
                 for (int i = 0; i < entries.size(); i++) {
-                    String strInEntry = new String(entries.get(i).getData().toByteArray(), StandardCharsets.UTF_8);
+                    String strInEntry = new String(entries.get(i).getData(), StandardCharsets.UTF_8);
                     assertEquals("" + (Math.max(from, start) + i), strInEntry);
                 }
             }

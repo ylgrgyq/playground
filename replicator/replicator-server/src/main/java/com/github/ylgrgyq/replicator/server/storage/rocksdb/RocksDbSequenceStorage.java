@@ -1,9 +1,8 @@
 package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
-import com.github.ylgrgyq.replicator.proto.LogEntry;
+import com.github.ylgrgyq.replicator.common.LogEntry;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
-import com.google.protobuf.ByteString;
 
 import java.util.List;
 import java.util.Objects;
@@ -67,11 +66,10 @@ public class RocksDbSequenceStorage implements SequenceStorage {
     public void append(long id, byte[] data) {
         readLock.lock();
         try {
-            LogEntry entry = LogEntry.newBuilder()
-                    .setId(id)
-                    .setData(ByteString.copyFrom(data))
-                    .build();
-            storage.append(handle, id, entry.toByteArray());
+            LogEntry entry = new LogEntry();
+            entry.setId(id);
+            entry.setData(data);
+            storage.append(handle, id, entry.serialize());
         } finally {
             readLock.unlock();
         }
