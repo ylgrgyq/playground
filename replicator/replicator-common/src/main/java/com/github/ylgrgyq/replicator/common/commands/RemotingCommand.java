@@ -1,9 +1,7 @@
-package com.github.ylgrgyq.replicator.common;
+package com.github.ylgrgyq.replicator.common.commands;
 
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 import com.github.ylgrgyq.replicator.common.exception.SerializationException;
-import com.github.ylgrgyq.replicator.common.protocol.v1.CommandType;
-import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
 
 import java.util.Objects;
 

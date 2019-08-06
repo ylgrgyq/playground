@@ -1,14 +1,21 @@
-package com.github.ylgrgyq.replicator.common.entity;
+package com.github.ylgrgyq.replicator.common.commands;
 
 import com.github.ylgrgyq.replicator.common.Bits;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 
 import java.util.Objects;
 
-public class FetchLogsRequest {
+@CommandFactoryManager.AutoLoad
+public final class FetchLogsRequestCommand extends RequestCommand {
     private static final int MINIMUM_LENGTH = 12;
+    private static final byte VERSION = 1;
+
     private long fromId;
     private int limit;
+
+    public FetchLogsRequestCommand() {
+        super(MessageType.FETCH_LOGS, VERSION);
+    }
 
     public long getFromId() {
         return fromId;
@@ -26,15 +33,18 @@ public class FetchLogsRequest {
         this.limit = limit;
     }
 
-    public byte[] serialize() {
+    @Override
+    public void serialize() {
         byte[] buffer = new byte[Long.BYTES + Integer.BYTES];
 
         Bits.putLong(buffer, 0, fromId);
         Bits.putInt(buffer, 8, limit);
-        return buffer;
+        setContent(buffer);
     }
 
-    public void deserialize(byte[] content) throws DeserializationException {
+    @Override
+    public void deserialize() throws DeserializationException {
+        byte[] content = getContent();
         if (content != null && content.length >= MINIMUM_LENGTH) {
             fromId = Bits.getLong(content, 0);
             limit = Bits.getInt(content, 8);
@@ -48,7 +58,7 @@ public class FetchLogsRequest {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
-        FetchLogsRequest that = (FetchLogsRequest) o;
+        FetchLogsRequestCommand that = (FetchLogsRequestCommand) o;
         return getFromId() == that.getFromId() &&
                 getLimit() == that.getLimit();
     }

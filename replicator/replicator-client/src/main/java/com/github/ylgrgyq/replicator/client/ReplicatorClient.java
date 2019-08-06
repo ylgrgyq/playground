@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.client;
 
-import com.github.ylgrgyq.replicator.common.RemotingCommand;
+import com.github.ylgrgyq.replicator.common.commands.RemotingCommand;
 import com.github.ylgrgyq.replicator.common.ReplicateChannel;
 
 public interface ReplicatorClient {

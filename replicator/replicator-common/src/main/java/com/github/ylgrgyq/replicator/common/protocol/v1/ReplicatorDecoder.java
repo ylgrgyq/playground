@@ -1,8 +1,6 @@
 package com.github.ylgrgyq.replicator.common.protocol.v1;
 
-import com.github.ylgrgyq.replicator.common.RemotingCommand;
-import com.github.ylgrgyq.replicator.common.RequestCommand;
-import com.github.ylgrgyq.replicator.common.ResponseCommand;
+import com.github.ylgrgyq.replicator.common.commands.*;
 import com.github.ylgrgyq.replicator.common.exception.CodecException;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;

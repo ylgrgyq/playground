@@ -1,6 +1,7 @@
 package com.github.ylgrgyq.replicator.common;
 
-import com.github.ylgrgyq.replicator.common.protocol.v1.ErrorCommand;
+import com.github.ylgrgyq.replicator.common.commands.ErrorCommand;
+import com.github.ylgrgyq.replicator.common.commands.RemotingCommand;
 import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

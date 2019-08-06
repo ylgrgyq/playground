@@ -1,7 +1,9 @@
 package com.github.ylgrgyq.replicator.common;
 
-import com.github.ylgrgyq.replicator.common.protocol.v1.CommandFactoryManager;
-import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
+import com.github.ylgrgyq.replicator.common.commands.RemotingCommand;
+import com.github.ylgrgyq.replicator.common.commands.ResponseCommand;
+import com.github.ylgrgyq.replicator.common.commands.CommandFactoryManager;
+import com.github.ylgrgyq.replicator.common.commands.MessageType;
 
 public class RemotingContext implements Context{
     private ReplicateChannel channel;

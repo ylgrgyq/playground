@@ -1,11 +1,19 @@
-package com.github.ylgrgyq.replicator.common.entity;
+package com.github.ylgrgyq.replicator.common.commands;
 
-public class HandshakeResponse {
-    public byte[] serialize() {
-        return new byte[0];
+@CommandFactoryManager.AutoLoad
+public final class HandshakeResponseCommand extends ResponseCommand {
+    private static final byte VERSION = 1;
+
+    public HandshakeResponseCommand() {
+        super(MessageType.HANDSHAKE, VERSION);
     }
 
-    public void deserialize(byte[] content) {
+    @Override
+    public void serialize() {
+    }
+
+    @Override
+    public void deserialize() {
     }
 
     @Override

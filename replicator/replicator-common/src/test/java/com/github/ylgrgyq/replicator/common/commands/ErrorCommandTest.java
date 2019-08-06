@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.common.protocol.v1;
+package com.github.ylgrgyq.replicator.common.commands;
 
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 import org.junit.Test;

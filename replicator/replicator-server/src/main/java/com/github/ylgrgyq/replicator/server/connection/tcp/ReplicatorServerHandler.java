@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.server.connection.tcp;
 
 import com.github.ylgrgyq.replicator.common.NettyReplicateChannel;
-import com.github.ylgrgyq.replicator.common.RemotingCommand;
+import com.github.ylgrgyq.replicator.common.commands.RemotingCommand;
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.server.Replica;

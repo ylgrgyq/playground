@@ -1,9 +1,6 @@
-package com.github.ylgrgyq.replicator.common.protocol.v1;
+package com.github.ylgrgyq.replicator.common.commands;
 
 import com.github.ylgrgyq.replicator.common.CommandFactory;
-import com.github.ylgrgyq.replicator.common.RemotingCommand;
-import com.github.ylgrgyq.replicator.common.RequestCommand;
-import com.github.ylgrgyq.replicator.common.ResponseCommand;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

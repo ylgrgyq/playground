@@ -1,8 +1,8 @@
-package com.github.ylgrgyq.replicator.common.protocol.v1;
+package com.github.ylgrgyq.replicator.common.commands;
 
 import org.junit.Test;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class HandshakeRequestCommandTest {
 

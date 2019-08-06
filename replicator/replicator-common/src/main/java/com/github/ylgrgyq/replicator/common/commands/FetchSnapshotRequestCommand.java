@@ -1,11 +1,19 @@
-package com.github.ylgrgyq.replicator.common.entity;
+package com.github.ylgrgyq.replicator.common.commands;
 
-public class FetchSnapshotRequest {
-    public byte[] serialize() {
-        return new byte[0];
+@CommandFactoryManager.AutoLoad
+public final class FetchSnapshotRequestCommand extends RequestCommand {
+    private static final byte VERSION = 1;
+
+    public FetchSnapshotRequestCommand() {
+        super(MessageType.FETCH_SNAPSHOT, VERSION);
     }
 
-    public void deserialize(byte[] content) {
+    @Override
+    public void serialize() {
+    }
+
+    @Override
+    public void deserialize() {
     }
 
     @Override

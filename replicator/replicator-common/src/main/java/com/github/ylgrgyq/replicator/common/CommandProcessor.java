@@ -1,6 +1,7 @@
 package com.github.ylgrgyq.replicator.common;
 
-import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
+import com.github.ylgrgyq.replicator.common.commands.RemotingCommand;
+import com.github.ylgrgyq.replicator.common.commands.MessageType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

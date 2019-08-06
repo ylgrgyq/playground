@@ -1,17 +1,18 @@
-package com.github.ylgrgyq.replicator.common.protocol.v1;
+package com.github.ylgrgyq.replicator.common.commands;
 
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
-public class FetchSnapshotRequestCommandTest {
+public class HandshakeResponseCommandTest {
+
     @Test
     public void serialize() {
-        FetchSnapshotRequestCommand expect = new FetchSnapshotRequestCommand();
+        HandshakeResponseCommand expect = new HandshakeResponseCommand();
 
         expect.serialize();
 
-        FetchSnapshotRequestCommand actual = new FetchSnapshotRequestCommand();
+        HandshakeResponseCommand actual = new HandshakeResponseCommand();
         actual.setContent(expect.getContent());
         actual.deserialize();
 

@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.common.protocol.v1;
+package com.github.ylgrgyq.replicator.common.commands;
 
 public enum CommandType {
     ONE_WAY((byte) 0),

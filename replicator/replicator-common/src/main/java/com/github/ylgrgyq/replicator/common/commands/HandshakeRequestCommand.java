@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.common.protocol.v1;
+package com.github.ylgrgyq.replicator.common.commands;
 
 import com.github.ylgrgyq.replicator.common.Bits;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
@@ -7,13 +7,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 @CommandFactoryManager.AutoLoad
-public final class HandshakeRequestCommand extends RequestCommandV1 {
+public final class HandshakeRequestCommand extends RequestCommand {
+    private static final byte VERSION = 1;
     private static final int MINIMUM_LENGTH = 4;
 
     private String topic;
 
     public HandshakeRequestCommand() {
-        super(MessageType.HANDSHAKE);
+        super(MessageType.HANDSHAKE, VERSION);
         this.topic = "";
     }
 

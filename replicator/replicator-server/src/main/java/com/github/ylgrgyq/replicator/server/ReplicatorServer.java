@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.server;
 
-import com.github.ylgrgyq.replicator.common.RemotingCommand;
+import com.github.ylgrgyq.replicator.common.commands.RemotingCommand;
 import com.github.ylgrgyq.replicator.common.ReplicateChannel;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;

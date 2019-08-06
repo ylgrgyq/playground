@@ -1,19 +1,21 @@
-package com.github.ylgrgyq.replicator.common.entity;
+package com.github.ylgrgyq.replicator.common.commands;
 
 import com.github.ylgrgyq.replicator.common.Bits;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
-import com.github.ylgrgyq.replicator.common.protocol.v1.ErrorCommand;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
-public class ErrorInfo {
+@CommandFactoryManager.AutoLoad
+public final class ErrorCommand extends RequestCommand {
     private static final int MINIMUM_LENGTH = 8;
+    private static final byte VERSION = 1;
 
     private int errorCode;
     private String errorMsg;
 
-    public ErrorInfo() {
+    public ErrorCommand() {
+        super(CommandType.ONE_WAY, MessageType.ERROR, VERSION);
         this.errorMsg = "";
     }
 
@@ -35,7 +37,8 @@ public class ErrorInfo {
         return errorMsg;
     }
 
-    public byte[] serialize() {
+    @Override
+    public void serialize() {
         byte[] buffer;
         if (errorMsg == null) {
             buffer = new byte[Integer.BYTES + Integer.BYTES];
@@ -52,10 +55,12 @@ public class ErrorInfo {
             System.arraycopy(msg, 0, buffer, 8, msg.length);
         }
 
-        return buffer;
+        setContent(buffer);
     }
 
-    public void deserialize(byte[] content) throws DeserializationException {
+    @Override
+    public void deserialize() throws DeserializationException {
+        byte[] content = getContent();
         if (content != null && content.length >= MINIMUM_LENGTH) {
             errorCode = Bits.getInt(content, 0);
             int len = Bits.getInt(content, 4);

@@ -1,14 +1,21 @@
-package com.github.ylgrgyq.replicator.common.entity;
+package com.github.ylgrgyq.replicator.common.commands;
 
 import com.github.ylgrgyq.replicator.common.Bits;
+import com.github.ylgrgyq.replicator.common.entity.Snapshot;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 
 import java.util.Objects;
 
-public class FetchSnapshotResponse {
+@CommandFactoryManager.AutoLoad
+public final class FetchSnapshotResponseCommand extends ResponseCommand {
+    private static final byte VERSION = 1;
     private static final int MINIMUM_LENGTH = 4;
 
     private Snapshot snapshot;
+
+    public FetchSnapshotResponseCommand() {
+        super(MessageType.FETCH_SNAPSHOT, VERSION);
+    }
 
     public Snapshot getSnapshot() {
         return snapshot;
@@ -18,7 +25,8 @@ public class FetchSnapshotResponse {
         this.snapshot = snapshot;
     }
 
-    public byte[] serialize() {
+    @Override
+    public void serialize() {
         byte[] buffer;
         if (snapshot != null) {
             byte[] snapshotInBytes = snapshot.serialize();
@@ -30,10 +38,12 @@ public class FetchSnapshotResponse {
             buffer = new byte[Integer.BYTES];
             Bits.putInt(buffer, 0, 0);
         }
-        return buffer;
+        setContent(buffer);
     }
 
-    public void deserialize(byte[] content) throws DeserializationException {
+    @Override
+    public void deserialize() throws DeserializationException {
+        byte[] content = getContent();
         if (content != null && content.length >= MINIMUM_LENGTH) {
             int size = Bits.getInt(content, 0);
             if (size + Integer.BYTES == content.length) {
@@ -56,7 +66,7 @@ public class FetchSnapshotResponse {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
-        FetchSnapshotResponse that = (FetchSnapshotResponse) o;
+        FetchSnapshotResponseCommand that = (FetchSnapshotResponseCommand) o;
         return Objects.equals(snapshot, that.snapshot);
     }
 

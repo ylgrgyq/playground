@@ -3,7 +3,7 @@ package com.github.ylgrgyq.replicator.client.connection.tcp;
 import com.github.ylgrgyq.replicator.client.*;
 import com.github.ylgrgyq.replicator.common.*;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
-import com.github.ylgrgyq.replicator.common.RemotingCommand;
+import com.github.ylgrgyq.replicator.common.commands.RemotingCommand;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;

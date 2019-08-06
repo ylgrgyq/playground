@@ -1,6 +1,7 @@
-package com.github.ylgrgyq.replicator.common.entity;
+package com.github.ylgrgyq.replicator.common.commands;
 
 import com.github.ylgrgyq.replicator.common.Bits;
+import com.github.ylgrgyq.replicator.common.entity.LogEntry;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 
 import java.util.ArrayList;
@@ -9,10 +10,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-public class FetchLogsResponse {
+@CommandFactoryManager.AutoLoad
+public final class FetchLogsResponseCommand extends ResponseCommand {
+    private static final byte VERSION = 1;
+
     private List<LogEntry> logs;
 
-    public FetchLogsResponse() {
+    public FetchLogsResponseCommand() {
+        super(MessageType.FETCH_LOGS, VERSION);
         this.logs = Collections.emptyList();
     }
 
@@ -26,7 +31,8 @@ public class FetchLogsResponse {
         }
     }
 
-    public byte[] serialize() {
+    @Override
+    public void serialize() {
         List<byte[]> logsInBytes = logs.stream().map(LogEntry::serialize).collect(Collectors.toList());
 
         int size = logsInBytes.stream().mapToInt(bs -> bs.length).sum();
@@ -42,10 +48,12 @@ public class FetchLogsResponse {
             off += logSize;
         }
 
-        return buffer;
+        setContent(buffer);
     }
 
-    public void deserialize(byte[] content) throws DeserializationException {
+    @Override
+    public void deserialize() throws DeserializationException {
+        byte[] content = getContent();
 
         ArrayList<LogEntry> entries = new ArrayList<>();
         if (content != null) {
@@ -79,7 +87,7 @@ public class FetchLogsResponse {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
-        FetchLogsResponse that = (FetchLogsResponse) o;
+        FetchLogsResponseCommand that = (FetchLogsResponseCommand) o;
         return Objects.equals(getLogs(), that.getLogs());
     }
 

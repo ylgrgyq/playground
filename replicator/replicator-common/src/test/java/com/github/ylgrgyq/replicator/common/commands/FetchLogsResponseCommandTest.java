@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.common.protocol.v1;
+package com.github.ylgrgyq.replicator.common.commands;
 
 import com.github.ylgrgyq.replicator.common.entity.LogEntry;
 import org.junit.Test;
