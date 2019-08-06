@@ -11,8 +11,8 @@ import java.util.Objects;
 public class CommandProcessor<CXT extends Context> implements Processor<CXT, RemotingCommand> {
     private static final Logger logger = LoggerFactory.getLogger("processor");
 
-    private Map<MessageType, Processor<? super CXT, ?>> requestProcessor;
-    private Map<MessageType, Processor<? super CXT, ?>> responseProcessor;
+    private Map<MessageType, Processor<? super CXT, ? extends RemotingCommand>> requestProcessor;
+    private Map<MessageType, Processor<? super CXT, ? extends RemotingCommand>> responseProcessor;
     private Processor<? super CXT, ?> defaultRequestProcessor;
     private Processor<? super CXT, ?> defaultResponseProcessor;
 
@@ -25,21 +25,21 @@ public class CommandProcessor<CXT extends Context> implements Processor<CXT, Rem
                 logger.warn("No processor available to process response: {} with type: {}", ctx, ctx.getRemotingCommandMessageType());
     }
 
-    public void registerRequestProcessor(MessageType type, Processor<? super CXT, ?> processor) {
+    public void registerRequestProcessor(MessageType type, Processor<? super CXT, ? extends RemotingCommand> processor) {
         Objects.requireNonNull(type);
         Objects.requireNonNull(processor);
 
         requestProcessor.put(type, processor);
     }
 
-    public void registerOnewayCommandProcessor(MessageType type, Processor<? super CXT, ?> processor) {
+    public void registerOnewayCommandProcessor(MessageType type, Processor<? super CXT, ? extends RemotingCommand> processor) {
         Objects.requireNonNull(type);
         Objects.requireNonNull(processor);
 
         requestProcessor.put(type, processor);
     }
 
-    public void registerResponseProcessor(MessageType type, Processor<? super CXT, ?> processor) {
+    public void registerResponseProcessor(MessageType type, Processor<? super CXT, ? extends RemotingCommand> processor) {
         Objects.requireNonNull(type);
         Objects.requireNonNull(processor);
 
@@ -61,17 +61,17 @@ public class CommandProcessor<CXT extends Context> implements Processor<CXT, Rem
         switch (cmd.getCommandType()) {
             case REQUEST:
             case ONE_WAY:
-                Processor<? super CXT, ?> reqProcessor = requestProcessor.get(cmd.getMessageType());
+                Processor<? super CXT, ? extends RemotingCommand> reqProcessor = requestProcessor.get(cmd.getMessageType());
                 if (reqProcessor != null) {
-                    reqProcessor.process(ctx, cmd.getBody());
+                    reqProcessor.process(ctx, cmd.cast());
                 } else {
                     defaultRequestProcessor.process(ctx, cmd.getBody());
                 }
                 break;
             case RESPONSE:
-                Processor<? super CXT, ?> resProcessor = responseProcessor.get(cmd.getMessageType());
+                Processor<? super CXT, ? extends RemotingCommand> resProcessor = responseProcessor.get(cmd.getMessageType());
                 if (resProcessor != null) {
-                    resProcessor.process(ctx, cmd.getBody());
+                    resProcessor.process(ctx, cmd.cast());
                 } else {
                     defaultResponseProcessor.process(ctx, cmd.getBody());
                 }

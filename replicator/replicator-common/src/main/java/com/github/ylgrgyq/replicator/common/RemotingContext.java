@@ -21,7 +21,7 @@ public class RemotingContext implements Context{
     public void sendResponse(Object responseObject) {
         ResponseCommand resp = CommandFactoryManager.createResponse(command);
         resp.setResponseObject(responseObject);
-        channel.writeRemoting(resp);
+        channel.writeRemoting((RemotingCommand)responseObject);
     }
 
     protected ReplicateChannel getChannel() {

@@ -286,9 +286,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class HandshakeResponseProcessor implements Processor<RemotingContext, FetchSnapshotResponseCommand> {
+    private class HandshakeResponseProcessor implements Processor<RemotingContext, HandshakeResponseCommand> {
         @Override
-        public void process(RemotingContext ctx, FetchSnapshotResponseCommand cmd) {
+        public void process(RemotingContext ctx, HandshakeResponseCommand cmd) {
             Snapshot lastSnapshot = snapshotManager.getLastSnapshot();
             if (lastSnapshot != null && lastSnapshot.getId() > lastId) {
                 handleApplySnapshot(lastSnapshot);
@@ -298,9 +298,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class FetchLogsResponseProcessor implements Processor<RemotingContext, FetchLogsResponse> {
+    private class FetchLogsResponseProcessor implements Processor<RemotingContext, FetchLogsResponseCommand> {
         @Override
-        public void process(RemotingContext ctx, FetchLogsResponse req) {
+        public void process(RemotingContext ctx, FetchLogsResponseCommand req) {
             List<LogEntry> entryList = req.getLogs();
             if (!entryList.isEmpty()) {
                 LogEntry firstEntry = entryList.get(0);
@@ -329,9 +329,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class FetchSnapshotResponseProcessor implements Processor<RemotingContext, FetchSnapshotResponse> {
+    private class FetchSnapshotResponseProcessor implements Processor<RemotingContext, FetchSnapshotResponseCommand> {
         @Override
-        public void process(RemotingContext ctx, FetchSnapshotResponse response) {
+        public void process(RemotingContext ctx, FetchSnapshotResponseCommand response) {
             Snapshot snapshot = response.getSnapshot();
             handleApplySnapshot(snapshot);
         }
@@ -345,8 +345,8 @@ public class ReplicatorClientImpl implements ReplicatorClient {
 
     private void handleApplySnapshot(Snapshot snapshot) {
         try {
-            long snapshotId = snapshot.getId();
-            if (snapshotId > lastId) {
+            if (snapshot != null && snapshot.getId() > lastId) {
+                long snapshotId = snapshot.getId();
                 snapshotManager.storeSnapshot(snapshot);
                 stateMachineCaller.applySnapshot(snapshot)
                         .whenComplete((ret, t) -> {
@@ -404,12 +404,10 @@ public class ReplicatorClientImpl implements ReplicatorClient {
             return;
         }
 
-        FetchLogsRequest fetchLogs = new FetchLogsRequest();
+        FetchLogsRequestCommand fetchLogs = new FetchLogsRequestCommand();
         fetchLogs.setFromId(lastId);
         fetchLogs.setLimit(options.getFetchLogsBatchSize());
 
-        RequestCommand command = CommandFactoryManager.createRequest(MessageType.FETCH_LOGS);
-        command.setRequestObject(fetchLogs);
-        remotingChannel.writeRemoting(command);
+        remotingChannel.writeRemoting(fetchLogs);
     }
 }

@@ -62,6 +62,11 @@ public abstract class RemotingCommand {
         this.body = body;
     }
 
+    @SuppressWarnings("unchecked")
+    public <T extends RemotingCommand> T cast() {
+        return (T)this;
+    }
+
     public abstract void serialize() throws SerializationException;
 
     public abstract void deserialize() throws DeserializationException;
