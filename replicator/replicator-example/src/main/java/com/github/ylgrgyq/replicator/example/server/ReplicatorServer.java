@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.example.server;
 
-import com.github.ylgrgyq.replicator.common.Snapshot;
+import com.github.ylgrgyq.replicator.common.entity.Snapshot;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;

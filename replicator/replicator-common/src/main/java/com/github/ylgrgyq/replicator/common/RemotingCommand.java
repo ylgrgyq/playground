@@ -5,7 +5,6 @@ import com.github.ylgrgyq.replicator.common.exception.SerializationException;
 import com.github.ylgrgyq.replicator.common.protocol.v1.CommandType;
 import com.github.ylgrgyq.replicator.common.protocol.v1.MessageType;
 
-import java.util.Arrays;
 import java.util.Objects;
 
 public abstract class RemotingCommand {

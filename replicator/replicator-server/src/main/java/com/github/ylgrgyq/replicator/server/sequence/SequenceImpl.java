@@ -1,8 +1,8 @@
 package com.github.ylgrgyq.replicator.server.sequence;
 
-import com.github.ylgrgyq.replicator.common.LogEntry;
+import com.github.ylgrgyq.replicator.common.entity.LogEntry;
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
-import com.github.ylgrgyq.replicator.common.Snapshot;
+import com.github.ylgrgyq.replicator.common.entity.Snapshot;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.server.SnapshotGenerator;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;

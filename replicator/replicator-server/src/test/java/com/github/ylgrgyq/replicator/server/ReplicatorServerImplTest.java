@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.server;
 
-import com.github.ylgrgyq.replicator.common.LogEntry;
-import com.github.ylgrgyq.replicator.common.Snapshot;
+import com.github.ylgrgyq.replicator.common.entity.LogEntry;
+import com.github.ylgrgyq.replicator.common.entity.Snapshot;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceReader;

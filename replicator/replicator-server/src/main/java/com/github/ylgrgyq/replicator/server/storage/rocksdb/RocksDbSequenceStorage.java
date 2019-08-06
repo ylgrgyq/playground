@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
-import com.github.ylgrgyq.replicator.common.LogEntry;
+import com.github.ylgrgyq.replicator.common.entity.LogEntry;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
 

@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.common.protocol.v1;
 
-import com.github.ylgrgyq.replicator.common.LogEntry;
+import com.github.ylgrgyq.replicator.common.entity.LogEntry;
 import org.junit.Test;
 
 import java.util.ArrayList;

@@ -1,6 +1,9 @@
 package com.github.ylgrgyq.replicator.server;
 
 import com.github.ylgrgyq.replicator.common.*;
+import com.github.ylgrgyq.replicator.common.entity.FetchLogsRequest;
+import com.github.ylgrgyq.replicator.common.entity.FetchSnapshotRequest;
+import com.github.ylgrgyq.replicator.common.entity.HandshakeRequest;
 import com.github.ylgrgyq.replicator.common.protocol.v1.*;
 import com.github.ylgrgyq.replicator.server.connection.tcp.ConnectionManager;
 import com.github.ylgrgyq.replicator.server.connection.tcp.ReplicatorServerHandler;
@@ -121,9 +124,9 @@ public class ReplicatorServerImpl implements ReplicatorServer {
         storage.shutdown();
     }
 
-    private class HandshakeRequestProcessor implements Processor<ReplicatorRemotingContext, HandshakeRequestCommand> {
+    private class HandshakeRequestProcessor implements Processor<ReplicatorRemotingContext, HandshakeRequest> {
         @Override
-        public void process(ReplicatorRemotingContext ctx, HandshakeRequestCommand handshake) {
+        public void process(ReplicatorRemotingContext ctx, HandshakeRequest handshake) {
             String topic = handshake.getTopic();
 
             SequenceImpl seq = groups.getSequence(topic);
@@ -135,16 +138,16 @@ public class ReplicatorServerImpl implements ReplicatorServer {
         }
     }
 
-    private class FetchLogsRequestProcessor implements  Processor<ReplicatorRemotingContext, FetchLogsRequestCommand> {
+    private class FetchLogsRequestProcessor implements  Processor<ReplicatorRemotingContext, FetchLogsRequest> {
         @Override
-        public void process(ReplicatorRemotingContext ctx, FetchLogsRequestCommand cmd) {
+        public void process(ReplicatorRemotingContext ctx, FetchLogsRequest cmd) {
             ctx.getReplica().handleFetchLogs(ctx, cmd);
         }
     }
 
-    private class FetchSnapshotRequestProcessor implements Processor<ReplicatorRemotingContext, FetchSnapshotRequestCommand> {
+    private class FetchSnapshotRequestProcessor implements Processor<ReplicatorRemotingContext, FetchSnapshotRequest> {
         @Override
-        public void process(ReplicatorRemotingContext ctx, FetchSnapshotRequestCommand cmd) {
+        public void process(ReplicatorRemotingContext ctx, FetchSnapshotRequest cmd) {
             ctx.getReplica().handleFetchSnapshot(ctx);
         }
     }

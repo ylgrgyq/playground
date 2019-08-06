@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.client;
 
-import com.github.ylgrgyq.replicator.common.Snapshot;
+import com.github.ylgrgyq.replicator.common.entity.Snapshot;
 import org.junit.Before;
 import org.junit.Test;
 

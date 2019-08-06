@@ -1,7 +1,6 @@
-package com.github.ylgrgyq.replicator.common.protocol.v1;
+package com.github.ylgrgyq.replicator.common.entity;
 
 import com.github.ylgrgyq.replicator.common.Bits;
-import com.github.ylgrgyq.replicator.common.entity.LogEntry;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 
 import java.util.ArrayList;
@@ -10,12 +9,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-@CommandFactoryManager.AutoLoad
-public final class FetchLogsResponseCommand extends ResponseCommandV1 {
+public class FetchLogsResponse {
     private List<LogEntry> logs;
 
-    public FetchLogsResponseCommand() {
-        super(MessageType.FETCH_LOGS);
+    public FetchLogsResponse() {
         this.logs = Collections.emptyList();
     }
 
@@ -29,8 +26,7 @@ public final class FetchLogsResponseCommand extends ResponseCommandV1 {
         }
     }
 
-    @Override
-    public void serialize() {
+    public byte[] serialize() {
         List<byte[]> logsInBytes = logs.stream().map(LogEntry::serialize).collect(Collectors.toList());
 
         int size = logsInBytes.stream().mapToInt(bs -> bs.length).sum();
@@ -46,12 +42,10 @@ public final class FetchLogsResponseCommand extends ResponseCommandV1 {
             off += logSize;
         }
 
-        setContent(buffer);
+        return buffer;
     }
 
-    @Override
-    public void deserialize() throws DeserializationException {
-        byte[] content = getContent();
+    public void deserialize(byte[] content) throws DeserializationException {
 
         ArrayList<LogEntry> entries = new ArrayList<>();
         if (content != null) {
@@ -85,7 +79,7 @@ public final class FetchLogsResponseCommand extends ResponseCommandV1 {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
-        FetchLogsResponseCommand that = (FetchLogsResponseCommand) o;
+        FetchLogsResponse that = (FetchLogsResponse) o;
         return Objects.equals(getLogs(), that.getLogs());
     }
 

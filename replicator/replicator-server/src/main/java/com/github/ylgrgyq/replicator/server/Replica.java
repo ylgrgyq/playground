@@ -1,13 +1,8 @@
 package com.github.ylgrgyq.replicator.server;
 
-import com.github.ylgrgyq.replicator.common.LogEntry;
 import com.github.ylgrgyq.replicator.common.ReplicateChannel;
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
-import com.github.ylgrgyq.replicator.common.Snapshot;
-import com.github.ylgrgyq.replicator.common.protocol.v1.FetchLogsRequestCommand;
-import com.github.ylgrgyq.replicator.common.protocol.v1.FetchLogsResponseCommand;
-import com.github.ylgrgyq.replicator.common.protocol.v1.FetchSnapshotResponseCommand;
-import com.github.ylgrgyq.replicator.common.protocol.v1.HandshakeResponseCommand;
+import com.github.ylgrgyq.replicator.common.entity.*;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,13 +27,13 @@ public class Replica implements ReplicateRequestHandler {
         this.seq = seq;
         handshaked.set(true);
 
-        HandshakeResponseCommand handshake = new HandshakeResponseCommand();
+        HandshakeResponse handshake = new HandshakeResponse();
 
         ctx.sendResponse(handshake);
     }
 
     @Override
-    public void handleFetchLogs(ReplicatorRemotingContext ctx, FetchLogsRequestCommand fetchLogs) {
+    public void handleFetchLogs(ReplicatorRemotingContext ctx, FetchLogsRequest fetchLogs) {
         if (!checkHandshakeState()) {
             return;
         }
@@ -49,7 +44,7 @@ public class Replica implements ReplicateRequestHandler {
         int limit = fetchLogs.getLimit();
 
         List<LogEntry> logs = seq.getLogs(fromIndex, limit);
-        FetchLogsResponseCommand r = new FetchLogsResponseCommand();
+        FetchLogsResponse r = new FetchLogsResponse();
         r.setLogs(logs);
 
         logger.debug("send get resp {} {}", r);
@@ -65,7 +60,7 @@ public class Replica implements ReplicateRequestHandler {
         logger.info("Got fetch snapshot request");
 
         Snapshot snapshot = seq.getLastSnapshot();
-        FetchSnapshotResponseCommand r = new FetchSnapshotResponseCommand();
+        FetchSnapshotResponse r = new FetchSnapshotResponse();
         r.setSnapshot(snapshot);
 
         logger.debug("send snapshot resp {}", r);

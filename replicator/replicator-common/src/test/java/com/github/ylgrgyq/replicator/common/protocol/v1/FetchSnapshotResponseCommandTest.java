@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.common.protocol.v1;
 
-import com.github.ylgrgyq.replicator.common.Snapshot;
+import com.github.ylgrgyq.replicator.common.entity.Snapshot;
 import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;

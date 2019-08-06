@@ -1,20 +1,14 @@
-package com.github.ylgrgyq.replicator.common.protocol.v1;
+package com.github.ylgrgyq.replicator.common.entity;
 
 import com.github.ylgrgyq.replicator.common.Bits;
-import com.github.ylgrgyq.replicator.common.entity.Snapshot;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 
 import java.util.Objects;
 
-@CommandFactoryManager.AutoLoad
-public final class FetchSnapshotResponseCommand extends ResponseCommandV1 {
+public class FetchSnapshotResponse {
     private static final int MINIMUM_LENGTH = 4;
 
     private Snapshot snapshot;
-
-    public FetchSnapshotResponseCommand() {
-        super(MessageType.FETCH_SNAPSHOT);
-    }
 
     public Snapshot getSnapshot() {
         return snapshot;
@@ -24,8 +18,7 @@ public final class FetchSnapshotResponseCommand extends ResponseCommandV1 {
         this.snapshot = snapshot;
     }
 
-    @Override
-    public void serialize() {
+    public byte[] serialize() {
         byte[] buffer;
         if (snapshot != null) {
             byte[] snapshotInBytes = snapshot.serialize();
@@ -37,12 +30,10 @@ public final class FetchSnapshotResponseCommand extends ResponseCommandV1 {
             buffer = new byte[Integer.BYTES];
             Bits.putInt(buffer, 0, 0);
         }
-        setContent(buffer);
+        return buffer;
     }
 
-    @Override
-    public void deserialize() throws DeserializationException {
-        byte[] content = getContent();
+    public void deserialize(byte[] content) throws DeserializationException {
         if (content != null && content.length >= MINIMUM_LENGTH) {
             int size = Bits.getInt(content, 0);
             if (size + Integer.BYTES == content.length) {
@@ -65,7 +56,7 @@ public final class FetchSnapshotResponseCommand extends ResponseCommandV1 {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
-        FetchSnapshotResponseCommand that = (FetchSnapshotResponseCommand) o;
+        FetchSnapshotResponse that = (FetchSnapshotResponse) o;
         return Objects.equals(snapshot, that.snapshot);
     }
 

@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.client;
 
 import com.github.ylgrgyq.replicator.common.Bits;
-import com.github.ylgrgyq.replicator.common.Snapshot;
+import com.github.ylgrgyq.replicator.common.entity.Snapshot;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

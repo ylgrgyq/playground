@@ -1,17 +1,18 @@
-package com.github.ylgrgyq.replicator.common;
+package com.github.ylgrgyq.replicator.common.entity;
 
+import com.github.ylgrgyq.replicator.common.Bits;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 
 import java.util.Arrays;
 import java.util.Objects;
 
-public class Snapshot {
+public class LogEntry {
     private static final int MINIMUM_LENGTH = 12;
 
     private long id;
     private byte[] data;
 
-    public Snapshot() {
+    public LogEntry() {
         this.data = new byte[0];
     }
 
@@ -49,7 +50,7 @@ public class Snapshot {
             data = new byte[size];
             System.arraycopy(content, 12, data, 0, size);
         } else {
-            throw new DeserializationException("Snapshot buffer underflow");
+            throw new DeserializationException("LogEntry buffer underflow");
         }
     }
 
@@ -57,9 +58,9 @@ public class Snapshot {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Snapshot snapshot = (Snapshot) o;
-        return getId() == snapshot.getId() &&
-                Arrays.equals(getData(), snapshot.getData());
+        LogEntry logEntry = (LogEntry) o;
+        return getId() == logEntry.getId() &&
+                Arrays.equals(getData(), logEntry.getData());
     }
 
     @Override
@@ -72,7 +73,7 @@ public class Snapshot {
 
     @Override
     public String toString() {
-        return "Snapshot{" +
+        return "LogEntry{" +
                 "id=" + id +
                 ", dataLength=" + data.length +
                 '}';

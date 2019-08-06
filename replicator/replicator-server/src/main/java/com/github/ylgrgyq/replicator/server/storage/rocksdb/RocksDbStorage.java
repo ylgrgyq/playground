@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.server.storage.rocksdb;
 
 import com.github.ylgrgyq.replicator.common.Bits;
-import com.github.ylgrgyq.replicator.common.LogEntry;
+import com.github.ylgrgyq.replicator.common.entity.LogEntry;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.server.Preconditions;

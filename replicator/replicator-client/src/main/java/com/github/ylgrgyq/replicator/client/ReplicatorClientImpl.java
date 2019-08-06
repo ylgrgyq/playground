@@ -2,6 +2,7 @@ package com.github.ylgrgyq.replicator.client;
 
 import com.github.ylgrgyq.replicator.client.connection.tcp.ReplicatorClientHandler;
 import com.github.ylgrgyq.replicator.common.*;
+import com.github.ylgrgyq.replicator.common.entity.*;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.common.protocol.v1.*;
 import io.netty.bootstrap.Bootstrap;
@@ -297,9 +298,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class FetchLogsResponseProcessor implements Processor<RemotingContext, FetchLogsResponseCommand> {
+    private class FetchLogsResponseProcessor implements Processor<RemotingContext, FetchLogsResponse> {
         @Override
-        public void process(RemotingContext ctx, FetchLogsResponseCommand req) {
+        public void process(RemotingContext ctx, FetchLogsResponse req) {
             List<LogEntry> entryList = req.getLogs();
             if (!entryList.isEmpty()) {
                 LogEntry firstEntry = entryList.get(0);
@@ -328,9 +329,9 @@ public class ReplicatorClientImpl implements ReplicatorClient {
         }
     }
 
-    private class FetchSnapshotResponseProcessor implements Processor<RemotingContext, FetchSnapshotResponseCommand> {
+    private class FetchSnapshotResponseProcessor implements Processor<RemotingContext, FetchSnapshotResponse> {
         @Override
-        public void process(RemotingContext ctx, FetchSnapshotResponseCommand response) {
+        public void process(RemotingContext ctx, FetchSnapshotResponse response) {
             Snapshot snapshot = response.getSnapshot();
             handleApplySnapshot(snapshot);
         }
@@ -403,10 +404,12 @@ public class ReplicatorClientImpl implements ReplicatorClient {
             return;
         }
 
-        FetchLogsRequestCommand fetchLogs = new FetchLogsRequestCommand();
+        FetchLogsRequest fetchLogs = new FetchLogsRequest();
         fetchLogs.setFromId(lastId);
         fetchLogs.setLimit(options.getFetchLogsBatchSize());
 
-        remotingChannel.writeRemoting(fetchLogs);
+        RequestCommand command = CommandFactoryManager.createRequest(MessageType.FETCH_LOGS);
+        command.setRequestObject(fetchLogs);
+        remotingChannel.writeRemoting(command);
     }
 }

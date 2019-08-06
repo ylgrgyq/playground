@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.client;
 
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
-import com.github.ylgrgyq.replicator.common.Snapshot;
+import com.github.ylgrgyq.replicator.common.entity.Snapshot;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

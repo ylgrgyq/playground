@@ -1,5 +1,6 @@
 package com.github.ylgrgyq.replicator.common;
 
+import com.github.ylgrgyq.replicator.common.entity.LogEntry;
 import org.junit.Test;
 
 import static org.junit.Assert.*;

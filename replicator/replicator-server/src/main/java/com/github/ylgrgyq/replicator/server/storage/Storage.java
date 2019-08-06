@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.replicator.server.storage;
 
 
-import com.github.ylgrgyq.replicator.common.LogEntry;
+import com.github.ylgrgyq.replicator.common.entity.LogEntry;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 
 import java.util.List;
