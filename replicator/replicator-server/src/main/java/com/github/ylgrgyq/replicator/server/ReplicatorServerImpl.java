@@ -1,15 +1,18 @@
 package com.github.ylgrgyq.replicator.server;
 
-import com.github.ylgrgyq.replicator.common.*;
+import com.github.ylgrgyq.replicator.common.CommandProcessor;
+import com.github.ylgrgyq.replicator.common.Processor;
+import com.github.ylgrgyq.replicator.common.ReplicateChannel;
+import com.github.ylgrgyq.replicator.common.ReplicatorError;
 import com.github.ylgrgyq.replicator.common.commands.*;
-import com.github.ylgrgyq.replicator.common.protocol.v1.*;
-import com.github.ylgrgyq.replicator.server.connection.tcp.ConnectionManager;
-import com.github.ylgrgyq.replicator.server.connection.tcp.ReplicatorServerHandler;
+import com.github.ylgrgyq.replicator.common.protocol.v1.ReplicatorDecoder;
+import com.github.ylgrgyq.replicator.common.protocol.v1.ReplicatorEncoder;
 import com.github.ylgrgyq.replicator.server.sequence.*;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
 import com.github.ylgrgyq.replicator.server.storage.StorageFactory;
 import com.github.ylgrgyq.replicator.server.storage.StorageHandle;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
@@ -22,13 +25,13 @@ import org.slf4j.LoggerFactory;
 public class ReplicatorServerImpl implements ReplicatorServer {
     private static final Logger logger = LoggerFactory.getLogger(ReplicatorServer.class);
 
-    private SequenceGroups groups;
-    private ReplicatorServerOptions options;
-    private EventLoopGroup bossGroup;
-    private EventLoopGroup workerGroup;
-    private Storage<? extends StorageHandle> storage;
-    private CommandProcessor<ReplicatorRemotingContext> processor;
-    private ConnectionManager connectionManager;
+    private final SequenceGroups groups;
+    private final ReplicatorServerOptions options;
+    private final EventLoopGroup bossGroup;
+    private final EventLoopGroup workerGroup;
+    private final Storage<? extends StorageHandle> storage;
+    private final CommandProcessor<ReplicatorRemotingContext> processor;
+    private final ConnectionEventHandler connectionEventHandler;
     private volatile boolean stop;
 
     public ReplicatorServerImpl(ReplicatorServerOptions options) throws InterruptedException {
@@ -38,7 +41,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
         this.workerGroup = options.getWorkerEventLoopGroup();
         this.storage = StorageFactory.createStorage(options.getStorageOptions());
         this.processor = new CommandProcessor<>();
-        this.connectionManager = new ConnectionManager();
+        this.connectionEventHandler = new ConnectionEventHandler();
 
         registerProcessors();
         initServer();
@@ -54,6 +57,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.channel(NioServerSocketChannel.class);
         bootstrap.group(bossGroup, workerGroup);
+        bootstrap.handler(connectionEventHandler);
         bootstrap.childHandler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel serverChannel) {
@@ -63,7 +67,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
                 pipeline.addLast(new ReplicatorDecoder());
                 pipeline.addLast(new IdleStateHandler(options.getConnectionReadTimeoutSecs(), 0, 0));
 
-                pipeline.addLast(new ReplicatorServerHandler(ReplicatorServerImpl.this, connectionManager));
+                pipeline.addLast(new ReplicatorServerHandler(ReplicatorServerImpl.this));
             }
         });
 
@@ -103,7 +107,9 @@ public class ReplicatorServerImpl implements ReplicatorServer {
 
         stop = true;
 
-        connectionManager.shutdown();
+        for (Channel ch : connectionEventHandler.children()) {
+            ch.close();
+        }
 
         if (options.shouldShutdownBossEventLoopGroup()) {
             bossGroup.shutdownGracefully();

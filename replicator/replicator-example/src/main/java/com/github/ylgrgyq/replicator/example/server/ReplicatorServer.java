@@ -62,7 +62,7 @@ public class ReplicatorServer {
                     }
                 }
 
-                logger.info("generate log done {}");
+                logger.info("generate log done");
             } catch (Exception ex) {
                 logger.error("Replicator server append logs failed", ex);
             }
