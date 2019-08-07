@@ -5,7 +5,12 @@ public final class FetchSnapshotRequestCommand extends RequestCommand {
     private static final byte VERSION = 1;
 
     public FetchSnapshotRequestCommand() {
-        super(MessageType.FETCH_SNAPSHOT, VERSION);
+        super(VERSION);
+    }
+
+    @Override
+    public MessageType getMessageType() {
+        return MessageType.FETCH_SNAPSHOT;
     }
 
     @Override
@@ -13,7 +18,7 @@ public final class FetchSnapshotRequestCommand extends RequestCommand {
     }
 
     @Override
-    public void deserialize() {
+    public void deserialize(byte[] content) {
     }
 
     @Override

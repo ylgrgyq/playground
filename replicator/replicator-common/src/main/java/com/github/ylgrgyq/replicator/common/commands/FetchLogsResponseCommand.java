@@ -17,7 +17,7 @@ public final class FetchLogsResponseCommand extends ResponseCommand {
     private List<LogEntry> logs;
 
     public FetchLogsResponseCommand() {
-        super(MessageType.FETCH_LOGS, VERSION);
+        super(VERSION);
         this.logs = Collections.emptyList();
     }
 
@@ -29,6 +29,11 @@ public final class FetchLogsResponseCommand extends ResponseCommand {
         if (logs != null) {
             this.logs = logs;
         }
+    }
+
+    @Override
+    public MessageType getMessageType() {
+        return MessageType.FETCH_LOGS;
     }
 
     @Override
@@ -52,9 +57,7 @@ public final class FetchLogsResponseCommand extends ResponseCommand {
     }
 
     @Override
-    public void deserialize() throws DeserializationException {
-        byte[] content = getContent();
-
+    public void deserialize(byte[] content) throws DeserializationException {
         ArrayList<LogEntry> entries = new ArrayList<>();
         if (content != null) {
             int off = 0;

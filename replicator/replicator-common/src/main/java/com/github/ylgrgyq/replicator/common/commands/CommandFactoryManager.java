@@ -46,9 +46,7 @@ public class CommandFactoryManager {
     public static RequestCommand createRequest(MessageType type) {
         CommandFactory<? extends RequestCommand> factory = getRequestCommandFactory(type);
         if (factory != null) {
-            RequestCommand req = factory.createCommand();
-            req.setMessageVersion(MessageType.VERSION);
-            return req;
+            return factory.createCommand();
         } else {
             String emsg = "No request command factory registered for message type: " + type.name();
             logger.error(emsg);
@@ -56,19 +54,18 @@ public class CommandFactoryManager {
         }
     }
 
-    public static ResponseCommand createResponse(RemotingCommand request) {
+    public static <T extends ResponseCommand> T createResponse(RemotingCommand request) {
         MessageType type = request.getMessageType();
-        ResponseCommand res =  createResponse(type);
+        T res =  createResponse(type);
         res.setMessageVersion(request.getMessageVersion());
         return res;
     }
 
-    public static ResponseCommand createResponse(MessageType type) {
+    @SuppressWarnings("unchecked")
+    public static <T extends ResponseCommand> T createResponse(MessageType type) {
         CommandFactory<? extends ResponseCommand> factory = getResponseCommandFactory(type);
         if (factory != null) {
-            ResponseCommand req = factory.createCommand();
-            req.setMessageVersion(MessageType.VERSION);
-            return req;
+            return (T)factory.createCommand();
         } else {
             String emsg = "No response command factory registered for message type: " + type.name();
             logger.error(emsg);

@@ -20,10 +20,8 @@ public class RemotingContext implements Context{
     }
 
     @Override
-    public void sendResponse(Object responseObject) {
-        ResponseCommand resp = CommandFactoryManager.createResponse(command);
-        resp.setResponseObject(responseObject);
-        channel.writeRemoting((RemotingCommand)responseObject);
+    public void sendResponse(ResponseCommand responseObject) {
+        channel.writeRemoting(responseObject);
     }
 
     protected ReplicateChannel getChannel() {

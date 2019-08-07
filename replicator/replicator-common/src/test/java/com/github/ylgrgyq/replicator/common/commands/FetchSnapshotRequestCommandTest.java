@@ -12,8 +12,7 @@ public class FetchSnapshotRequestCommandTest {
         expect.serialize();
 
         FetchSnapshotRequestCommand actual = new FetchSnapshotRequestCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
     }

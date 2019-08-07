@@ -15,7 +15,7 @@ public final class ErrorCommand extends RequestCommand {
     private String errorMsg;
 
     public ErrorCommand() {
-        super(CommandType.ONE_WAY, MessageType.ERROR, VERSION);
+        super(CommandType.ONE_WAY, VERSION);
         this.errorMsg = "";
     }
 
@@ -35,6 +35,11 @@ public final class ErrorCommand extends RequestCommand {
 
     public String getErrorMsg() {
         return errorMsg;
+    }
+
+    @Override
+    public MessageType getMessageType() {
+        return MessageType.ERROR;
     }
 
     @Override
@@ -59,8 +64,7 @@ public final class ErrorCommand extends RequestCommand {
     }
 
     @Override
-    public void deserialize() throws DeserializationException {
-        byte[] content = getContent();
+    public void deserialize(byte[] content) throws DeserializationException {
         if (content != null && content.length >= MINIMUM_LENGTH) {
             errorCode = Bits.getInt(content, 0);
             int len = Bits.getInt(content, 4);

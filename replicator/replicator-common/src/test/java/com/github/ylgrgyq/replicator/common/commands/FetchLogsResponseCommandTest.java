@@ -44,8 +44,7 @@ public class FetchLogsResponseCommandTest {
         expect.serialize();
 
         FetchLogsResponseCommand actual = new FetchLogsResponseCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
         assertEquals(logs, actual.getLogs());
@@ -58,8 +57,7 @@ public class FetchLogsResponseCommandTest {
         expect.serialize();
 
         FetchLogsResponseCommand actual = new FetchLogsResponseCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
         assertTrue(actual.getLogs().isEmpty());

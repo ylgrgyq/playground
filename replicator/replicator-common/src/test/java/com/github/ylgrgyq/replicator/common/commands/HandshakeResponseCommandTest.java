@@ -13,8 +13,7 @@ public class HandshakeResponseCommandTest {
         expect.serialize();
 
         HandshakeResponseCommand actual = new HandshakeResponseCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
     }

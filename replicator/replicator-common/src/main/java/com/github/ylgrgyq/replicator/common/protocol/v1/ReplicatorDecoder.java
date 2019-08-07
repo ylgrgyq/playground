@@ -75,8 +75,7 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
 
             RemotingCommand command = getRequestCommandFactory(msgTypeCode);
             command.setMessageVersion(msgVersion);
-            command.setContent(content);
-            command.deserialize();
+            command.deserialize(content);
 
             if (logger.isDebugEnabled()) {
                 logger.info("receive request {} {}", MessageType.findMessageTypeByCode(msgTypeCode), command);
@@ -108,8 +107,7 @@ public class ReplicatorDecoder extends ByteToMessageDecoder {
 
             RemotingCommand command = getResponseCommandFactory(msgTypeCode);
             command.setMessageVersion(msgVersion);
-            command.setContent(content);
-            command.deserialize();
+            command.deserialize(content);
 
             if (logger.isDebugEnabled()) {
                 logger.info("response {} {}", MessageType.findMessageTypeByCode(msgTypeCode), command);

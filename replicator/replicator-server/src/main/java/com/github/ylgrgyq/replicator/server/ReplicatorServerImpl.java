@@ -132,7 +132,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
                 ctx.sendError(ReplicatorError.ETOPIC_NOT_FOUND);
             }
 
-            ctx.getReplica().onStart(ctx, seq);
+            ctx.getReplica().onStart(ctx, seq, handshake);
         }
     }
 
@@ -146,7 +146,7 @@ public class ReplicatorServerImpl implements ReplicatorServer {
     private class FetchSnapshotRequestProcessor implements Processor<ReplicatorRemotingContext, FetchSnapshotRequestCommand> {
         @Override
         public void process(ReplicatorRemotingContext ctx, FetchSnapshotRequestCommand cmd) {
-            ctx.getReplica().handleFetchSnapshot(ctx);
+            ctx.getReplica().handleFetchSnapshot(ctx, cmd);
         }
     }
 }

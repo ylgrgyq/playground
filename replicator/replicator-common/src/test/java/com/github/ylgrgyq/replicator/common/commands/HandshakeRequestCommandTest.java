@@ -14,8 +14,7 @@ public class HandshakeRequestCommandTest {
         expect.serialize();
 
         HandshakeRequestCommand actual = new HandshakeRequestCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
     }
@@ -27,8 +26,7 @@ public class HandshakeRequestCommandTest {
         expect.serialize();
 
         HandshakeRequestCommand actual = new HandshakeRequestCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
     }

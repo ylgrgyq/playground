@@ -14,15 +14,15 @@ public class CommandProcessor<CXT extends Context> implements Processor<CXT, Rem
 
     private Map<MessageType, Processor<? super CXT, ? extends RemotingCommand>> requestProcessor;
     private Map<MessageType, Processor<? super CXT, ? extends RemotingCommand>> responseProcessor;
-    private Processor<? super CXT, ?> defaultRequestProcessor;
-    private Processor<? super CXT, ?> defaultResponseProcessor;
+    private Processor<? super CXT, RemotingCommand> defaultRequestProcessor;
+    private Processor<? super CXT, RemotingCommand> defaultResponseProcessor;
 
     public CommandProcessor() {
         this.requestProcessor = new HashMap<>();
         this.responseProcessor = new HashMap<>();
-        this.defaultRequestProcessor = (ctx, obj) ->
+        this.defaultRequestProcessor = (Context ctx, RemotingCommand obj) ->
                 logger.warn("No processor available to process request: {} with type: {}", ctx, ctx.getRemotingCommandMessageType());
-        this.defaultResponseProcessor = (ctx, obj) ->
+        this.defaultResponseProcessor = (Context ctx, RemotingCommand obj) ->
                 logger.warn("No processor available to process response: {} with type: {}", ctx, ctx.getRemotingCommandMessageType());
     }
 
@@ -47,12 +47,12 @@ public class CommandProcessor<CXT extends Context> implements Processor<CXT, Rem
         responseProcessor.put(type, processor);
     }
 
-    public void registerDefaultRequestProcessor(Processor<? super Context, ?> processor) {
+    public void registerDefaultRequestProcessor(Processor<? super Context, RemotingCommand> processor) {
         Objects.requireNonNull(processor);
         defaultRequestProcessor = processor;
     }
 
-    public void registerDefaultResponseProcessor(Processor<? super Context, ?> processor) {
+    public void registerDefaultResponseProcessor(Processor<? super Context, RemotingCommand> processor) {
         Objects.requireNonNull(processor);
         defaultResponseProcessor = processor;
     }
@@ -66,7 +66,7 @@ public class CommandProcessor<CXT extends Context> implements Processor<CXT, Rem
                 if (reqProcessor != null) {
                     reqProcessor.process(ctx, cmd.cast());
                 } else {
-                    defaultRequestProcessor.process(ctx, cmd.getBody());
+                    defaultRequestProcessor.process(ctx, cmd);
                 }
                 break;
             case RESPONSE:
@@ -74,7 +74,7 @@ public class CommandProcessor<CXT extends Context> implements Processor<CXT, Rem
                 if (resProcessor != null) {
                     resProcessor.process(ctx, cmd.cast());
                 } else {
-                    defaultResponseProcessor.process(ctx, cmd.getBody());
+                    defaultResponseProcessor.process(ctx, cmd);
                 }
                 break;
             default:

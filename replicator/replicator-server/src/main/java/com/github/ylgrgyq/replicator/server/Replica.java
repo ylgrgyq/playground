@@ -2,11 +2,8 @@ package com.github.ylgrgyq.replicator.server;
 
 import com.github.ylgrgyq.replicator.common.ReplicateChannel;
 import com.github.ylgrgyq.replicator.common.ReplicatorError;
+import com.github.ylgrgyq.replicator.common.commands.*;
 import com.github.ylgrgyq.replicator.common.entity.*;
-import com.github.ylgrgyq.replicator.common.commands.FetchLogsRequestCommand;
-import com.github.ylgrgyq.replicator.common.commands.FetchLogsResponseCommand;
-import com.github.ylgrgyq.replicator.common.commands.FetchSnapshotResponseCommand;
-import com.github.ylgrgyq.replicator.common.commands.HandshakeResponseCommand;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceImpl;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,13 +24,13 @@ public class Replica implements ReplicateRequestHandler {
     }
 
     @Override
-    public void onStart(ReplicatorRemotingContext ctx, SequenceImpl seq) {
+    public void onStart(ReplicatorRemotingContext ctx, SequenceImpl seq, HandshakeRequestCommand req) {
         this.seq = seq;
         handshaked.set(true);
 
-        HandshakeResponseCommand handshake = new HandshakeResponseCommand();
+        ResponseCommand resp = CommandFactoryManager.createResponse(req);
 
-        ctx.sendResponse(handshake);
+        ctx.sendResponse(resp);
     }
 
     @Override
@@ -48,7 +45,7 @@ public class Replica implements ReplicateRequestHandler {
         int limit = fetchLogs.getLimit();
 
         List<LogEntry> logs = seq.getLogs(fromIndex, limit);
-        FetchLogsResponseCommand r = new FetchLogsResponseCommand();
+        FetchLogsResponseCommand r = CommandFactoryManager.createResponse(fetchLogs);
         r.setLogs(logs);
 
         logger.debug("send get resp {} {}", r);
@@ -56,7 +53,7 @@ public class Replica implements ReplicateRequestHandler {
     }
 
     @Override
-    public void handleFetchSnapshot(ReplicatorRemotingContext ctx) {
+    public void handleFetchSnapshot(ReplicatorRemotingContext ctx, FetchSnapshotRequestCommand fetchSnapshot) {
         if (!checkHandshakeState()) {
             return;
         }
@@ -64,7 +61,7 @@ public class Replica implements ReplicateRequestHandler {
         logger.info("Got fetch snapshot request");
 
         Snapshot snapshot = seq.getLastSnapshot();
-        FetchSnapshotResponseCommand r = new FetchSnapshotResponseCommand();
+        FetchSnapshotResponseCommand r = CommandFactoryManager.createResponse(fetchSnapshot);
         r.setSnapshot(snapshot);
 
         logger.debug("send snapshot resp {}", r);

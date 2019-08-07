@@ -20,8 +20,7 @@ public class FetchSnapshotResponseCommandTest {
         expect.serialize();
 
         FetchSnapshotResponseCommand actual = new FetchSnapshotResponseCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
         assertEquals(expectSnapshot, actual.getSnapshot());
@@ -33,8 +32,7 @@ public class FetchSnapshotResponseCommandTest {
         expect.serialize();
 
         FetchSnapshotResponseCommand actual = new FetchSnapshotResponseCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
     }

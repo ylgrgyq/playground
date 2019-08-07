@@ -18,8 +18,7 @@ public class ErrorCommandTest {
         expect.serialize();
 
         ErrorCommand actual = new ErrorCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
         assertEquals(errorCode, actual.getErrorCode());
@@ -35,8 +34,7 @@ public class ErrorCommandTest {
         expect.serialize();
 
         ErrorCommand actual = new ErrorCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
         assertEquals(errorCode, actual.getErrorCode());
@@ -50,8 +48,7 @@ public class ErrorCommandTest {
         expect.serialize();
 
         ErrorCommand actual = new ErrorCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
     }

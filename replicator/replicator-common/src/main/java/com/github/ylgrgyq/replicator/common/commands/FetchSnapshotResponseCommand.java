@@ -14,7 +14,7 @@ public final class FetchSnapshotResponseCommand extends ResponseCommand {
     private Snapshot snapshot;
 
     public FetchSnapshotResponseCommand() {
-        super(MessageType.FETCH_SNAPSHOT, VERSION);
+        super(VERSION);
     }
 
     public Snapshot getSnapshot() {
@@ -23,6 +23,11 @@ public final class FetchSnapshotResponseCommand extends ResponseCommand {
 
     public void setSnapshot(Snapshot snapshot) {
         this.snapshot = snapshot;
+    }
+
+    @Override
+    public MessageType getMessageType() {
+        return MessageType.FETCH_SNAPSHOT;
     }
 
     @Override
@@ -42,8 +47,7 @@ public final class FetchSnapshotResponseCommand extends ResponseCommand {
     }
 
     @Override
-    public void deserialize() throws DeserializationException {
-        byte[] content = getContent();
+    public void deserialize(byte[] content) throws DeserializationException {
         if (content != null && content.length >= MINIMUM_LENGTH) {
             int size = Bits.getInt(content, 0);
             if (size + Integer.BYTES == content.length) {

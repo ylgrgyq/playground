@@ -27,7 +27,7 @@ public class ReplicatorEncoder extends MessageToByteEncoder<RemotingCommand> {
             out.writeByte(Protocol.PROTOCOL_VERSION);
             out.writeByte(msg.getCommandType().getCode());
             out.writeByte(msg.getMessageType().getCode());
-            out.writeByte(MessageType.VERSION);
+            out.writeByte(msg.getMessageVersion());
 
             if (logger.isDebugEnabled()) {
                 logger.info("send request {} {}", msg.getMessageType().name(), msg);

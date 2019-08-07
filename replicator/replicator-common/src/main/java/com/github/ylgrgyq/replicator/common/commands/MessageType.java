@@ -7,8 +7,6 @@ public enum MessageType {
     FETCH_SNAPSHOT((byte) 3),
     ERROR((byte) 4);
 
-    public static final byte VERSION = 1;
-
     private byte code;
 
     MessageType(byte code) {

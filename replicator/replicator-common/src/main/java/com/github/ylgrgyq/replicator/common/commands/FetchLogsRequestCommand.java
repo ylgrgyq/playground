@@ -14,7 +14,7 @@ public final class FetchLogsRequestCommand extends RequestCommand {
     private int limit;
 
     public FetchLogsRequestCommand() {
-        super(MessageType.FETCH_LOGS, VERSION);
+        super(VERSION);
     }
 
     public long getFromId() {
@@ -34,6 +34,11 @@ public final class FetchLogsRequestCommand extends RequestCommand {
     }
 
     @Override
+    public MessageType getMessageType() {
+        return MessageType.FETCH_LOGS;
+    }
+
+    @Override
     public void serialize() {
         byte[] buffer = new byte[Long.BYTES + Integer.BYTES];
 
@@ -43,8 +48,7 @@ public final class FetchLogsRequestCommand extends RequestCommand {
     }
 
     @Override
-    public void deserialize() throws DeserializationException {
-        byte[] content = getContent();
+    public void deserialize(byte[] content) throws DeserializationException {
         if (content != null && content.length >= MINIMUM_LENGTH) {
             fromId = Bits.getLong(content, 0);
             limit = Bits.getInt(content, 8);

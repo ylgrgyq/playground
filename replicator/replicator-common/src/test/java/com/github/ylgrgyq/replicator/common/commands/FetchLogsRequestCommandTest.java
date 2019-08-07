@@ -18,8 +18,7 @@ public class FetchLogsRequestCommandTest {
         expect.serialize();
 
         FetchLogsRequestCommand actual = new FetchLogsRequestCommand();
-        actual.setContent(expect.getContent());
-        actual.deserialize();
+        actual.deserialize(expect.getContent());
 
         assertEquals(expect, actual);
         assertEquals(fromId, actual.getFromId());

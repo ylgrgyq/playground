@@ -14,7 +14,7 @@ public final class HandshakeRequestCommand extends RequestCommand {
     private String topic;
 
     public HandshakeRequestCommand() {
-        super(MessageType.HANDSHAKE, VERSION);
+        super(VERSION);
         this.topic = "";
     }
 
@@ -24,6 +24,11 @@ public final class HandshakeRequestCommand extends RequestCommand {
 
     public void setTopic(String topic) {
         this.topic = topic;
+    }
+
+    @Override
+    public MessageType getMessageType() {
+        return MessageType.HANDSHAKE;
     }
 
     @Override
@@ -43,8 +48,7 @@ public final class HandshakeRequestCommand extends RequestCommand {
     }
 
     @Override
-    public void deserialize() throws DeserializationException {
-        byte[] content = getContent();
+    public void deserialize(byte[] content) throws DeserializationException {
         if (content != null && content.length >= MINIMUM_LENGTH) {
             int len = Bits.getInt(content, 0);
             if (content.length >= MINIMUM_LENGTH + len) {

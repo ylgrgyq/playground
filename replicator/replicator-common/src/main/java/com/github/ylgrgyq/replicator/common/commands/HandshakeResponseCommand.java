@@ -5,7 +5,12 @@ public final class HandshakeResponseCommand extends ResponseCommand {
     private static final byte VERSION = 1;
 
     public HandshakeResponseCommand() {
-        super(MessageType.HANDSHAKE, VERSION);
+        super(VERSION);
+    }
+
+    @Override
+    public MessageType getMessageType() {
+        return MessageType.HANDSHAKE;
     }
 
     @Override
@@ -13,7 +18,7 @@ public final class HandshakeResponseCommand extends ResponseCommand {
     }
 
     @Override
-    public void deserialize() {
+    public void deserialize(byte[] content) {
     }
 
     @Override
