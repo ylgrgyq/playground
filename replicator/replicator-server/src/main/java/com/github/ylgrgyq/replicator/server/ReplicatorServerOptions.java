@@ -6,10 +6,10 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 
+import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 import static com.github.ylgrgyq.replicator.server.Preconditions.checkArgument;
 
@@ -175,11 +175,11 @@ public final class ReplicatorServerOptions {
             return this;
         }
 
-        public ReplicatorServerOptionsBuilder setConnectionReadTimeoutSecs(long connectionReadTimeout, TimeUnit unit) {
-            Preconditions.checkArgument(connectionReadTimeout > 0);
-            Objects.requireNonNull(unit);
+        public ReplicatorServerOptionsBuilder setConnectionReadTimeout(Duration connectionReadTimeout) {
+            Objects.requireNonNull(connectionReadTimeout);
+            Preconditions.checkArgument(connectionReadTimeout.getSeconds() > 0);
 
-            this.connectionReadTimeoutSecs = (int) unit.toSeconds(connectionReadTimeout);
+            this.connectionReadTimeoutSecs = (int) connectionReadTimeout.getSeconds();
             return this;
         }
 
