@@ -34,10 +34,6 @@
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.spotify</groupId>
-            <artifactId>completable-futures</artifactId>
-        </dependency>
         <!-- Test dependencies -->
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>

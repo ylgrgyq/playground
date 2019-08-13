@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.replicator.server;
+package com.github.ylgrgyq.replicator.common;
 
 import com.spotify.futures.CompletableFutures;
 import org.slf4j.Logger;
