@@ -17,8 +17,8 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 
-public class ReplicatorServerImplTest {
-    private ReplicatorServerImpl server;
+public class ReplicatorServerTest {
+    private ReplicatorServer server;
 
     @Before
     public void setUp() throws Exception {
@@ -37,12 +37,13 @@ public class ReplicatorServerImplTest {
                 .setStorageOptions(storageOptions)
                 .build();
 
-        server = new ReplicatorServerImpl(options);
+        server = new ReplicatorServer(options);
+        server.start().join();
     }
 
     @After
     public void tearDown() throws Exception {
-        server.shutdown();
+        server.stop();
     }
 
     @Test

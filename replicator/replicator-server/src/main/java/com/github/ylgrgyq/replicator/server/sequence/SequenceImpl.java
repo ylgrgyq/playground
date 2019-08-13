@@ -100,6 +100,10 @@ public class SequenceImpl implements Sequence {
 
     private ScheduledFuture<?> scheduleGenerateSnapshot() {
         return executor.scheduleWithFixedDelay(() -> {
+            if (stop) {
+                return;
+            }
+
             if (generateSnapshotJobScheduled.compareAndSet(false, true)) {
                 Snapshot snapshot = null;
                 try {

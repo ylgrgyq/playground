@@ -4,7 +4,6 @@ import com.github.ylgrgyq.replicator.common.Bits;
 import com.github.ylgrgyq.replicator.common.entity.LogEntry;
 import com.github.ylgrgyq.replicator.common.exception.DeserializationException;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
-import com.github.ylgrgyq.replicator.server.Preconditions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
 import com.github.ylgrgyq.replicator.server.storage.SequenceStorage;
 import com.github.ylgrgyq.replicator.server.storage.Storage;
@@ -25,6 +24,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import static com.github.ylgrgyq.replicator.common.Preconditions.checkArgument;
 
 public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbStorage.class);
@@ -294,7 +295,7 @@ public class RocksDbStorage implements Storage<RocksDbStorageHandle> {
 
     @Override
     public void append(RocksDbStorageHandle handle, long id, byte[] data) {
-        Preconditions.checkArgument(id > 0);
+        checkArgument(id > 0, "actual id: " + id);
 
         readLock.lock();
         try {

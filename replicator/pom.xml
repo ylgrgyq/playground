@@ -67,6 +67,11 @@
                 <artifactId>netty-all</artifactId>
                 <version>4.1.30.Final</version>
             </dependency>
+            <dependency>
+                <groupId>com.spotify</groupId>
+                <artifactId>completable-futures</artifactId>
+                <version>0.3.2</version>
+            </dependency>
             <!-- Test dependencies -->
             <dependency>
                 <groupId>org.apache.logging.log4j</groupId>
@@ -87,6 +92,12 @@
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
                 <version>4.12</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-core</artifactId>
+                <version>3.0.0</version>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

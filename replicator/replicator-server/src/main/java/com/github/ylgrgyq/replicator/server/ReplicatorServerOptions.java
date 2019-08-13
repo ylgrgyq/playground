@@ -11,7 +11,7 @@ import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 
-import static com.github.ylgrgyq.replicator.server.Preconditions.checkArgument;
+import static com.github.ylgrgyq.replicator.common.Preconditions.checkArgument;
 
 public final class ReplicatorServerOptions {
     private final int port;
@@ -177,7 +177,7 @@ public final class ReplicatorServerOptions {
 
         public ReplicatorServerOptionsBuilder setConnectionReadTimeout(Duration connectionReadTimeout) {
             Objects.requireNonNull(connectionReadTimeout);
-            Preconditions.checkArgument(connectionReadTimeout.getSeconds() > 0);
+            checkArgument(connectionReadTimeout.getSeconds() > 0);
 
             this.connectionReadTimeoutSecs = (int) connectionReadTimeout.getSeconds();
             return this;

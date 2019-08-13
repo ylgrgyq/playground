@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.server.storage;
 
-import static com.github.ylgrgyq.replicator.server.Preconditions.checkArgument;
+import static com.github.ylgrgyq.replicator.common.Preconditions.checkArgument;
 
 public final class StorageOptions {
     private final String storagePath;

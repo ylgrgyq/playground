@@ -2,7 +2,6 @@ package com.github.ylgrgyq.replicator.benchmark.server;
 
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import com.github.ylgrgyq.replicator.server.ReplicatorServer;
-import com.github.ylgrgyq.replicator.server.ReplicatorServerImpl;
 import com.github.ylgrgyq.replicator.server.ReplicatorServerOptions;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceAppender;
 import com.github.ylgrgyq.replicator.server.sequence.SequenceOptions;
@@ -13,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 public class ReplicatorBenchmarkServer {
@@ -34,24 +34,41 @@ public class ReplicatorBenchmarkServer {
                 .setStorageOptions(storageOptions)
                 .build();
 
-        ReplicatorServerImpl server = new ReplicatorServerImpl(options);
+        ReplicatorServer server = new ReplicatorServer(options);
 
-        logger.info("Start append log test...");
-        long nextId = 1;
-        long logsCount = 1000000;
-        for (int i = 1; i <= 5; ++i) {
-            logger.info("Start append log for the {} round with nextId: {}", i, nextId);
+        CompletableFuture<Void> finish = new CompletableFuture<>();
+        server.start().whenComplete((unused, cause) -> {
+            if (cause != null) {
+                logger.warn("Start server failed", cause);
+                return;
+            }
 
-            long start = System.nanoTime();
-            nextId = runTest(server, nextId, logsCount);
-            long duration = System.nanoTime() - start;
-            logger.info("Test finished for the {} round.", i);
-            logger.info("Append {} logs in {} milliseconds.", logsCount, TimeUnit.NANOSECONDS.toMillis(duration));
+            new Thread(() -> {
+                try {
+                    logger.info("Start append log test...");
+                    long nextId = 1;
+                    long logsCount = 1000000;
+                    for (int i = 1; i <= 5; ++i) {
+                        logger.info("Start append log for the {} round with nextId: {}", i, nextId);
 
-            Thread.sleep(5000);
+                        long start = System.nanoTime();
+                        nextId = runTest(server, nextId, logsCount);
+                        long duration = System.nanoTime() - start;
+                        logger.info("Test finished for the {} round.", i);
+                        logger.info("Append {} logs in {} milliseconds.", logsCount, TimeUnit.NANOSECONDS.toMillis(duration));
 
-            logger.info("The {} round append log test succeed", i);
-        }
+                        Thread.sleep(5000);
+
+                        logger.info("The {} round append log test succeed", i);
+                    }
+                    finish.complete(null);
+                } catch (Exception ex) {
+                    logger.error("Replicator server append logs failed", ex);
+                }
+            }).start();
+        });
+
+        finish.get();
     }
 
     private static long runTest(ReplicatorServer server, long nextId, long logsCount) {
