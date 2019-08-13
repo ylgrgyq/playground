@@ -26,9 +26,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.Executor;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.github.ylgrgyq.replicator.common.Preconditions.checkState;
@@ -58,34 +56,12 @@ public final class ReplicatorServer implements AutoCloseable {
         this.startStop = new ServerStartStopSupport(GlobalEventExecutor.INSTANCE);
 
         registerProcessors();
-//        initServer();
     }
 
     private void registerProcessors() {
         processor.registerRequestProcessor(MessageType.HANDSHAKE, new HandshakeRequestProcessor());
         processor.registerRequestProcessor(MessageType.FETCH_LOGS, new FetchLogsRequestProcessor());
         processor.registerRequestProcessor(MessageType.FETCH_SNAPSHOT, new FetchSnapshotRequestProcessor());
-    }
-
-    private void initServer() throws InterruptedException {
-        ServerBootstrap bootstrap = new ServerBootstrap();
-        bootstrap.channel(NioServerSocketChannel.class);
-        bootstrap.group(bossGroup, workerGroup);
-        bootstrap.handler(connectionEventHandler);
-        bootstrap.childHandler(new ChannelInitializer<SocketChannel>() {
-            @Override
-            protected void initChannel(SocketChannel serverChannel) {
-                ChannelPipeline pipeline = serverChannel.pipeline();
-
-                pipeline.addLast(new ReplicatorEncoder());
-                pipeline.addLast(new ReplicatorDecoder());
-                pipeline.addLast(new IdleStateHandler(options.getConnectionReadTimeoutSecs(), 0, 0));
-
-                pipeline.addLast(new ReplicatorServerHandler(ReplicatorServer.this));
-            }
-        });
-
-        bootstrap.bind(options.getHost(), options.getPort()).sync();
     }
 
     public void onReceiveRemotingCommand(ReplicateChannel channel, Replica replica, RemotingCommand cmd) {
@@ -234,7 +210,19 @@ public final class ReplicatorServer implements AutoCloseable {
             groups.shutdownAllSequences();
 
             if (options.shouldShutdownWorkerScheduledExecutor()) {
-                options.getWorkerScheduledExecutor().shutdown();
+                ExecutorService executor = options.getWorkerScheduledExecutor();
+                try {
+                    executor.shutdown();
+                    while (!executor.isTerminated()) {
+                        try {
+                            executor.awaitTermination(1, TimeUnit.DAYS);
+                        } catch (InterruptedException ignore) {
+                            // Do nothing.
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to shutdown the worker scheduled executor: {}", executor, e);
+                }
             }
 
             storage.shutdown();

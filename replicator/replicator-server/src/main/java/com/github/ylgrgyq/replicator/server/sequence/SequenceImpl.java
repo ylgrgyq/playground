@@ -132,27 +132,11 @@ public class SequenceImpl implements Sequence {
     }
 
     @Override
-    public void shutdown() throws InterruptedException {
-        if (stop) {
-            return;
-        }
-
+    public void shutdown() {
         stop = true;
 
         if (generateSnapshotFuture != null) {
             generateSnapshotFuture.cancel(false);
-            while (true) {
-                try {
-                    // schedule and wait shutdown job done
-                    executor.submit(() -> null).get();
-                    break;
-                } catch (ExecutionException ex) {
-                    // it's safe to ignore ExecutionException
-                } catch (RejectedExecutionException ex) {
-                    // retry
-                    Thread.sleep(1000);
-                }
-            }
         }
     }
 

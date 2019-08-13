@@ -52,7 +52,7 @@ public class SequenceGroups {
         return topicToSource.get(topic);
     }
 
-    public void shutdownAllSequences() throws InterruptedException {
+    public void shutdownAllSequences() {
         for (Map.Entry<String, SequenceImpl> entry : topicToSource.entrySet()){
             SequenceImpl seq = entry.getValue();
             seq.shutdown();
