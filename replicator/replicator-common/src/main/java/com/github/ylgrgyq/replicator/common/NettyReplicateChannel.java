@@ -6,10 +6,13 @@ import io.netty.channel.Channel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class NettyReplicateChannel implements ReplicateChannel{
+import java.util.concurrent.CompletableFuture;
+
+public class NettyReplicateChannel implements ReplicateChannel {
     private static final Logger logger = LoggerFactory.getLogger(NettyReplicateChannel.class);
 
     private Channel socket;
+
     public NettyReplicateChannel(Channel socket) {
         this.socket = socket;
     }
@@ -29,7 +32,11 @@ public class NettyReplicateChannel implements ReplicateChannel{
     }
 
     @Override
-    public void close() {
-        socket.close();
+    public CompletableFuture<Void> close() {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        socket.close().addListener(f ->
+                future.complete(null)
+        );
+        return future;
     }
 }

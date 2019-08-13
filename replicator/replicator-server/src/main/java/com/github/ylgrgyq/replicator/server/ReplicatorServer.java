@@ -239,7 +239,7 @@ public final class ReplicatorServer implements AutoCloseable {
 
         @Override
         protected void notifyStopping(ServerListener listener, Void arg) throws Exception {
-            listener.serverStoping(ReplicatorServer.this);
+            listener.serverStopping(ReplicatorServer.this);
         }
 
         @Override

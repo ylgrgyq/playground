@@ -5,7 +5,7 @@ public interface ServerListener {
 
     void serverStarted(ReplicatorServer server) throws Exception;
 
-    void serverStoping(ReplicatorServer server) throws Exception;
+    void serverStopping(ReplicatorServer server) throws Exception;
 
     void serverStopped(ReplicatorServer server) throws Exception;
 }

@@ -1,6 +1,5 @@
 package com.github.ylgrgyq.replicator.example.client;
 
-import com.github.ylgrgyq.replicator.client.ReplicatorClientImpl;
 import com.github.ylgrgyq.replicator.client.ReplicatorClientOptions;
 import com.github.ylgrgyq.replicator.client.StateMachine;
 import org.slf4j.Logger;
@@ -10,7 +9,6 @@ import java.io.File;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 public class ReplicatorClient {
@@ -26,7 +24,7 @@ public class ReplicatorClient {
                 .setMaxSnapshotsToKeep(0)
                 .setUri(new URI("ws://localhost:8888"))
                 .build();
-        ReplicatorClientImpl client = new ReplicatorClientImpl("hahaha", new StateMachine() {
+        com.github.ylgrgyq.replicator.client.ReplicatorClient client = new com.github.ylgrgyq.replicator.client.ReplicatorClient("hahaha", new StateMachine() {
             @Override
             public void apply(List<byte[]> logs) {
                 List<String> logsInStr = logs.stream().map(bs -> new String(bs, StandardCharsets.UTF_8)).collect(Collectors.toList());
@@ -44,12 +42,11 @@ public class ReplicatorClient {
             }
         }, options);
 
+        client.start();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
-                client.shutdown();
+                client.stop();
                 logger.info("client shutdown");
-            } catch (InterruptedException ex) {
-                logger.error("Client graceful shutdown was interrupted");
             } catch (Exception ex) {
                 logger.error("Client graceful shutdown got unexpected exception", ex);
             }

@@ -5,27 +5,26 @@ import com.github.ylgrgyq.replicator.common.entity.Snapshot;
 import com.github.ylgrgyq.replicator.common.exception.ReplicatorException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public class StateMachineCaller {
+final class StateMachineCaller {
     private static final Logger logger = LoggerFactory.getLogger(StateMachineCaller.class);
 
     private final StateMachine stateMachine;
     private final BlockingQueue<Job> jobQueue;
-    private final ReplicatorClientImpl client;
-    private final Thread worker;
+    private final ReplicatorClient client;
+    private CompletableFuture<Void> terminationFuture;
     private volatile boolean stop;
 
-    StateMachineCaller(StateMachine stateMachine, ReplicatorClientImpl client) {
+    StateMachineCaller(StateMachine stateMachine, ReplicatorClient client) {
         this.stop = false;
         this.stateMachine = stateMachine;
         this.client = client;
         this.jobQueue = new LinkedBlockingQueue<>();
-        this.worker = new Thread(() -> {
+        Thread worker = new Thread(() -> {
             while (!stop) {
                 try {
                     Job job = jobQueue.take();
@@ -41,8 +40,8 @@ public class StateMachineCaller {
             }
         });
 
-        this.worker.setName("State-Machine-Caller-Worker");
-        this.worker.start();
+        worker.setName("State-Machine-Caller-Worker");
+        worker.start();
     }
 
     public CompletableFuture<Void> applySnapshot(Snapshot snapshot) {
@@ -87,25 +86,26 @@ public class StateMachineCaller {
         return future;
     }
 
-    private void handleExecuteJobFailed(Job job, Throwable t) throws Exception {
+    private void handleExecuteJobFailed(Job job, Throwable t) {
         logger.error("process job failed", t);
         stop = true;
         job.fail(new ReplicatorException(ReplicatorError.ESTATEMACHINE_EXECUTION_ERROR, t));
-        client.shutdown();
+        client.stop().join();
     }
 
-    void shutdown() throws InterruptedException {
-        if (stop) {
-            return;
+    synchronized CompletableFuture<Void> shutdown() {
+        if (terminationFuture != null) {
+            return terminationFuture;
         }
 
         stop = true;
+        terminationFuture = new CompletableFuture<>();
 
         jobQueue.offer(new ReplicatorClientInternalJob(() -> {
             // do nothing. it is only used to wake up worker thread.
-        }, new CompletableFuture<>()));
+        }, terminationFuture));
 
-        worker.join();
+        return terminationFuture;
     }
 
     private class Job implements Runnable {

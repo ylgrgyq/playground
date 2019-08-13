@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.replicator.benchmark.client;
 
-import com.github.ylgrgyq.replicator.client.ReplicatorClientImpl;
+import com.github.ylgrgyq.replicator.client.ReplicatorClient;
 import com.github.ylgrgyq.replicator.client.ReplicatorClientOptions;
 import com.github.ylgrgyq.replicator.client.StateMachine;
 import org.slf4j.Logger;
@@ -30,14 +30,15 @@ public class ReplicatorBenchmarkClient {
         for (int i = 1; i <= 5; ++i) {
             TestingStateMachine stateMachine = new TestingStateMachine(logsCount);
             long start = System.nanoTime();
-            ReplicatorClientImpl client = new ReplicatorClientImpl("benchmark", stateMachine, options);
+            ReplicatorClient client = new ReplicatorClient("benchmark", stateMachine, options);
+            client.start();
 
             stateMachine.waitComplete();
             long duration = System.nanoTime() - start;
             logger.info("Test finished for the {} round.", i);
             logger.info("Synced {} logs in {} milliseconds.", logsCount, TimeUnit.NANOSECONDS.toMillis(duration));
 
-            client.shutdown();
+            client.stop();
 
             Thread.sleep(2000);
 
