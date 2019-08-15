@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
 
-public final class DefaultBackupQueue<E extends BackupPayload> implements BackupQueue<E> {
+public final class DefaultBackupQueue<E extends PayloadCarrier> implements BackupQueue<E> {
     private final BlockingDeque<E> queue;
     private final BackupStorage<E> storage;
     private final PersistentBackupQueueFence persistentFence;

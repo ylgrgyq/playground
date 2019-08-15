@@ -9,12 +9,12 @@ import java.util.function.Consumer;
 public final class BackupQueueResender implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(BackupQueueResender.class);
 
-    private final BackupQueue<BackupPayload> backupQueue;
-    private final Consumer<? super BackupPayload> resendConsumer;
+    private final BackupQueue<PayloadCarrier> backupQueue;
+    private final Consumer<? super PayloadCarrier> resendConsumer;
     private final Thread worker;
     private volatile boolean stop;
 
-    public BackupQueueResender(BackupQueue<BackupPayload> queue, Consumer<? super BackupPayload> resendConsumer) {
+    public BackupQueueResender(BackupQueue<PayloadCarrier> queue, Consumer<? super PayloadCarrier> resendConsumer) {
         this.backupQueue = queue;
         this.resendConsumer = resendConsumer;
         this.worker = new Thread(new Worker());
@@ -35,7 +35,7 @@ public final class BackupQueueResender implements AutoCloseable {
         @Override
         public void run() {
             while (!stop) {
-                BackupPayload payload = backupQueue.peekFirst();
+                PayloadCarrier payload = backupQueue.peekFirst();
                 try {
                     if (payload != null) {
                         long delayed = payload.getDelay(TimeUnit.NANOSECONDS);
@@ -59,7 +59,7 @@ public final class BackupQueueResender implements AutoCloseable {
                             }
                         }
                     } else {
-                        BackupPayload nextPayload = null;
+                        PayloadCarrier nextPayload = null;
                         for (; !stop && nextPayload == null; ) {
                             // wait at most 5 seconds to check if worker needs to stop
                             nextPayload = backupQueue.pollFirst(5, TimeUnit.SECONDS);
