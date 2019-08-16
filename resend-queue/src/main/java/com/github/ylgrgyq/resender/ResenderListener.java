@@ -1,8 +1,8 @@
 package com.github.ylgrgyq.resender;
 
-public interface ResenderListener<E> {
-    void onInvalidPayload(PayloadCarrier<E> failedPayload);
-    void onPayloadSendSuccess(PayloadCarrier<E> failedPayload);
-    void onPayloadSendFailed(PayloadCarrier<E> failedPayload);
+public interface ResenderListener<E extends Payload> {
+    void onInvalidPayload(E failedPayload);
+    void onPayloadSendSuccess(E failedPayload);
+    void onPayloadSendFailed(E failedPayload);
     void onNotificationFailed(Throwable throwable);
 }

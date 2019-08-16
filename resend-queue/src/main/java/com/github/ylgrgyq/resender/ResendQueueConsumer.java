@@ -1,23 +1,27 @@
 package com.github.ylgrgyq.resender;
 
-import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-public class ResendQueueConsumer<E> {
-    private BackupStorage<PayloadCarrier<E>> storage;
-    public ResendQueueConsumer(BackupStorage<PayloadCarrier<E>> storage) {
+public class ResendQueueConsumer<E extends Payload> {
+    private BackupStorage<PayloadWithId> storage;
+    private BlockingQueue<E> queue;
+
+    public ResendQueueConsumer(BackupStorage<PayloadWithId> storage) {
         this.storage = storage;
+        this.queue = new ArrayBlockingQueue<>(1000);
     }
 
-    E fetch() {
+    public E fetch() throws InterruptedException {
+        return queue.take();
+    }
+
+    public E fetch(long timeout, TimeUnit unit) throws InterruptedException {
         return null;
     }
 
-    E fetch(long timeout, TimeUnit unit) {
-        return null;
-    }
-
-    E commit() {
+    public E commit() {
         return null;
     }
 

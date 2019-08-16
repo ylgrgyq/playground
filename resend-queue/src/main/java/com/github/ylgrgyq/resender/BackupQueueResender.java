@@ -4,20 +4,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.Executor;
-import java.util.function.Consumer;
 
-public final class BackupQueueResender<E> implements AutoCloseable {
+public final class BackupQueueResender<E extends Payload> implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(BackupQueueResender.class);
 
-    private final ResendQueueConsumer<PayloadCarrier<E>> backupQueue;
-    private final BackupQueueHandler<PayloadCarrier<E>> handler;
+    private final ResendQueueConsumer<E> backupQueue;
+    private final BackupQueueHandler<E> handler;
     private final ResenderListener<E> listener;
     private final Executor listenerExecutor;
     private final Thread worker;
     private volatile boolean stop;
 
-    public BackupQueueResender(ResendQueueConsumer<PayloadCarrier<E>> queue,
-                               BackupQueueHandler<PayloadCarrier<E>> handler,
+    public BackupQueueResender(ResendQueueConsumer<E> queue,
+                               BackupQueueHandler<E> handler,
                                ResenderListener<E> listener,
                                Executor listenerExecutor) {
         this.backupQueue = queue;
@@ -44,7 +43,7 @@ public final class BackupQueueResender<E> implements AutoCloseable {
             while (!stop) {
                 boolean commit = false;
                 try {
-                    PayloadCarrier<E> payload = backupQueue.fetch();
+                    E payload = backupQueue.fetch();
                     if (payload.isValid()) {
                         onInvalidPayload(payload);
                     } else {
@@ -57,6 +56,8 @@ public final class BackupQueueResender<E> implements AutoCloseable {
                             commit = handler.handleFailedPayload(payload, ex);
                         }
                     }
+                } catch (InterruptedException ex) {
+                    // do nothing
                 } catch (Exception ex) {
                     logger.warn("Got unexpected exception on processing payload in backup queue resender.", ex);
                 } finally {
@@ -68,15 +69,15 @@ public final class BackupQueueResender<E> implements AutoCloseable {
         }
     }
 
-    private void onInvalidPayload(PayloadCarrier<E> payload) {
+    private void onInvalidPayload(E payload) {
         notification(() -> listener.onInvalidPayload(payload));
     }
 
-    private void onPayloadSendSuccess(PayloadCarrier<E> payload) {
+    private void onPayloadSendSuccess(E payload) {
         notification(() -> listener.onPayloadSendSuccess(payload));
     }
 
-    private void onPayloadSendFailed(PayloadCarrier<E> payload) {
+    private void onPayloadSendFailed(E payload) {
         notification(() -> listener.onPayloadSendFailed(payload));
     }
 

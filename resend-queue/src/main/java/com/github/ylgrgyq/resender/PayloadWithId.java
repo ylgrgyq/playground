@@ -1,16 +1,12 @@
 package com.github.ylgrgyq.resender;
 
-public final class PayloadCarrier<E> {
-    private long id;
-    private E payload;
+public final class PayloadWithId {
+    private final long id;
+    private final byte[] payload;
 
-    public PayloadCarrier(long id, E payload) {
+    public PayloadWithId(long id, byte[] payload) {
         this.id = id;
         this.payload = payload;
-    }
-
-    public PayloadCarrier(byte[] bytes){
-
     }
 
     public long getId() {
@@ -21,7 +17,7 @@ public final class PayloadCarrier<E> {
         return false;
     }
 
-    public E getPayload() {
+    public byte[] getPayload() {
         return payload;
     }
 

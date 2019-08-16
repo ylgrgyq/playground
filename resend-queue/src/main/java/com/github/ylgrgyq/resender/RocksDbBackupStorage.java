@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -15,7 +14,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class RocksDbBackupStorage<T> implements BackupStorage<PayloadCarrier<T>>{
+public class RocksDbBackupStorage<T> implements BackupStorage<PayloadWithId> {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbBackupStorage.class);
     private static final String DEFAULT_QUEUE_NAME = "resend_queue";
 
@@ -64,17 +63,17 @@ public class RocksDbBackupStorage<T> implements BackupStorage<PayloadCarrier<T>>
     }
 
     @Override
-    public Collection<? extends PayloadCarrier<T>> read(long fromId, int limit) {
+    public Collection<? extends PayloadWithId> read(long fromId, int limit) {
         readLock.lock();
 
         try {
             fromId = Math.max(fromId, 0);
 
-            List<PayloadCarrier<T>> entries = new ArrayList<>(limit);
+            List<PayloadWithId> entries = new ArrayList<>(limit);
             RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions);
             for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
                 try {
-                    PayloadCarrier<T> entry = new PayloadCarrier<>(it.value());
+                    PayloadWithId entry = new PayloadWithId(it.value());
                     entries.add(entry);
                 } catch (DeserializationException ex) {
                     logger.error("Bad log entry format for id={}", Bits.getLong(it.key(), 0));
@@ -87,14 +86,14 @@ public class RocksDbBackupStorage<T> implements BackupStorage<PayloadCarrier<T>>
     }
 
     @Override
-    public void store(Collection<? extends PayloadCarrier<T>> queue) {
+    public void store(Collection<? extends PayloadWithId> queue) {
         Objects.requireNonNull(queue, "queue");
 
         readLock.lock();
         try {
             WriteBatch batch = new WriteBatch();
-            for(PayloadCarrier<T> e : queue) {
-                batch.put(columnFamilyHandle, getKeyBytes(e.getId()), null);
+            for (PayloadWithId e : queue) {
+                batch.put(columnFamilyHandle, getKeyBytes(e.getId()), e.getPayload());
             }
             db.write(writeOptions, batch);
         } catch (final RocksDBException e) {
@@ -216,10 +215,12 @@ public class RocksDbBackupStorage<T> implements BackupStorage<PayloadCarrier<T>>
         }
     }
 
-
-
     private void closeDB() {
-        ColumnFamilyHandle handle = columnFamilyHandle;
+        ColumnFamilyHandle handle = defaultColumnFamilyHandle;
+        if (handle != null) {
+            handle.close();
+        }
+        handle = columnFamilyHandle;
         if (handle != null) {
             handle.close();
         }
@@ -360,6 +361,6 @@ public class RocksDbBackupStorage<T> implements BackupStorage<PayloadCarrier<T>>
     private void truncatePrefixInBackground(final long startId, final long firstIdToKeep) {
         truncateJobsQueue.offer(new TruncateJob(columnFamilyHandle, startId, firstIdToKeep));
     }
-    
-    
+
+
 }
