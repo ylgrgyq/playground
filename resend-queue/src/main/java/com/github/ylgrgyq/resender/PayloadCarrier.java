@@ -9,8 +9,16 @@ public final class PayloadCarrier<E> {
         this.payload = payload;
     }
 
+    public PayloadCarrier(byte[] bytes){
+
+    }
+
     public long getId() {
         return id;
+    }
+
+    public boolean isValid() {
+        return false;
     }
 
     public E getPayload() {

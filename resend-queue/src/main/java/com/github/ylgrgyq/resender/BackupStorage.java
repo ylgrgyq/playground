@@ -5,9 +5,9 @@ import java.util.Collection;
 public interface BackupStorage<E> {
     long getLastId();
 
-    Collection<? extends E> read();
+    Collection<? extends E> read(long fromId, int limit);
 
-    void store(Collection<? super E> queue);
+    void store(Collection<? extends E> queue);
 
     void shutdown() throws Exception;
 }

@@ -15,7 +15,7 @@ import static com.github.ylgrgyq.replicator.common.Preconditions.checkArgument;
 
 public final class ReplicatorServerOptions {
     private final int port;
-    private final String host;
+    private final String hostname;
     private final EventLoopGroup bossEventLoopGroup;
     private final EventLoopGroup workerEventLoopGroup;
     private final boolean shouldShutdownBossEventLoopGroup;
@@ -27,7 +27,7 @@ public final class ReplicatorServerOptions {
 
     private ReplicatorServerOptions(ReplicatorServerOptionsBuilder builder) {
         this.port = builder.port;
-        this.host = builder.host == null ? "0.0.0.0" : builder.host;
+        this.hostname = builder.hostname == null ? "0.0.0.0" : builder.hostname;
         this.storageOptions = builder.storageOptions;
 
         if (builder.bossEventLoopGroup == null) {
@@ -76,8 +76,8 @@ public final class ReplicatorServerOptions {
         return port;
     }
 
-    public String getHost() {
-        return host;
+    public String getHostname() {
+        return hostname;
     }
 
     public EventLoopGroup getBossEventLoopGroup() {
@@ -118,7 +118,7 @@ public final class ReplicatorServerOptions {
 
     public static class ReplicatorServerOptionsBuilder {
         private Integer port;
-        private String host;
+        private String hostname;
         private StorageOptions storageOptions;
         private EventLoopGroup bossEventLoopGroup;
         private Boolean shouldShutdownBossEventLoopGroup;
@@ -136,10 +136,10 @@ public final class ReplicatorServerOptions {
             return this;
         }
 
-        public ReplicatorServerOptionsBuilder setHost(String host) {
-            Objects.requireNonNull(host);
+        public ReplicatorServerOptionsBuilder setHostname(String hostname) {
+            Objects.requireNonNull(hostname);
 
-            this.host = host;
+            this.hostname = hostname;
             return this;
         }
 

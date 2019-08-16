@@ -82,6 +82,10 @@ public final class ReplicatorServer implements AutoCloseable {
         return startStop.stop();
     }
 
+    public String hostname() {
+        return options.getHostname();
+    }
+
     public SequenceAppender createSequence(String topic, SequenceOptions options) {
         checkState(startStop.isStarted(), "server is not started.");
 
@@ -131,7 +135,7 @@ public final class ReplicatorServer implements AutoCloseable {
                 }
             });
 
-            bootstrap.bind(options.getHost(), options.getPort())
+            bootstrap.bind(options.getPort())
                     .addListener((ChannelFuture future) -> {
                         final Channel ch = future.channel();
                         assert ch.eventLoop().inEventLoop();
@@ -140,7 +144,7 @@ public final class ReplicatorServer implements AutoCloseable {
                             serverChannel = ch;
                             if (logger.isInfoEnabled()) {
                                 final InetSocketAddress localAddr = (InetSocketAddress) ch.localAddress();
-                                logger.info("Replicator service at {}", localAddr);
+                                logger.info("Replicator service at {}", localAddr.getAddress().getHostAddress());
                             }
                             f.complete(null);
                         } else {

@@ -2,6 +2,7 @@ package com.github.ylgrgyq.resender;
 
 import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.Disruptor;
+import com.spotify.futures.CompletableFutures;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,17 +11,18 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
-public final class Producer<E extends PayloadCarrier> implements AutoCloseable {
+public final class ResendQueueProducer<E extends PayloadCarrier> implements AutoCloseable {
     private final BackupStorage<PayloadCarrier<E>> storage;
     private final Disruptor<ProducerEvent<E>> disruptor;
     private final RingBuffer<ProducerEvent<E>> ringBuffer;
-    private final EventTranslatorTwoArg<ProducerEvent<E>, E, Boolean> translator;
+    private final EventTranslatorThreeArg<ProducerEvent<E>, E, CompletableFuture<Void>, Boolean> translator;
     private final Executor executor;
 
-    public Producer(BackupStorage<PayloadCarrier<E>> storage) {
+    public ResendQueueProducer(BackupStorage<PayloadCarrier<E>> storage) {
         this.storage = storage;
         final long lastId = storage.getLastId();
-        this.disruptor = new Disruptor<>(ProducerEvent<E>::new, 512, new NamedThreadFactory("asdfasdf"));
+        this.disruptor = new Disruptor<>(ProducerEvent<E>::new, 512,
+                new NamedThreadFactory("Producer-Worker-"));
         this.disruptor.handleEventsWith(new ProduceHandler(512));
         this.disruptor.start();
         this.translator = new ProducerTranslator<>(lastId);
@@ -29,12 +31,13 @@ public final class Producer<E extends PayloadCarrier> implements AutoCloseable {
     }
 
     public CompletableFuture<Void> produce(E element) {
-        ringBuffer.publishEvent(translator, element, Boolean.FALSE);
-        return null;
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        ringBuffer.publishEvent(translator, element, future, Boolean.FALSE);
+        return future;
     }
 
     public void flush() {
-        ringBuffer.publishEvent(translator, null, Boolean.TRUE);
+        ringBuffer.publishEvent(translator, null, new CompletableFuture<>(), Boolean.TRUE);
     }
 
     @Override
@@ -43,7 +46,8 @@ public final class Producer<E extends PayloadCarrier> implements AutoCloseable {
         storage.shutdown();
     }
 
-    private final static class ProducerTranslator<T> implements EventTranslatorTwoArg<ProducerEvent<T>, T, Boolean> {
+    private final static class ProducerTranslator<T>
+            implements EventTranslatorThreeArg<ProducerEvent<T>, T, CompletableFuture<Void>, Boolean> {
         private final AtomicLong nextId;
 
         ProducerTranslator(long nextId) {
@@ -51,10 +55,10 @@ public final class Producer<E extends PayloadCarrier> implements AutoCloseable {
         }
 
         @Override
-        public void translateTo(ProducerEvent<T> event, long sequence, T payload, Boolean flush) {
+        public void translateTo(ProducerEvent<T> event, long sequence, T payload, CompletableFuture<Void> future, Boolean flush) {
             event.reset();
             event.carrier = new PayloadCarrier<>(nextId.incrementAndGet(), payload);
-            event.future = new CompletableFuture<>();
+            event.future = future;
             if (flush == Boolean.TRUE) {
                 event.flush = true;
             }

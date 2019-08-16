@@ -3,21 +3,28 @@ package com.github.ylgrgyq.resender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
-public final class BackupQueueResender implements AutoCloseable {
+public final class BackupQueueResender<E> implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(BackupQueueResender.class);
 
-    private final BackupQueue<PayloadCarrier> backupQueue;
-    private final Consumer<? super PayloadCarrier> resendConsumer;
+    private final ResendQueueConsumer<PayloadCarrier<E>> backupQueue;
+    private final BackupQueueHandler<PayloadCarrier<E>> handler;
+    private final ResenderListener<E> listener;
+    private final Executor listenerExecutor;
     private final Thread worker;
     private volatile boolean stop;
 
-    public BackupQueueResender(BackupQueue<PayloadCarrier> queue, Consumer<? super PayloadCarrier> resendConsumer) {
+    public BackupQueueResender(ResendQueueConsumer<PayloadCarrier<E>> queue,
+                               BackupQueueHandler<PayloadCarrier<E>> handler,
+                               ResenderListener<E> listener,
+                               Executor listenerExecutor) {
         this.backupQueue = queue;
-        this.resendConsumer = resendConsumer;
+        this.handler = handler;
         this.worker = new Thread(new Worker());
+        this.listener = listener;
+        this.listenerExecutor = listenerExecutor;
     }
 
     public void start() {
@@ -35,46 +42,56 @@ public final class BackupQueueResender implements AutoCloseable {
         @Override
         public void run() {
             while (!stop) {
-                PayloadCarrier payload = backupQueue.peekFirst();
+                boolean commit = false;
                 try {
-                    if (payload != null) {
-                        long delayed = payload.getDelay(TimeUnit.NANOSECONDS);
-                        if (delayed > 0) {
-                            Thread.sleep(TimeUnit.NANOSECONDS.toMillis(delayed));
-                        } else {
-                            try {
-                                if (payload.noNeedToResend()) {
-                                    logger.warn("Backup payload {} dropped due to no need to resend.", payload);
-                                } else {
-                                    try {
-                                        resendConsumer.accept(payload);
-                                    } catch (Exception ex) {
-                                        payload.increaseFailedTimes();
-                                        backupQueue.putLast(payload);
-                                    }
-                                }
-                                backupQueue.pollFirst();
-                            } finally {
-                                backupQueue.persistent();
-                            }
-                        }
+                    PayloadCarrier<E> payload = backupQueue.fetch();
+                    if (payload.isValid()) {
+                        onInvalidPayload(payload);
                     } else {
-                        PayloadCarrier nextPayload = null;
-                        for (; !stop && nextPayload == null; ) {
-                            // wait at most 5 seconds to check if worker needs to stop
-                            nextPayload = backupQueue.pollFirst(5, TimeUnit.SECONDS);
-                        }
-
-                        if (nextPayload != null) {
-                            backupQueue.putFirst(nextPayload);
+                        try {
+                            handler.handleBackupPayload(payload);
+                            onPayloadSendSuccess(payload);
+                            commit = true;
+                        } catch (Exception ex) {
+                            onPayloadSendFailed(payload);
+                            commit = handler.handleFailedPayload(payload, ex);
                         }
                     }
-                } catch (InterruptedException ex) {
-                    // do nothing
                 } catch (Exception ex) {
-                    logger.warn("Got unexpected exception on processing payload {} in backup queue resender.", payload, ex);
+                    logger.warn("Got unexpected exception on processing payload in backup queue resender.", ex);
+                } finally {
+                    if (commit) {
+                        backupQueue.commit();
+                    }
                 }
             }
         }
+    }
+
+    private void onInvalidPayload(PayloadCarrier<E> payload) {
+        notification(() -> listener.onInvalidPayload(payload));
+    }
+
+    private void onPayloadSendSuccess(PayloadCarrier<E> payload) {
+        notification(() -> listener.onPayloadSendSuccess(payload));
+    }
+
+    private void onPayloadSendFailed(PayloadCarrier<E> payload) {
+        notification(() -> listener.onPayloadSendFailed(payload));
+    }
+
+    private void notification(Runnable runnable) {
+        try {
+            listenerExecutor.execute(() -> {
+                try {
+                    runnable.run();
+                } catch (Exception ex) {
+                    listener.onNotificationFailed(ex);
+                }
+            });
+        } catch (Exception ex) {
+            logger.error("Notification failed", ex);
+        }
+
     }
 }
