@@ -22,7 +22,7 @@ public final class BackupQueueResender<E extends Payload> implements AutoCloseab
                                boolean reliable) {
         this.backupQueue = queue;
         this.handler = handler;
-        this.worker = new Thread(new Worker());
+        this.worker = new NamedThreadFactory("Resend-Queue-Resender-").newThread(new Worker());
         this.listener = listener;
         this.listenerExecutor = listenerExecutor;
     }

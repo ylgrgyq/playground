@@ -15,22 +15,23 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ResendQueueConsumer<E extends Payload> implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(ResendQueueConsumer.class);
 
-    private final BackupStorage<PayloadWithId> storage;
+    private final ConsumerStorage<PayloadWithId> storage;
     private final BlockingQueue<E> queue;
     private final boolean autoCommit;
     private final Thread worker;
-    private final AtomicLong nextId;
+    private final AtomicLong offset;
     private final ReentrantLock lock;
     private final Condition notEmpty;
 
     private volatile boolean stop;
 
-    public ResendQueueConsumer(BackupStorage<PayloadWithId> storage, Deserializer<E> deserializer, boolean autoCommit) {
+    public ResendQueueConsumer(ConsumerStorage<PayloadWithId> storage, Deserializer<E> deserializer, boolean autoCommit) {
         this.storage = storage;
         this.queue = new ArrayBlockingQueue<>(1000);
         this.autoCommit = autoCommit;
-        this.nextId = new AtomicLong();
-        this.worker = new Thread(new FetchWorker(nextId.get(), deserializer));
+        long offset = storage.getLastCommittedId();
+        this.offset = new AtomicLong(offset);
+        this.worker = new NamedThreadFactory("Resend-Queue-Consumer-").newThread(new FetchWorker(offset, deserializer));
         this.lock = new ReentrantLock();
         this.notEmpty = this.lock.newCondition();
     }
@@ -82,9 +83,10 @@ public class ResendQueueConsumer<E extends Payload> implements AutoCloseable {
 
     public void commit() {
         if (!autoCommit) {
-            queue.poll();
-            nextId.incrementAndGet();
-
+            Payload payload = queue.poll();
+            assert payload != null;
+            long id = offset.incrementAndGet();
+            storage.commitId(id);
         }
     }
 
@@ -96,8 +98,12 @@ public class ResendQueueConsumer<E extends Payload> implements AutoCloseable {
     public void close() throws Exception {
         stop = true;
 
-        worker.interrupt();
-        worker.join();
+        if (Thread.currentThread() != worker) {
+            worker.interrupt();
+            worker.join();
+        }
+
+        storage.close();
     }
 
     private final class FetchWorker implements Runnable {
@@ -123,7 +129,7 @@ public class ResendQueueConsumer<E extends Payload> implements AutoCloseable {
                             } catch (DeserializationException ex) {
                                 logger.error("Deserialize payload with id: {} failed. Content in Base64 string is: {}",
                                         lastId, Base64.getEncoder().encodeToString(pInBytes), ex);
-                                stop = true;
+                                close();
                                 break;
                             }
 

@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -14,9 +15,10 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class RocksDbBackupStorage<T> implements BackupStorage<PayloadWithId> {
+public class RocksDbBackupStorage<T> implements ProducerStorage<PayloadWithId>, ConsumerStorage<PayloadWithId> {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbBackupStorage.class);
     private static final String DEFAULT_QUEUE_NAME = "resend_queue";
+    private static final byte[] CONSUMER_COMMIT_ID_META_KEY = "consumer_committed_id".getBytes(StandardCharsets.UTF_8);
 
     private final BlockingQueue<TruncateQueueEntry> truncateJobsQueue;
     private final String path;
@@ -49,7 +51,34 @@ public class RocksDbBackupStorage<T> implements BackupStorage<PayloadWithId> {
     }
 
     @Override
-    public long getLastId() {
+    public void commitId(long id) {
+        readLock.lock();
+        try {
+            final byte[] bs = new byte[8];
+            Bits.putLong(bs, 0, id);
+            db.put(defaultColumnFamilyHandle, writeOptions, CONSUMER_COMMIT_ID_META_KEY, bs);
+        } catch (RocksDBException ex) {
+            throw new IllegalStateException("fail to commit id: " + id, ex);
+        } finally {
+            readLock.unlock();
+        }
+    }
+
+    @Override
+    public long getLastCommittedId() {
+        readLock.lock();
+        try {
+            byte[] commitIdInBytes = db.get(defaultColumnFamilyHandle, totalOrderReadOptions, CONSUMER_COMMIT_ID_META_KEY);
+            return Bits.getLong(commitIdInBytes, 0);
+        } catch (RocksDBException ex) {
+            throw new IllegalStateException("fail to get last committed id: ", ex);
+        } finally {
+            readLock.unlock();
+        }
+    }
+
+    @Override
+    public long getLastProducedId() {
         readLock.lock();
         try (final RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions)) {
             it.seekToLast();
@@ -104,7 +133,7 @@ public class RocksDbBackupStorage<T> implements BackupStorage<PayloadWithId> {
     }
 
     @Override
-    public void shutdown() throws InterruptedException {
+    public void close() throws InterruptedException {
         backgroundTruncateHandler.shutdown();
         wakeupTruncateHandler();
         backgroundTruncateHandler.join();
@@ -164,7 +193,7 @@ public class RocksDbBackupStorage<T> implements BackupStorage<PayloadWithId> {
             columnFamilyHandle = columnFamilyHandles.get(1);
         } catch (final RocksDBException ex) {
             String msg = String.format("init RocksDb on path %s failed", path);
-            shutdown();
+            close();
             throw new IllegalStateException(msg, ex);
         } finally {
             writeLock.unlock();

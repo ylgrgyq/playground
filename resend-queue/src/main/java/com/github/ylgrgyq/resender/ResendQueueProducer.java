@@ -11,21 +11,21 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 public final class ResendQueueProducer<E extends Payload> implements AutoCloseable {
-    private final BackupStorage<PayloadWithId> storage;
+    private final ProducerStorage<PayloadWithId> storage;
     private final Disruptor<ProducerEvent> disruptor;
     private final RingBuffer<ProducerEvent> ringBuffer;
     private final EventTranslatorThreeArg<ProducerEvent, byte[], CompletableFuture<Void>, Boolean> translator;
     private final Executor executor;
     private final Serializer<E> serializer;
 
-    public ResendQueueProducer(BackupStorage<PayloadWithId> storage, Serializer<E> serializer) {
+    public ResendQueueProducer(ProducerStorage<PayloadWithId> storage, Serializer<E> serializer) {
         this.storage = storage;
-        final long lastId = storage.getLastId();
+        final long lastId = storage.getLastProducedId();
         this.disruptor = new Disruptor<>(ProducerEvent::new, 512,
                 new NamedThreadFactory("Producer-Worker-"));
         this.disruptor.handleEventsWith(new ProduceHandler(512));
         this.disruptor.start();
-        this.translator = new ProducerTranslator(lastId);
+        this.translator = new ProducerTranslator(lastId + 1);
         this.ringBuffer = disruptor.getRingBuffer();
         this.executor = Executors.newSingleThreadExecutor();
         this.serializer = serializer;
@@ -50,7 +50,7 @@ public final class ResendQueueProducer<E extends Payload> implements AutoCloseab
     @Override
     public void close() throws Exception {
         disruptor.shutdown();
-        storage.shutdown();
+        storage.close();
     }
 
     private final static class ProducerTranslator
