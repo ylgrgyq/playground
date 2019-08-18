@@ -1,6 +1,5 @@
 package com.github.ylgrgyq.resender;
 
-import com.sun.xml.internal.ws.encoding.soap.DeserializationException;
 import org.rocksdb.*;
 import org.rocksdb.util.SizeUnit;
 import org.slf4j.Logger;
@@ -8,7 +7,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.Lock;
@@ -28,6 +30,7 @@ public class RocksDbBackupStorage<T> implements ProducerStorage<PayloadWithId>, 
     private final Lock readLock = lock.readLock();
     private final Lock writeLock = lock.writeLock();
     private final List<ColumnFamilyOptions> cfOptions;
+    private final long readRetryIntervalMillis;
 
     private RocksDB db;
     private ColumnFamilyHandle defaultColumnFamilyHandle;
@@ -40,12 +43,13 @@ public class RocksDbBackupStorage<T> implements ProducerStorage<PayloadWithId>, 
         RocksDB.loadLibrary();
     }
 
-    public RocksDbBackupStorage(String path, boolean destroyPreviousDbFiles) throws InterruptedException {
+    public RocksDbBackupStorage(String path, boolean destroyPreviousDbFiles, long readRetryIntervalMillis) throws InterruptedException {
         this.path = path;
         this.cfOptions = new ArrayList<>();
         this.truncateJobsQueue = new LinkedBlockingQueue<>();
         this.backgroundTruncateHandler = new BackgroundTruncateHandler("StorageBackgroundTruncateHandler");
         this.backgroundTruncateHandler.start();
+        this.readRetryIntervalMillis = readRetryIntervalMillis;
 
         initDB(destroyPreviousDbFiles);
     }
@@ -92,20 +96,25 @@ public class RocksDbBackupStorage<T> implements ProducerStorage<PayloadWithId>, 
     }
 
     @Override
-    public Collection<? extends PayloadWithId> read(long fromId, int limit) {
+    public Collection<? extends PayloadWithId> read(long fromId, int limit) throws InterruptedException {
         readLock.lock();
 
         try {
             fromId = Math.max(fromId, 0);
 
             List<PayloadWithId> entries = new ArrayList<>(limit);
-            RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions);
-            for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
-                try {
-//                    PayloadWithId entry = new PayloadWithId(it.value());
-//                    entries.add(entry);
-                } catch (DeserializationException ex) {
-                    logger.error("Bad log entry format for id={}", Bits.getLong(it.key(), 0));
+            while (true) {
+                RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions);
+                for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
+                    long id = Bits.getLong(it.key(), 0);
+                    PayloadWithId entry = new PayloadWithId(id, it.value());
+                    entries.add(entry);
+                }
+
+                if (entries.isEmpty()) {
+                    Thread.sleep(readRetryIntervalMillis);
+                } else {
+                    break;
                 }
             }
             return entries;
