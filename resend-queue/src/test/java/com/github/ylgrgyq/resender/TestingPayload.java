@@ -34,8 +34,8 @@ public class TestingPayload implements Payload {
         return content;
     }
 
-    public PayloadWithId createPayloweWithId() {
-        return new PayloadWithId(id, content);
+    public ElementWithId createPayloweWithId() {
+        return new ElementWithId(id, content);
     }
 
     @Override

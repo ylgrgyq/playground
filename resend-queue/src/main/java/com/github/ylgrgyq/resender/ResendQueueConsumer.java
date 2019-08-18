@@ -138,10 +138,10 @@ public final class ResendQueueConsumer<E> implements AutoCloseable {
         public void run() {
             while (!stop) {
                 try {
-                    final Collection<? extends PayloadWithId> payloads = storage.read(lastId, batchSize);
+                    final Collection<? extends ElementWithId> payloads = storage.read(lastId, batchSize);
                     if (payloads != null && !payloads.isEmpty()) {
-                        for (PayloadWithId p : payloads) {
-                            final byte[] pInBytes = p.getPayload();
+                        for (ElementWithId p : payloads) {
+                            final byte[] pInBytes = p.getElement();
                             try {
                                 final E pObj = deserializer.deserialize(pInBytes);
                                 queue.put(pObj);

@@ -33,10 +33,10 @@ public class ResendQueueProducerTest {
 
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
 
-        List<PayloadWithId> payloads = storage.getProdcedPayloads();
+        List<ElementWithId> payloads = storage.getProdcedPayloads();
         for (int i = 0; i < payloads.size(); i++) {
             assertThat(payloads.get(i).getId()).isEqualTo(i + 1);
-            assertThat(new String(payloads.get(i).getPayload(), StandardCharsets.UTF_8)).isEqualTo("" + i);
+            assertThat(new String(payloads.get(i).getElement(), StandardCharsets.UTF_8)).isEqualTo("" + i);
         }
     }
 
@@ -56,10 +56,10 @@ public class ResendQueueProducerTest {
         await().until(() -> CompletableFutures.allAsList(futures).isDone());
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
 
-        List<PayloadWithId> payloads = storage.getProdcedPayloads();
+        List<ElementWithId> payloads = storage.getProdcedPayloads();
         for (int i = 0; i < payloads.size(); i++) {
             assertThat(payloads.get(i).getId()).isEqualTo(i + 1);
-            assertThat(new String(payloads.get(i).getPayload(), StandardCharsets.UTF_8)).isEqualTo("" + i);
+            assertThat(new String(payloads.get(i).getElement(), StandardCharsets.UTF_8)).isEqualTo("" + i);
         }
     }
 

@@ -100,18 +100,18 @@ public final class ResendQueueProducer<E> implements AutoCloseable {
             }
 
             if (payload != null) {
-                event.payloadWithId = new PayloadWithId(nextId.incrementAndGet(), payload);
+                event.elementWithId = new ElementWithId(nextId.incrementAndGet(), payload);
             }
         }
     }
 
     private final static class ProducerEvent {
-        private PayloadWithId payloadWithId;
+        private ElementWithId elementWithId;
         private CompletableFuture<Void> future;
         private boolean flush;
 
         void reset() {
-            payloadWithId = null;
+            elementWithId = null;
             future = null;
             flush = false;
         }
@@ -119,7 +119,7 @@ public final class ResendQueueProducer<E> implements AutoCloseable {
 
     private final class ProduceHandler implements EventHandler<ProducerEvent> {
         private final int batchSize;
-        private final List<PayloadWithId> batchPayload;
+        private final List<ElementWithId> batchPayload;
         private final List<CompletableFuture<Void>> batchFutures;
 
         ProduceHandler(int batchSize) {
@@ -136,7 +136,7 @@ public final class ResendQueueProducer<E> implements AutoCloseable {
                 }
                 executor.execute(() -> event.future.complete(null));
             } else {
-                batchPayload.add(event.payloadWithId);
+                batchPayload.add(event.elementWithId);
                 batchFutures.add(event.future);
                 if (batchPayload.size() >= batchSize || endOfBatch) {
                     flush();

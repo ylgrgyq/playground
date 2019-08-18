@@ -4,7 +4,6 @@ import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
@@ -17,7 +16,7 @@ public class ResendQueueConsumerTest {
     @Test
     public void fetchWithManualCommit() throws Exception {
         final TestingProducerStorage storage = new TestingProducerStorage();
-        final ArrayList<PayloadWithId> storedPayload = new ArrayList<>();
+        final ArrayList<ElementWithId> storedPayload = new ArrayList<>();
         TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
         TestingPayload second = new TestingPayload(2, "second".getBytes(StandardCharsets.UTF_8));
         storedPayload.add(first.createPayloweWithId());
@@ -38,7 +37,7 @@ public class ResendQueueConsumerTest {
     @Test
     public void fetchWithAutoCommit() throws Exception {
         final TestingProducerStorage storage = new TestingProducerStorage();
-        final ArrayList<PayloadWithId> storedPayload = new ArrayList<>();
+        final ArrayList<ElementWithId> storedPayload = new ArrayList<>();
         TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
         TestingPayload second = new TestingPayload(2, "second".getBytes(StandardCharsets.UTF_8));
         storedPayload.add(first.createPayloweWithId());
@@ -82,7 +81,7 @@ public class ResendQueueConsumerTest {
     @Test
     public void blockFetchWithAutoCommit() throws Exception {
         final TestingProducerStorage storage = new TestingProducerStorage();
-        final ArrayList<PayloadWithId> storedPayload = new ArrayList<>();
+        final ArrayList<ElementWithId> storedPayload = new ArrayList<>();
         final TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
         storedPayload.add(first.createPayloweWithId());
 
@@ -111,7 +110,7 @@ public class ResendQueueConsumerTest {
     @Test
     public void blockFetchWithManualCommit() throws Exception {
         final TestingProducerStorage storage = new TestingProducerStorage();
-        final ArrayList<PayloadWithId> storedPayload = new ArrayList<>();
+        final ArrayList<ElementWithId> storedPayload = new ArrayList<>();
         final TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
         storedPayload.add(first.createPayloweWithId());
 

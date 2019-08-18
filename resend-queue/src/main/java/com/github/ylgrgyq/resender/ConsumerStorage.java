@@ -7,5 +7,5 @@ public interface ConsumerStorage extends AutoCloseable{
 
     long getLastCommittedId();
 
-    Collection<PayloadWithId> read(long fromId, int limit) throws InterruptedException;
+    Collection<ElementWithId> read(long fromId, int limit) throws InterruptedException;
 }

@@ -5,7 +5,7 @@ import java.util.Collection;
 import java.util.List;
 
 public class TestingProducerStorage implements ConsumerStorage, ProducerStorage {
-    private final ArrayList<PayloadWithId> producedPayloads;
+    private final ArrayList<ElementWithId> producedPayloads;
     private long lastProducedId;
     private long lastCommittedId;
     private boolean stopped;
@@ -16,7 +16,7 @@ public class TestingProducerStorage implements ConsumerStorage, ProducerStorage 
         this.lastCommittedId = -1;
     }
 
-    synchronized List<PayloadWithId> getProdcedPayloads() {
+    synchronized List<ElementWithId> getProdcedPayloads() {
         return new ArrayList<>(producedPayloads);
     }
 
@@ -31,14 +31,14 @@ public class TestingProducerStorage implements ConsumerStorage, ProducerStorage 
     }
 
     @Override
-    public synchronized Collection<PayloadWithId> read(long fromId, int limit) throws InterruptedException {
-        ArrayList<PayloadWithId> ret = new ArrayList<>();
+    public synchronized Collection<ElementWithId> read(long fromId, int limit) throws InterruptedException {
+        ArrayList<ElementWithId> ret = new ArrayList<>();
         while (true) {
             while (producedPayloads.isEmpty()) {
                 wait();
             }
 
-            PayloadWithId firstPayload = producedPayloads.get(0);
+            ElementWithId firstPayload = producedPayloads.get(0);
             int start = (int) (fromId - firstPayload.getId()) + 1;
             start = Math.max(0, start);
             int end = Math.min(start + limit, producedPayloads.size());
@@ -62,13 +62,13 @@ public class TestingProducerStorage implements ConsumerStorage, ProducerStorage 
     }
 
     @Override
-    public synchronized void store(Collection<PayloadWithId> batch) {
-        for (PayloadWithId payloadWithId : batch) {
-            producedPayloads.add(payloadWithId);
-            assert lastProducedId != payloadWithId.getId() :
-                    "lastProducedId: " + lastProducedId + " payloadId:" + payloadWithId.getId();
-            if (payloadWithId.getId() > lastProducedId) {
-                lastProducedId = payloadWithId.getId();
+    public synchronized void store(Collection<ElementWithId> batch) {
+        for (ElementWithId elementWithId : batch) {
+            producedPayloads.add(elementWithId);
+            assert lastProducedId != elementWithId.getId() :
+                    "lastProducedId: " + lastProducedId + " payloadId:" + elementWithId.getId();
+            if (elementWithId.getId() > lastProducedId) {
+                lastProducedId = elementWithId.getId();
             }
         }
         notify();

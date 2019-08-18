@@ -132,15 +132,15 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
     }
 
     @Override
-    public Collection<PayloadWithId> read(long fromId, int limit) throws InterruptedException {
+    public Collection<ElementWithId> read(long fromId, int limit) throws InterruptedException {
         fromId = Math.max(fromId, 0);
 
-        final List<PayloadWithId> entries = new ArrayList<>(limit);
+        final List<ElementWithId> entries = new ArrayList<>(limit);
         while (true) {
             try (RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions)) {
                 for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
                     final long id = Bits.getLong(it.key(), 0);
-                    final PayloadWithId entry = new PayloadWithId(id, it.value());
+                    final ElementWithId entry = new ElementWithId(id, it.value());
                     entries.add(entry);
                 }
             }
@@ -155,13 +155,13 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
     }
 
     @Override
-    public void store(Collection<PayloadWithId> queue) {
+    public void store(Collection<ElementWithId> queue) {
         requireNonNull(queue, "queue");
 
         try {
             final WriteBatch batch = new WriteBatch();
-            for (PayloadWithId e : queue) {
-                batch.put(columnFamilyHandle, getKeyBytes(e.getId()), e.getPayload());
+            for (ElementWithId e : queue) {
+                batch.put(columnFamilyHandle, getKeyBytes(e.getId()), e.getElement());
             }
             db.write(writeOptions, batch);
         } catch (final RocksDBException e) {

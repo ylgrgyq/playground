@@ -18,16 +18,16 @@ public final class BackupQueueResender<E extends Payload> implements AutoCloseab
     private final Thread worker;
     private volatile boolean stop;
 
-    public BackupQueueResender(ResendQueueConsumer<E> queue,
+    public BackupQueueResender(ResendQueueConsumer<E> consumer,
                                BackupQueueHandler<E> handler,
                                ResenderListener<E> listener,
                                Executor listenerExecutor) {
-        requireNonNull(queue, "queue");
+        requireNonNull(consumer, "consumer");
         requireNonNull(handler, "handler");
         requireNonNull(listener, "listener");
         requireNonNull(listenerExecutor, "listenerExecutor");
 
-        this.backupQueue = queue;
+        this.backupQueue = consumer;
         this.handler = handler;
         this.worker = new NamedThreadFactory("resend-queue-resender-").newThread(new Worker());
         this.listener = listener;
@@ -37,6 +37,8 @@ public final class BackupQueueResender<E extends Payload> implements AutoCloseab
     public void start() {
         worker.start();
     }
+
+
 
     @Override
     public void close() throws Exception {
