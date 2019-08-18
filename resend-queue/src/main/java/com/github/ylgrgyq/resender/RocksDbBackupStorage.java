@@ -9,15 +9,14 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public final class RocksDbBackupStorage<T> implements ProducerStorage, ConsumerStorage {
+import static java.util.Objects.requireNonNull;
+
+public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStorage {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbBackupStorage.class);
     private static final String DEFAULT_QUEUE_NAME = "resend_queue";
     private static final byte[] CONSUMER_COMMIT_ID_META_KEY = "consumer_committed_id".getBytes(StandardCharsets.UTF_8);
@@ -26,18 +25,17 @@ public final class RocksDbBackupStorage<T> implements ProducerStorage, ConsumerS
     private final String path;
     private final BackgroundTruncateHandler backgroundTruncateHandler;
 
-    private final ReadWriteLock lock = new ReentrantReadWriteLock(false);
-    private final Lock readLock = lock.readLock();
-    private final Lock writeLock = lock.writeLock();
     private final List<ColumnFamilyOptions> cfOptions;
     private final long readRetryIntervalMillis;
 
-    private RocksDB db;
-    private ColumnFamilyHandle defaultColumnFamilyHandle;
-    private ColumnFamilyHandle columnFamilyHandle;
-    private WriteOptions writeOptions;
-    private ReadOptions totalOrderReadOptions;
-    private DBOptions dbOptions;
+    private final RocksDB db;
+    private final ColumnFamilyHandle defaultColumnFamilyHandle;
+    private final ColumnFamilyHandle columnFamilyHandle;
+    private final WriteOptions writeOptions;
+    private final ReadOptions totalOrderReadOptions;
+    private final DBOptions dbOptions;
+
+    private volatile boolean stopped;
 
     static {
         RocksDB.loadLibrary();
@@ -51,125 +49,19 @@ public final class RocksDbBackupStorage<T> implements ProducerStorage, ConsumerS
         this.backgroundTruncateHandler.start();
         this.readRetryIntervalMillis = readRetryIntervalMillis;
 
-        initDB(destroyPreviousDbFiles);
-    }
-
-    @Override
-    public void commitId(long id) {
-        readLock.lock();
         try {
-            final byte[] bs = new byte[8];
-            Bits.putLong(bs, 0, id);
-            db.put(defaultColumnFamilyHandle, writeOptions, CONSUMER_COMMIT_ID_META_KEY, bs);
-        } catch (RocksDBException ex) {
-            throw new IllegalStateException("fail to commit id: " + id, ex);
-        } finally {
-            readLock.unlock();
-        }
-    }
-
-    @Override
-    public long getLastCommittedId() {
-        readLock.lock();
-        try {
-            byte[] commitIdInBytes = db.get(defaultColumnFamilyHandle, totalOrderReadOptions, CONSUMER_COMMIT_ID_META_KEY);
-            return Bits.getLong(commitIdInBytes, 0);
-        } catch (RocksDBException ex) {
-            throw new IllegalStateException("fail to get last committed id: ", ex);
-        } finally {
-            readLock.unlock();
-        }
-    }
-
-    @Override
-    public long getLastProducedId() {
-        readLock.lock();
-        try (final RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions)) {
-            it.seekToLast();
-            if (it.isValid()) {
-                return Bits.getLong(it.key(), 0);
-            }
-            return 0;
-        } finally {
-            readLock.unlock();
-        }
-    }
-
-    @Override
-    public Collection<PayloadWithId> read(long fromId, int limit) throws InterruptedException {
-        readLock.lock();
-
-        try {
-            fromId = Math.max(fromId, 0);
-
-            List<PayloadWithId> entries = new ArrayList<>(limit);
-            while (true) {
-                RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions);
-                for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
-                    long id = Bits.getLong(it.key(), 0);
-                    PayloadWithId entry = new PayloadWithId(id, it.value());
-                    entries.add(entry);
-                }
-
-                if (entries.isEmpty()) {
-                    Thread.sleep(readRetryIntervalMillis);
-                } else {
-                    break;
-                }
-            }
-            return entries;
-        } finally {
-            readLock.unlock();
-        }
-    }
-
-    @Override
-    public void store(Collection<PayloadWithId> queue) {
-        Objects.requireNonNull(queue, "queue");
-
-        readLock.lock();
-        try {
-            WriteBatch batch = new WriteBatch();
-            for (PayloadWithId e : queue) {
-                batch.put(columnFamilyHandle, getKeyBytes(e.getId()), e.getPayload());
-            }
-            db.write(writeOptions, batch);
-        } catch (final RocksDBException e) {
-            throw new IllegalStateException("fail to append entry", e);
-        } finally {
-            readLock.unlock();
-        }
-    }
-
-    @Override
-    public void close() throws InterruptedException {
-        backgroundTruncateHandler.shutdown();
-        wakeupTruncateHandler();
-        backgroundTruncateHandler.join();
-
-        writeLock.lock();
-        try {
-            // The shutdown order is matter.
-            // 1. close db and column family handles
-            closeDB();
-            // 2. close internal options.
-            closeOptions();
-        } finally {
-            writeLock.unlock();
-        }
-
-    }
-
-    private void initDB(boolean destroyPreviousDbFiles) throws InterruptedException {
-        writeLock.lock();
-        try {
-            dbOptions = createDefaultRocksDBOptions();
-            dbOptions.setCreateIfMissing(true);
+            DBOptions dbOptions = createDefaultRocksDBOptions();
             dbOptions.setCreateMissingColumnFamilies(true);
-            writeOptions = new WriteOptions();
+            dbOptions.setCreateIfMissing(true);
+            this.dbOptions = dbOptions;
+
+            WriteOptions writeOptions = new WriteOptions();
             writeOptions.setSync(false);
-            totalOrderReadOptions = new ReadOptions();
+            this.writeOptions = writeOptions;
+
+            ReadOptions totalOrderReadOptions = new ReadOptions();
             totalOrderReadOptions.setTotalOrderSeek(true);
+            this.totalOrderReadOptions = totalOrderReadOptions;
 
             BlockBasedTableConfig tableConfig = new BlockBasedTableConfig(). //
                     setIndexType(IndexType.kHashSearch). // use hash search(btree) for prefix scan.
@@ -197,16 +89,97 @@ public final class RocksDbBackupStorage<T> implements ProducerStorage, ConsumerS
             columnFamilyDescriptors.add(new ColumnFamilyDescriptor(DEFAULT_QUEUE_NAME.getBytes(), options));
 
             final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
-            db = RocksDB.open(dbOptions, path, columnFamilyDescriptors, columnFamilyHandles);
-            defaultColumnFamilyHandle = columnFamilyHandles.get(0);
-            columnFamilyHandle = columnFamilyHandles.get(1);
+            this.db = RocksDB.open(dbOptions, path, columnFamilyDescriptors, columnFamilyHandles);
+            this.defaultColumnFamilyHandle = columnFamilyHandles.get(0);
+            this.columnFamilyHandle = columnFamilyHandles.get(1);
         } catch (final RocksDBException ex) {
             String msg = String.format("init RocksDb on path %s failed", path);
             close();
             throw new IllegalStateException(msg, ex);
-        } finally {
-            writeLock.unlock();
         }
+    }
+
+    @Override
+    public void commitId(long id) {
+        try {
+            final byte[] bs = new byte[8];
+            Bits.putLong(bs, 0, id);
+            db.put(defaultColumnFamilyHandle, writeOptions, CONSUMER_COMMIT_ID_META_KEY, bs);
+        } catch (RocksDBException ex) {
+            throw new IllegalStateException("fail to commit id: " + id, ex);
+        }
+    }
+
+    @Override
+    public long getLastCommittedId() {
+        try {
+            byte[] commitIdInBytes = db.get(defaultColumnFamilyHandle, totalOrderReadOptions, CONSUMER_COMMIT_ID_META_KEY);
+            return Bits.getLong(commitIdInBytes, 0);
+        } catch (RocksDBException ex) {
+            throw new IllegalStateException("fail to get last committed id: ", ex);
+        }
+    }
+
+    @Override
+    public long getLastProducedId() {
+        try (final RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions)) {
+            it.seekToLast();
+            if (it.isValid()) {
+                return Bits.getLong(it.key(), 0);
+            }
+            return 0;
+        }
+    }
+
+    @Override
+    public Collection<PayloadWithId> read(long fromId, int limit) throws InterruptedException {
+        fromId = Math.max(fromId, 0);
+
+        List<PayloadWithId> entries = new ArrayList<>(limit);
+        while (true) {
+            try (RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions)) {
+                for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
+                    long id = Bits.getLong(it.key(), 0);
+                    PayloadWithId entry = new PayloadWithId(id, it.value());
+                    entries.add(entry);
+                }
+            }
+
+            if (entries.isEmpty()) {
+                Thread.sleep(readRetryIntervalMillis);
+            } else {
+                break;
+            }
+        }
+        return Collections.unmodifiableCollection(entries);
+    }
+
+    @Override
+    public void store(Collection<PayloadWithId> queue) {
+        requireNonNull(queue, "queue");
+
+        try {
+            WriteBatch batch = new WriteBatch();
+            for (PayloadWithId e : queue) {
+                batch.put(columnFamilyHandle, getKeyBytes(e.getId()), e.getPayload());
+            }
+            db.write(writeOptions, batch);
+        } catch (final RocksDBException e) {
+            throw new IllegalStateException("fail to append entry", e);
+        }
+    }
+
+    @Override
+    public void close() throws InterruptedException {
+        backgroundTruncateHandler.shutdown();
+        wakeupTruncateHandler();
+        backgroundTruncateHandler.join();
+
+        // The shutdown order is matter.
+        // 1. close db and column family handles
+        closeDB();
+        // 2. close internal options.
+        closeOptions();
     }
 
     private DBOptions createDefaultRocksDBOptions() {
@@ -265,7 +238,6 @@ public final class RocksDbBackupStorage<T> implements ProducerStorage, ConsumerS
 
         if (db != null) {
             db.close();
-            db = null;
         }
     }
 
@@ -282,12 +254,10 @@ public final class RocksDbBackupStorage<T> implements ProducerStorage, ConsumerS
         // 3. close write/read options
         if (writeOptions != null) {
             writeOptions.close();
-            writeOptions = null;
         }
 
         if (totalOrderReadOptions != null) {
             totalOrderReadOptions.close();
-            totalOrderReadOptions = null;
         }
     }
 
@@ -364,7 +334,6 @@ public final class RocksDbBackupStorage<T> implements ProducerStorage, ConsumerS
                     entry = truncateJobsQueue.take();
                     if (entry instanceof TruncateJob) {
                         TruncateJob job = (TruncateJob) entry;
-                        readLock.lock();
                         try {
                             if (db == null) {
                                 break;
@@ -372,8 +341,6 @@ public final class RocksDbBackupStorage<T> implements ProducerStorage, ConsumerS
                             db.deleteRange(job.getHandle(), getKeyBytes(job.getStartId()), getKeyBytes(job.getFirstIdToKeep()));
                         } catch (final RocksDBException e) {
                             logger.error("Fail to truncatePrefix {}", job, e);
-                        } finally {
-                            readLock.unlock();
                         }
                     }
                 } catch (InterruptedException ex) {

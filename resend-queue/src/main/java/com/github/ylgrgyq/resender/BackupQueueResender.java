@@ -18,11 +18,10 @@ public final class BackupQueueResender<E extends Payload> implements AutoCloseab
     public BackupQueueResender(ResendQueueConsumer<E> queue,
                                BackupQueueHandler<E> handler,
                                ResenderListener<E> listener,
-                               Executor listenerExecutor,
-                               boolean reliable) {
+                               Executor listenerExecutor) {
         this.backupQueue = queue;
         this.handler = handler;
-        this.worker = new NamedThreadFactory("Resend-Queue-Resender-").newThread(new Worker());
+        this.worker = new NamedThreadFactory("resend-queue-resender-").newThread(new Worker());
         this.listener = listener;
         this.listenerExecutor = listenerExecutor;
     }

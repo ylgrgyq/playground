@@ -12,6 +12,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
+import static java.util.Objects.requireNonNull;
+
 public final class ResendQueueConsumer<E extends Payload> implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(ResendQueueConsumer.class);
 
@@ -26,12 +28,16 @@ public final class ResendQueueConsumer<E extends Payload> implements AutoCloseab
     private volatile boolean stop;
 
     public ResendQueueConsumer(ConsumerStorage storage, Deserializer<E> deserializer, boolean autoCommit) {
+        requireNonNull(storage, "storage");
+        requireNonNull(deserializer, "deserializer");
+
         this.storage = storage;
         this.queue = new ArrayBlockingQueue<>(1000);
         this.autoCommit = autoCommit;
         long offset = storage.getLastCommittedId();
         this.offset = new AtomicLong(offset);
-        this.worker = new NamedThreadFactory("Resend-Queue-Consumer-").newThread(new FetchWorker(offset, deserializer));
+        this.worker = new NamedThreadFactory("resend-queue-consumer-").newThread(new FetchWorker(offset, deserializer));
+        this.worker.start();
         this.lock = new ReentrantLock();
         this.notEmpty = this.lock.newCondition();
     }
@@ -42,7 +48,7 @@ public final class ResendQueueConsumer<E extends Payload> implements AutoCloseab
         if (autoCommit) {
             element = queue.poll();
             if (element == null) {
-                queue.take();
+                element = queue.take();
             }
         } else {
             lock.lockInterruptibly();
@@ -59,6 +65,8 @@ public final class ResendQueueConsumer<E extends Payload> implements AutoCloseab
     }
 
     public E fetch(long timeout, TimeUnit unit) throws InterruptedException {
+        requireNonNull(unit);
+
         E element = null;
 
         if (autoCommit) {
@@ -67,11 +75,12 @@ public final class ResendQueueConsumer<E extends Payload> implements AutoCloseab
                 queue.poll(timeout, unit);
             }
         } else {
-            long end = System.nanoTime() + unit.toNanos(timeout);
+            final long end = System.nanoTime() + unit.toNanos(timeout);
             lock.lockInterruptibly();
             try {
-                while (System.nanoTime() < end && (element = queue.peek()) == null) {
-                    notEmpty.await(timeout, unit);
+                long remain;
+                while ((remain = end - System.nanoTime()) > 0 && (element = queue.peek()) == null) {
+                    notEmpty.await(remain, TimeUnit.NANOSECONDS);
                 }
             } finally {
                 lock.unlock();
@@ -83,9 +92,9 @@ public final class ResendQueueConsumer<E extends Payload> implements AutoCloseab
 
     public void commit() {
         if (!autoCommit) {
-            Payload payload = queue.poll();
+            final Payload payload = queue.poll();
             assert payload != null;
-            long id = offset.incrementAndGet();
+            final long id = offset.incrementAndGet();
             storage.commitId(id);
         }
     }
@@ -119,12 +128,12 @@ public final class ResendQueueConsumer<E extends Payload> implements AutoCloseab
         public void run() {
             while (!stop) {
                 try {
-                    Collection<? extends PayloadWithId> payloads = storage.read(lastId, 1000);
+                    final Collection<? extends PayloadWithId> payloads = storage.read(lastId, 1000);
                     if (payloads != null && !payloads.isEmpty()) {
                         for (PayloadWithId p : payloads) {
-                            byte[] pInBytes = p.getPayload();
+                            final byte[] pInBytes = p.getPayload();
                             try {
-                                E pObj = deserializer.deserialize(pInBytes);
+                                final E pObj = deserializer.deserialize(pInBytes);
                                 queue.put(pObj);
                             } catch (DeserializationException ex) {
                                 logger.error("Deserialize payload with id: {} failed. Content in Base64 string is: {}",
