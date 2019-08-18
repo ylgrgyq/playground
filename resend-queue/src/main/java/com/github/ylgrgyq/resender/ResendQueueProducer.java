@@ -16,8 +16,9 @@ public final class ResendQueueProducer<E extends Payload> implements AutoCloseab
     private final RingBuffer<ProducerEvent> ringBuffer;
     private final EventTranslatorThreeArg<ProducerEvent, byte[], CompletableFuture<Void>, Boolean> translator;
     private final Executor executor;
+    private final Serializer<E> serializer;
 
-    public ResendQueueProducer(BackupStorage<PayloadWithId> storage) {
+    public ResendQueueProducer(BackupStorage<PayloadWithId> storage, Serializer<E> serializer) {
         this.storage = storage;
         final long lastId = storage.getLastId();
         this.disruptor = new Disruptor<>(ProducerEvent::new, 512,
@@ -27,12 +28,13 @@ public final class ResendQueueProducer<E extends Payload> implements AutoCloseab
         this.translator = new ProducerTranslator(lastId);
         this.ringBuffer = disruptor.getRingBuffer();
         this.executor = Executors.newSingleThreadExecutor();
+        this.serializer = serializer;
     }
 
     public CompletableFuture<Void> produce(E element) {
         CompletableFuture<Void> future = new CompletableFuture<>();
         try {
-            byte[] payload = element.serialize();
+            byte[] payload = serializer.serialize(element);
             ringBuffer.publishEvent(translator, payload, future, Boolean.FALSE);
         } catch (Exception ex) {
             future.completeExceptionally(ex);

@@ -73,8 +73,8 @@ public class RocksDbBackupStorage<T> implements BackupStorage<PayloadWithId> {
             RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions);
             for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
                 try {
-                    PayloadWithId entry = new PayloadWithId(it.value());
-                    entries.add(entry);
+//                    PayloadWithId entry = new PayloadWithId(it.value());
+//                    entries.add(entry);
                 } catch (DeserializationException ex) {
                     logger.error("Bad log entry format for id={}", Bits.getLong(it.key(), 0));
                 }
