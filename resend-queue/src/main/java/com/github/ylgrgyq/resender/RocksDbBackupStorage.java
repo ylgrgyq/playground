@@ -17,7 +17,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-public class RocksDbBackupStorage<T> implements ProducerStorage<PayloadWithId>, ConsumerStorage<PayloadWithId> {
+public final class RocksDbBackupStorage<T> implements ProducerStorage<PayloadWithId>, ConsumerStorage<PayloadWithId> {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbBackupStorage.class);
     private static final String DEFAULT_QUEUE_NAME = "resend_queue";
     private static final byte[] CONSUMER_COMMIT_ID_META_KEY = "consumer_committed_id".getBytes(StandardCharsets.UTF_8);

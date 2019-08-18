@@ -1,4 +1,4 @@
 package com.github.ylgrgyq.resender;
 
-public class SerializationException extends Exception {
+public final class SerializationException extends Exception {
 }

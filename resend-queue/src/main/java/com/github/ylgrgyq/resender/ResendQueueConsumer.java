@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class ResendQueueConsumer<E extends Payload> implements AutoCloseable {
+public final class ResendQueueConsumer<E extends Payload> implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(ResendQueueConsumer.class);
 
     private final ConsumerStorage<PayloadWithId> storage;
