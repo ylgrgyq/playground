@@ -27,7 +27,7 @@ public final class BackupQueueResender<E extends Payload> implements AutoCloseab
     }
 
     public void start() {
-        this.worker.start();
+        worker.start();
     }
 
     @Override
@@ -43,7 +43,7 @@ public final class BackupQueueResender<E extends Payload> implements AutoCloseab
             while (!stop) {
                 boolean commit = false;
                 try {
-                    E payload = backupQueue.fetch();
+                    final E payload = backupQueue.fetch();
                     if (payload.isValid()) {
                         onInvalidPayload(payload);
                     } else {

@@ -7,7 +7,6 @@ import com.lmax.disruptor.dsl.Disruptor;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -16,7 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFuture;
 import static java.util.Objects.requireNonNull;
 
-public final class ResendQueueProducer<E extends Payload> implements AutoCloseable {
+public final class ResendQueueProducer<E> implements AutoCloseable {
     private final ProducerStorage storage;
     private final Disruptor<ProducerEvent> disruptor;
     private final RingBuffer<ProducerEvent> ringBuffer;

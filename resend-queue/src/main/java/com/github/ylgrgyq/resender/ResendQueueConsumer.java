@@ -14,7 +14,7 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static java.util.Objects.requireNonNull;
 
-public final class ResendQueueConsumer<E extends Payload> implements AutoCloseable {
+public final class ResendQueueConsumer<E> implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(ResendQueueConsumer.class);
 
     private final ConsumerStorage storage;
@@ -24,15 +24,24 @@ public final class ResendQueueConsumer<E extends Payload> implements AutoCloseab
     private final AtomicLong offset;
     private final ReentrantLock lock;
     private final Condition notEmpty;
+    private final int batchSize;
 
     private volatile boolean stop;
 
+    public ResendQueueConsumer(ConsumerStorage storage, Deserializer<E> deserializer) {
+        this(storage, deserializer, true);
+    }
+
     public ResendQueueConsumer(ConsumerStorage storage, Deserializer<E> deserializer, boolean autoCommit) {
+        this(storage, deserializer, autoCommit, 1024);
+    }
+
+    public ResendQueueConsumer(ConsumerStorage storage, Deserializer<E> deserializer, boolean autoCommit, int batchSize) {
         requireNonNull(storage, "storage");
         requireNonNull(deserializer, "deserializer");
 
         this.storage = storage;
-        this.queue = new ArrayBlockingQueue<>(1000);
+        this.queue = new ArrayBlockingQueue<>(batchSize);
         this.autoCommit = autoCommit;
         long offset = storage.getLastCommittedId();
         this.offset = new AtomicLong(offset);
@@ -40,6 +49,7 @@ public final class ResendQueueConsumer<E extends Payload> implements AutoCloseab
         this.worker.start();
         this.lock = new ReentrantLock();
         this.notEmpty = this.lock.newCondition();
+        this.batchSize = batchSize;
     }
 
     public E fetch() throws InterruptedException {
@@ -92,7 +102,7 @@ public final class ResendQueueConsumer<E extends Payload> implements AutoCloseab
 
     public void commit() {
         if (!autoCommit) {
-            final Payload payload = queue.poll();
+            final E payload = queue.poll();
             assert payload != null;
             final long id = offset.incrementAndGet();
             storage.commitId(id);
@@ -128,7 +138,7 @@ public final class ResendQueueConsumer<E extends Payload> implements AutoCloseab
         public void run() {
             while (!stop) {
                 try {
-                    final Collection<? extends PayloadWithId> payloads = storage.read(lastId, 1000);
+                    final Collection<? extends PayloadWithId> payloads = storage.read(lastId, batchSize);
                     if (payloads != null && !payloads.isEmpty()) {
                         for (PayloadWithId p : payloads) {
                             final byte[] pInBytes = p.getPayload();
