@@ -1,19 +1,19 @@
 package com.github.ylgrgyq.resender;
 
-final class PayloadWithId {
+public final class PayloadWithId {
     private final long id;
     private final byte[] payload;
 
-    PayloadWithId(long id, byte[] payload) {
+    public PayloadWithId(long id, byte[] payload) {
         this.id = id;
         this.payload = payload;
     }
 
-    long getId() {
+    public long getId() {
         return id;
     }
 
-    byte[] getPayload() {
+    public byte[] getPayload() {
         return payload;
     }
 }

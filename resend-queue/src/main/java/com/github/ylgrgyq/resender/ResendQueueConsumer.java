@@ -15,7 +15,7 @@ import java.util.concurrent.locks.ReentrantLock;
 public final class ResendQueueConsumer<E extends Payload> implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(ResendQueueConsumer.class);
 
-    private final ConsumerStorage<PayloadWithId> storage;
+    private final ConsumerStorage storage;
     private final BlockingQueue<E> queue;
     private final boolean autoCommit;
     private final Thread worker;
@@ -25,7 +25,7 @@ public final class ResendQueueConsumer<E extends Payload> implements AutoCloseab
 
     private volatile boolean stop;
 
-    public ResendQueueConsumer(ConsumerStorage<PayloadWithId> storage, Deserializer<E> deserializer, boolean autoCommit) {
+    public ResendQueueConsumer(ConsumerStorage storage, Deserializer<E> deserializer, boolean autoCommit) {
         this.storage = storage;
         this.queue = new ArrayBlockingQueue<>(1000);
         this.autoCommit = autoCommit;

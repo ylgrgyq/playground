@@ -1,6 +1,8 @@
 package com.github.ylgrgyq.resender;
 
-import com.lmax.disruptor.*;
+import com.lmax.disruptor.EventHandler;
+import com.lmax.disruptor.EventTranslatorThreeArg;
+import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 
 import java.util.ArrayList;
@@ -10,46 +12,68 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFuture;
+
 public final class ResendQueueProducer<E extends Payload> implements AutoCloseable {
-    private final ProducerStorage<PayloadWithId> storage;
+    private final ProducerStorage storage;
     private final Disruptor<ProducerEvent> disruptor;
     private final RingBuffer<ProducerEvent> ringBuffer;
     private final EventTranslatorThreeArg<ProducerEvent, byte[], CompletableFuture<Void>, Boolean> translator;
     private final Executor executor;
     private final Serializer<E> serializer;
+    private volatile boolean stopped;
 
-    public ResendQueueProducer(ProducerStorage<PayloadWithId> storage, Serializer<E> serializer) {
+    public ResendQueueProducer(ProducerStorage storage, Serializer<E> serializer) {
         this.storage = storage;
         final long lastId = storage.getLastProducedId();
         this.disruptor = new Disruptor<>(ProducerEvent::new, 512,
                 new NamedThreadFactory("Producer-Worker-"));
-        this.disruptor.handleEventsWith(new ProduceHandler(512));
+        this.disruptor.handleEventsWith(new ProduceHandler(128));
         this.disruptor.start();
-        this.translator = new ProducerTranslator(lastId + 1);
+        this.translator = new ProducerTranslator(lastId);
         this.ringBuffer = disruptor.getRingBuffer();
         this.executor = Executors.newSingleThreadExecutor();
         this.serializer = serializer;
     }
 
+    /**
+     * Produce an element to the queue. This method may block when the downstream storage is too slow and
+     * the internal buffer is running out.
+     *
+     * @param element The element to put into the queue
+     * @return a future which will be completed when the element is safely saved or encounter some exceptions
+     */
     public CompletableFuture<Void> produce(E element) {
+        if (stopped) {
+            return exceptionallyCompletedFuture(new IllegalStateException("producer has been stopped"));
+        }
+
         CompletableFuture<Void> future = new CompletableFuture<>();
         try {
             byte[] payload = serializer.serialize(element);
             ringBuffer.publishEvent(translator, payload, future, Boolean.FALSE);
-        } catch (Exception ex) {
+        } catch (SerializationException ex) {
             future.completeExceptionally(ex);
         }
 
         return future;
     }
 
-    public void flush() {
-        ringBuffer.publishEvent(translator, null, new CompletableFuture<>(), Boolean.TRUE);
+    public CompletableFuture<Void> flush() {
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        ringBuffer.publishEvent(translator, null, future, Boolean.TRUE);
+        return future;
     }
 
     @Override
     public void close() throws Exception {
+        stopped = true;
+
+        CompletableFuture<Void> future = flush();
+        future.join();
+
         disruptor.shutdown();
+
         storage.close();
     }
 
@@ -64,10 +88,13 @@ public final class ResendQueueProducer<E extends Payload> implements AutoCloseab
         @Override
         public void translateTo(ProducerEvent event, long sequence, byte[] payload, CompletableFuture<Void> future, Boolean flush) {
             event.reset();
-            event.payloadWithId = new PayloadWithId(nextId.incrementAndGet(), payload);
             event.future = future;
             if (flush == Boolean.TRUE) {
                 event.flush = true;
+            }
+
+            if (payload != null) {
+                event.payloadWithId = new PayloadWithId(nextId.incrementAndGet(), payload);
             }
         }
     }
@@ -101,6 +128,7 @@ public final class ResendQueueProducer<E extends Payload> implements AutoCloseab
                 if (!batchPayload.isEmpty()) {
                     flush();
                 }
+                executor.execute(() -> event.future.complete(null));
             } else {
                 batchPayload.add(event.payloadWithId);
                 batchFutures.add(event.future);
