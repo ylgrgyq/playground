@@ -43,7 +43,7 @@ public final class ResendQueueConsumer<E> implements AutoCloseable {
         this.storage = storage;
         this.queue = new ArrayBlockingQueue<>(batchSize);
         this.autoCommit = autoCommit;
-        long offset = storage.getLastCommittedId();
+        final long offset = storage.getLastCommittedId();
         this.offset = new AtomicLong(offset);
         this.worker = new NamedThreadFactory("resend-queue-consumer-").newThread(new FetchWorker(offset, deserializer));
         this.worker.start();

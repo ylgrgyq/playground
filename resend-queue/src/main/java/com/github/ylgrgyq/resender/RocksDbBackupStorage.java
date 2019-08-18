@@ -50,20 +50,20 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
         this.readRetryIntervalMillis = readRetryIntervalMillis;
 
         try {
-            DBOptions dbOptions = createDefaultRocksDBOptions();
+            final DBOptions dbOptions = createDefaultRocksDBOptions();
             dbOptions.setCreateMissingColumnFamilies(true);
             dbOptions.setCreateIfMissing(true);
             this.dbOptions = dbOptions;
 
-            WriteOptions writeOptions = new WriteOptions();
+            final WriteOptions writeOptions = new WriteOptions();
             writeOptions.setSync(false);
             this.writeOptions = writeOptions;
 
-            ReadOptions totalOrderReadOptions = new ReadOptions();
+            final ReadOptions totalOrderReadOptions = new ReadOptions();
             totalOrderReadOptions.setTotalOrderSeek(true);
             this.totalOrderReadOptions = totalOrderReadOptions;
 
-            BlockBasedTableConfig tableConfig = new BlockBasedTableConfig(). //
+            final BlockBasedTableConfig tableConfig = new BlockBasedTableConfig(). //
                     setIndexType(IndexType.kHashSearch). // use hash search(btree) for prefix scan.
                     setBlockSize(4 * SizeUnit.KB).//
                     setFilter(new BloomFilter(16, false)). //
@@ -113,7 +113,7 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
     @Override
     public long getLastCommittedId() {
         try {
-            byte[] commitIdInBytes = db.get(defaultColumnFamilyHandle, totalOrderReadOptions, CONSUMER_COMMIT_ID_META_KEY);
+            final byte[] commitIdInBytes = db.get(defaultColumnFamilyHandle, totalOrderReadOptions, CONSUMER_COMMIT_ID_META_KEY);
             return Bits.getLong(commitIdInBytes, 0);
         } catch (RocksDBException ex) {
             throw new IllegalStateException("fail to get last committed id: ", ex);
@@ -135,12 +135,12 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
     public Collection<PayloadWithId> read(long fromId, int limit) throws InterruptedException {
         fromId = Math.max(fromId, 0);
 
-        List<PayloadWithId> entries = new ArrayList<>(limit);
+        final List<PayloadWithId> entries = new ArrayList<>(limit);
         while (true) {
             try (RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions)) {
                 for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
-                    long id = Bits.getLong(it.key(), 0);
-                    PayloadWithId entry = new PayloadWithId(id, it.value());
+                    final long id = Bits.getLong(it.key(), 0);
+                    final PayloadWithId entry = new PayloadWithId(id, it.value());
                     entries.add(entry);
                 }
             }
@@ -159,7 +159,7 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
         requireNonNull(queue, "queue");
 
         try {
-            WriteBatch batch = new WriteBatch();
+            final WriteBatch batch = new WriteBatch();
             for (PayloadWithId e : queue) {
                 batch.put(columnFamilyHandle, getKeyBytes(e.getId()), e.getPayload());
             }
@@ -212,7 +212,7 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
     }
 
     private ColumnFamilyOptions createDefaultColumnFamilyOptions() {
-        ColumnFamilyOptions options = new ColumnFamilyOptions();
+        final ColumnFamilyOptions options = new ColumnFamilyOptions();
 
         cfOptions.add(options);
 

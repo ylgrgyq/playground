@@ -54,9 +54,9 @@ public final class ResendQueueProducer<E> implements AutoCloseable {
             return exceptionallyCompletedFuture(new IllegalStateException("producer has been stopped"));
         }
 
-        CompletableFuture<Void> future = new CompletableFuture<>();
+        final CompletableFuture<Void> future = new CompletableFuture<>();
         try {
-            byte[] payload = serializer.serialize(element);
+            final byte[] payload = serializer.serialize(element);
             ringBuffer.publishEvent(translator, payload, future, Boolean.FALSE);
         } catch (SerializationException ex) {
             future.completeExceptionally(ex);
@@ -66,7 +66,7 @@ public final class ResendQueueProducer<E> implements AutoCloseable {
     }
 
     public CompletableFuture<Void> flush() {
-        CompletableFuture<Void> future = new CompletableFuture<>();
+        final CompletableFuture<Void> future = new CompletableFuture<>();
         ringBuffer.publishEvent(translator, null, future, Boolean.TRUE);
         return future;
     }
@@ -75,7 +75,7 @@ public final class ResendQueueProducer<E> implements AutoCloseable {
     public void close() throws Exception {
         stopped = true;
 
-        CompletableFuture<Void> future = flush();
+        final CompletableFuture<Void> future = flush();
         future.join();
 
         disruptor.shutdown();

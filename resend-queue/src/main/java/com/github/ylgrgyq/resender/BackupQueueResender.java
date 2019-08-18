@@ -3,7 +3,10 @@ package com.github.ylgrgyq.resender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Objects;
 import java.util.concurrent.Executor;
+
+import static java.util.Objects.requireNonNull;
 
 public final class BackupQueueResender<E extends Payload> implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(BackupQueueResender.class);
@@ -19,6 +22,11 @@ public final class BackupQueueResender<E extends Payload> implements AutoCloseab
                                BackupQueueHandler<E> handler,
                                ResenderListener<E> listener,
                                Executor listenerExecutor) {
+        requireNonNull(queue, "queue");
+        requireNonNull(handler, "handler");
+        requireNonNull(listener, "listener");
+        requireNonNull(listenerExecutor, "listenerExecutor");
+
         this.backupQueue = queue;
         this.handler = handler;
         this.worker = new NamedThreadFactory("resend-queue-resender-").newThread(new Worker());
