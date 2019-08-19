@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.concurrent.atomic.AtomicLong;
 
-public class TestingPayload implements Payload {
+public class TestingPayload implements Verifiable {
     private static AtomicLong idGenerator = new AtomicLong();
 
     private long id;
@@ -34,8 +34,8 @@ public class TestingPayload implements Payload {
         return content;
     }
 
-    public ElementWithId createPayloweWithId() {
-        return new ElementWithId(id, content);
+    public ObjectWithId createPayloweWithId() {
+        return new ObjectWithId(id, content);
     }
 
     @Override

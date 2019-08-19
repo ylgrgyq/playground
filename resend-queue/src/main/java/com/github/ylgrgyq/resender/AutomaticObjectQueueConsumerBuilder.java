@@ -1,38 +1,58 @@
 package com.github.ylgrgyq.resender;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Executor;
 
 import static java.util.Objects.requireNonNull;
 
-public class AutomaticObjectQueueConsumerBuilder {
-    private ObjectQueueConsumerBuilder consumerBuilder;
-    private ConsumeObjectHandler handler;
+public class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
+    private final List<ConsumeObjectListener<E>> listeners;
+    private final ObjectQueueConsumerBuilder<E> consumerBuilder;
+
+    private ConsumeObjectHandler<E> consumeObjectHandler;
     private Executor listenerExecutor;
+    private ObjectQueueConsumer<E> consumer;
 
     private AutomaticObjectQueueConsumerBuilder() {
-        consumerBuilder = ObjectQueueConsumerBuilder.newBuilder();
+        this.consumerBuilder = ObjectQueueConsumerBuilder.newBuilder();
+        this.listeners = new ArrayList<>();
     }
 
-    public static AutomaticObjectQueueConsumerBuilder newBuilder() {
-        return new AutomaticObjectQueueConsumerBuilder();
+    public static <E extends Verifiable> AutomaticObjectQueueConsumerBuilder<E> newBuilder() {
+        return new AutomaticObjectQueueConsumerBuilder<>();
+    }
+
+    ObjectQueueConsumer<E> getConsumer() {
+        return consumer;
     }
 
     ConsumerStorage getStorage() {
         return consumerBuilder.getStorage();
     }
 
-    public AutomaticObjectQueueConsumerBuilder setStorage(ConsumerStorage storage) {
+    public AutomaticObjectQueueConsumerBuilder<E> addConsumeElementListener(ConsumeObjectListener<E> listener) {
+        requireNonNull(listener, "listener");
+        listeners.add(listener);
+        return this;
+    }
+
+
+    List<ConsumeObjectListener<E>> getConsumeElementListeners() {
+        return listeners;
+    }
+
+    public AutomaticObjectQueueConsumerBuilder<E> setStorage(ConsumerStorage storage) {
         requireNonNull(storage, "storage");
         consumerBuilder.setStorage(storage);
         return this;
     }
 
-    @SuppressWarnings("unchecked")
-    <E> Deserializer<E> getDeserializer() {
+    Deserializer<E> getDeserializer() {
         return consumerBuilder.getDeserializer();
     }
 
-    public AutomaticObjectQueueConsumerBuilder setDeserializer(Deserializer deserializer) {
+    public AutomaticObjectQueueConsumerBuilder<E> setDeserializer(Deserializer<E> deserializer) {
         requireNonNull(deserializer, "deserializer");
         consumerBuilder.setDeserializer(deserializer);
         return this;
@@ -42,7 +62,7 @@ public class AutomaticObjectQueueConsumerBuilder {
         return consumerBuilder.isAutoCommit();
     }
 
-    public AutomaticObjectQueueConsumerBuilder setAutoCommit(boolean autoCommit) {
+    public AutomaticObjectQueueConsumerBuilder<E> setAutoCommit(boolean autoCommit) {
         consumerBuilder.setAutoCommit(autoCommit);
         return this;
     }
@@ -51,18 +71,17 @@ public class AutomaticObjectQueueConsumerBuilder {
         return consumerBuilder.getBatchSize();
     }
 
-    public AutomaticObjectQueueConsumerBuilder setBatchSize(int batchSize) {
+    public AutomaticObjectQueueConsumerBuilder<E> setBatchSize(int batchSize) {
         consumerBuilder.setBatchSize(batchSize);
         return this;
     }
 
-    @SuppressWarnings("unchecked")
-    <E extends Payload> ConsumeObjectHandler<E> getHandler() {
-        return (ConsumeObjectHandler<E>)handler;
+    ConsumeObjectHandler<E> getConsumeObjectHandler() {
+        return consumeObjectHandler;
     }
 
-    public AutomaticObjectQueueConsumerBuilder setHandler(ConsumeObjectHandler handler) {
-        this.handler = handler;
+    public AutomaticObjectQueueConsumerBuilder<E> setConsumeObjectHandler(ConsumeObjectHandler<E> consumeObjectHandler) {
+        this.consumeObjectHandler = consumeObjectHandler;
         return this;
     }
 
@@ -70,18 +89,17 @@ public class AutomaticObjectQueueConsumerBuilder {
         return listenerExecutor;
     }
 
-    public AutomaticObjectQueueConsumerBuilder setListenerExecutor(Executor listenerExecutor) {
+    public AutomaticObjectQueueConsumerBuilder<E> setListenerExecutor(Executor listenerExecutor) {
         this.listenerExecutor = listenerExecutor;
         return this;
     }
 
-    public <E extends Payload> AutomaticObjectQueueConsumer<E> build() {
-        requireNonNull(handler, "handler");
-        requireNonNull(listenerExecutor, "listenerExecutor");
+    public AutomaticObjectQueueConsumer<E> build() {
+        requireNonNull(consumeObjectHandler, "please provide consume object handler");
+        requireNonNull(listenerExecutor, "please provide listener executor");
 
-        ObjectQueueConsumer<E> consumer = consumerBuilder.build();
-        return new AutomaticObjectQueueConsumer<>(consumer, this);
+        this.consumer = consumerBuilder.build();
+
+        return new AutomaticObjectQueueConsumer<>(this);
     }
-
-
 }

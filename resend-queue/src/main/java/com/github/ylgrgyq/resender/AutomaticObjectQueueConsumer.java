@@ -3,7 +3,6 @@ package com.github.ylgrgyq.resender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executor;
@@ -12,7 +11,7 @@ import java.util.function.BiConsumer;
 
 import static java.util.Objects.requireNonNull;
 
-public final class AutomaticObjectQueueConsumer<E extends Payload> implements AutoCloseable {
+public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(AutomaticObjectQueueConsumer.class);
     private static final ThreadFactory threadFactory = new NamedThreadFactory("automatic-object-queue-consumer-");
 
@@ -20,23 +19,16 @@ public final class AutomaticObjectQueueConsumer<E extends Payload> implements Au
     private final Thread worker;
     private final Executor listenerExecutor;
     private final Set<ConsumeObjectListener<E>> listeners;
-    private volatile boolean stop;
+    private volatile boolean stopped;
 
-    AutomaticObjectQueueConsumer(ObjectQueueConsumer<E> consumer, AutomaticObjectQueueConsumerBuilder builder) {
+    AutomaticObjectQueueConsumer(AutomaticObjectQueueConsumerBuilder<E> builder) {
         requireNonNull(builder, "builder");
 
-        this.backupQueue = consumer;
-        this.worker = threadFactory.newThread(new Worker(builder.getHandler()));
+        this.backupQueue = builder.getConsumer();
+        this.worker = threadFactory.newThread(new Worker(builder.getConsumeObjectHandler()));
         this.listenerExecutor = builder.getListenerExecutor();
-        this.listeners = new CopyOnWriteArraySet<>();
-    }
-
-    public void start() {
-        if (stop) {
-            throw new IllegalStateException("consumer already stopped");
-        }
-
-        worker.start();
+        this.listeners = new CopyOnWriteArraySet<>(builder.getConsumeElementListeners());
+        this.worker.start();
     }
 
     public void addListener(ConsumeObjectListener<E> listener) {
@@ -53,7 +45,7 @@ public final class AutomaticObjectQueueConsumer<E extends Payload> implements Au
 
     @Override
     public void close() throws Exception {
-        stop = true;
+        stopped = true;
 
         if (worker != Thread.currentThread()) {
             worker.interrupt();
@@ -72,22 +64,22 @@ public final class AutomaticObjectQueueConsumer<E extends Payload> implements Au
         @Override
         public void run() {
             final ConsumeObjectHandler<E> handler = this.handler;
-            final ObjectQueueConsumer<E> backupQueue = AutomaticObjectQueueConsumer.this.backupQueue;
-            while (!stop) {
+            final ObjectQueueConsumer<E> consumer = AutomaticObjectQueueConsumer.this.backupQueue;
+            while (!stopped) {
                 boolean commit = false;
                 try {
-                    final E payload = backupQueue.fetch();
+                    final E obj = consumer.fetch();
 
-                    if (payload.isValid()) {
-                        notifyInvalidPayload(payload);
+                    if (!obj.isValid()) {
+                        notifyInvalidObject(obj);
                     } else {
                         try {
-                            handler.onReceivedObject(payload);
-                            notifyOnPayloadSendSuccess(payload);
+                            handler.onHandleObject(obj);
+                            notifyOnHandleSuccess(obj);
                             commit = true;
                         } catch (Exception ex) {
-                            notifyOnPayloadSendFailed(payload);
-                            switch (handler.onReceivedObjectFailed(payload, ex)) {
+                            notifyOnHandleFailed(obj);
+                            switch (handler.onHandleObjectFailed(obj, ex)) {
                                 case RETRY:
                                     break;
                                 case IGNORE:
@@ -105,23 +97,23 @@ public final class AutomaticObjectQueueConsumer<E extends Payload> implements Au
                     logger.warn("Got unexpected exception on processing payload in backup queue resender.", ex);
                 } finally {
                     if (commit) {
-                        backupQueue.commit();
+                        consumer.commit();
                     }
                 }
             }
         }
     }
 
-    private void notifyInvalidPayload(E failedPayload) {
-        sendNotification(ConsumeObjectListener::onInvalidPayload, failedPayload);
+    private void notifyInvalidObject(E obj) {
+        sendNotification(ConsumeObjectListener::onInvalidObject, obj);
     }
 
-    private void notifyOnPayloadSendSuccess(E failedPayload) {
-        sendNotification(ConsumeObjectListener::onPayloadSendSuccess, failedPayload);
+    private void notifyOnHandleSuccess(E failedPayload) {
+        sendNotification(ConsumeObjectListener::onHandleSuccess, failedPayload);
     }
 
-    private void notifyOnPayloadSendFailed(E failedPayload) {
-        sendNotification(ConsumeObjectListener::onPayloadSendFailed, failedPayload);
+    private void notifyOnHandleFailed(E failedPayload) {
+        sendNotification(ConsumeObjectListener::onHandleFailed, failedPayload);
     }
 
     private void sendNotification(BiConsumer<ConsumeObjectListener<E>, E> consumer, E payload) {
@@ -131,7 +123,7 @@ public final class AutomaticObjectQueueConsumer<E extends Payload> implements Au
                     try {
                         consumer.accept(l, payload);
                     } catch (Exception ex) {
-                        l.onNotificationFailed(ex);
+                        l.onListenerNotificationFailed(ex);
                     }
                 }
             });

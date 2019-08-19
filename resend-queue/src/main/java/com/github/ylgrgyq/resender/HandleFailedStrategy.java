@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.resender;
 
-public enum HandleFailedObjectStrategy {
+public enum HandleFailedStrategy {
     IGNORE,
     SHUTDOWN,
     RETRY,

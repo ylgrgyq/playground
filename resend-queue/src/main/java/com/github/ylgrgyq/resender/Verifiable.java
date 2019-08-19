@@ -1,5 +1,5 @@
 package com.github.ylgrgyq.resender;
 
-public interface Payload {
+public interface Verifiable {
     boolean isValid();
 }

@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.resender;
 
-public interface ConsumeObjectHandler<E extends Payload> {
-    void onReceivedObject(E payload) throws Exception;
+public interface ConsumeObjectHandler<E extends Verifiable> {
+    void onHandleObject(E obj) throws Exception;
 
-    HandleFailedObjectStrategy onReceivedObjectFailed(E failedPayload, Throwable throwable);
+    HandleFailedStrategy onHandleObjectFailed(E obj, Throwable throwable);
 }

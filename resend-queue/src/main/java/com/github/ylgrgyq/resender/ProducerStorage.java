@@ -5,5 +5,5 @@ import java.util.Collection;
 public interface ProducerStorage extends AutoCloseable {
     long getLastProducedId();
 
-    void store(Collection<ElementWithId> batch);
+    void store(Collection<ObjectWithId> batch);
 }

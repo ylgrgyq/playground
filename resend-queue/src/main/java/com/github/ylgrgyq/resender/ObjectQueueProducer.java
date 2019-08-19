@@ -42,14 +42,14 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
     }
 
     /**
-     * Produce an element to the queue. This method may block when the downstream storage is too slow and
+     * Produce an object to the queue. This method may block when the downstream storage is too slow and
      * the internal buffer is running out.
      *
-     * @param element The element to put into the queue
-     * @return a future which will be completed when the element is safely saved or encounter some exceptions
+     * @param object The object to put into the queue
+     * @return a future which will be completed when the object is safely saved or encounter some exceptions
      */
-    public CompletableFuture<Void> produce(@Nonnull E element) {
-        requireNonNull(element, "element");
+    public CompletableFuture<Void> produce(@Nonnull E object) {
+        requireNonNull(object, "object");
 
         if (stopped) {
             return exceptionallyCompletedFuture(new IllegalStateException("producer has been stopped"));
@@ -57,7 +57,7 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
 
         final CompletableFuture<Void> future = new CompletableFuture<>();
         try {
-            final byte[] payload = serializer.serialize(element);
+            final byte[] payload = serializer.serialize(object);
             ringBuffer.publishEvent(translator, payload, future, Boolean.FALSE);
         } catch (SerializationException ex) {
             future.completeExceptionally(ex);
@@ -101,18 +101,18 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
             }
 
             if (payload != null) {
-                event.elementWithId = new ElementWithId(nextId.incrementAndGet(), payload);
+                event.objectWithId = new ObjectWithId(nextId.incrementAndGet(), payload);
             }
         }
     }
 
     private final static class ProducerEvent {
-        private ElementWithId elementWithId;
+        private ObjectWithId objectWithId;
         private CompletableFuture<Void> future;
         private boolean flush;
 
         void reset() {
-            elementWithId = null;
+            objectWithId = null;
             future = null;
             flush = false;
         }
@@ -120,7 +120,7 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
 
     private final class ProduceHandler implements EventHandler<ProducerEvent> {
         private final int batchSize;
-        private final List<ElementWithId> batchPayload;
+        private final List<ObjectWithId> batchPayload;
         private final List<CompletableFuture<Void>> batchFutures;
 
         ProduceHandler(int batchSize) {
@@ -137,7 +137,7 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
                 }
                 executor.execute(() -> event.future.complete(null));
             } else {
-                batchPayload.add(event.elementWithId);
+                batchPayload.add(event.objectWithId);
                 batchFutures.add(event.future);
                 if (batchPayload.size() >= batchSize || endOfBatch) {
                     flush();

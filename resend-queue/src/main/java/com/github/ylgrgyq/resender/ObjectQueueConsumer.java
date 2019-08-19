@@ -49,17 +49,17 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
 
     @Nonnull
     public E fetch() throws InterruptedException {
-        E element;
+        E obj;
 
         if (autoCommit) {
-            element = queue.poll();
-            if (element == null) {
-                element = queue.take();
+            obj = queue.poll();
+            if (obj == null) {
+                obj = queue.take();
             }
         } else {
             lock.lockInterruptibly();
             try {
-                while ((element = queue.peek()) == null) {
+                while ((obj = queue.peek()) == null) {
                     notEmpty.await();
                 }
             } finally {
@@ -67,18 +67,18 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
             }
         }
 
-        return element;
+        return obj;
     }
 
     @Nullable
     public E fetch(long timeout, @Nonnull TimeUnit unit) throws InterruptedException {
         requireNonNull(unit);
 
-        E element = null;
+        E obj = null;
 
         if (autoCommit) {
-            element = queue.poll();
-            if (element == null) {
+            obj = queue.poll();
+            if (obj == null) {
                 queue.poll(timeout, unit);
             }
         } else {
@@ -86,7 +86,7 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
             lock.lockInterruptibly();
             try {
                 long remain;
-                while ((remain = end - System.nanoTime()) > 0 && (element = queue.peek()) == null) {
+                while ((remain = end - System.nanoTime()) > 0 && (obj = queue.peek()) == null) {
                     notEmpty.await(remain, TimeUnit.NANOSECONDS);
                 }
             } finally {
@@ -94,7 +94,7 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
             }
         }
 
-        return element;
+        return obj;
     }
 
     public void commit() {
@@ -135,10 +135,10 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
         public void run() {
             while (!stop) {
                 try {
-                    final Collection<? extends ElementWithId> payloads = storage.read(lastId, batchSize);
+                    final Collection<? extends ObjectWithId> payloads = storage.read(lastId, batchSize);
                     if (payloads != null && !payloads.isEmpty()) {
-                        for (ElementWithId p : payloads) {
-                            final byte[] pInBytes = p.getElement();
+                        for (ObjectWithId p : payloads) {
+                            final byte[] pInBytes = p.getObjectInBytes();
                             try {
                                 final E pObj = deserializer.deserialize(pInBytes);
                                 queue.put(pObj);

@@ -2,35 +2,35 @@ package com.github.ylgrgyq.resender;
 
 import static java.util.Objects.requireNonNull;
 
-public final class ObjectQueueConsumerBuilder {
+public class ObjectQueueConsumerBuilder<E> {
     private boolean autoCommit = true;
     private int batchSize = 1024;
 
     private ConsumerStorage storage;
-    private Deserializer deserializer;
+    private Deserializer<E> deserializer;
 
     private ObjectQueueConsumerBuilder() {}
 
-    public static ObjectQueueConsumerBuilder newBuilder() {
-        return new ObjectQueueConsumerBuilder();
+    public static <E> ObjectQueueConsumerBuilder<E> newBuilder() {
+        return new ObjectQueueConsumerBuilder<>();
     }
 
     ConsumerStorage getStorage() {
         return storage;
     }
 
-    public ObjectQueueConsumerBuilder setStorage(ConsumerStorage storage) {
+    public ObjectQueueConsumerBuilder<E> setStorage(ConsumerStorage storage) {
         requireNonNull(storage, "storage");
         this.storage = storage;
         return this;
     }
 
-    @SuppressWarnings("unchecked")
-    <E> Deserializer<E> getDeserializer() {
-        return (Deserializer<E>)deserializer;
+
+    Deserializer<E> getDeserializer() {
+        return deserializer;
     }
 
-    public ObjectQueueConsumerBuilder setDeserializer(Deserializer deserializer) {
+    public ObjectQueueConsumerBuilder<E> setDeserializer(Deserializer<E> deserializer) {
         requireNonNull(deserializer, "deserializer");
         this.deserializer = deserializer;
         return this;
@@ -40,7 +40,7 @@ public final class ObjectQueueConsumerBuilder {
         return autoCommit;
     }
 
-    public ObjectQueueConsumerBuilder setAutoCommit(boolean autoCommit) {
+    public ObjectQueueConsumerBuilder<E> setAutoCommit(boolean autoCommit) {
         this.autoCommit = autoCommit;
         return this;
     }
@@ -49,12 +49,12 @@ public final class ObjectQueueConsumerBuilder {
         return batchSize;
     }
 
-    public ObjectQueueConsumerBuilder setBatchSize(int batchSize) {
+    public ObjectQueueConsumerBuilder<E> setBatchSize(int batchSize) {
         this.batchSize = batchSize;
         return this;
     }
 
-    public <E> ObjectQueueConsumer<E> build() {
+    public ObjectQueueConsumer<E> build() {
         requireNonNull(storage, "storage");
         requireNonNull(deserializer, "deserializer");
 
