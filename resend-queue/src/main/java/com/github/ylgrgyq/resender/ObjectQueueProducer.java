@@ -5,6 +5,7 @@ import com.lmax.disruptor.EventTranslatorThreeArg;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -15,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFuture;
 import static java.util.Objects.requireNonNull;
 
-public final class ResendQueueProducer<E> implements AutoCloseable {
+public final class ObjectQueueProducer<E> implements AutoCloseable {
     private final ProducerStorage storage;
     private final Disruptor<ProducerEvent> disruptor;
     private final RingBuffer<ProducerEvent> ringBuffer;
@@ -24,7 +25,7 @@ public final class ResendQueueProducer<E> implements AutoCloseable {
     private final Serializer<E> serializer;
     private volatile boolean stopped;
 
-    public ResendQueueProducer(ProducerStorage storage, Serializer<E> serializer) {
+    public ObjectQueueProducer(@Nonnull ProducerStorage storage, @Nonnull Serializer<E> serializer) {
         requireNonNull(storage, "storage");
         requireNonNull(serializer, "serializer");
 
@@ -47,7 +48,7 @@ public final class ResendQueueProducer<E> implements AutoCloseable {
      * @param element The element to put into the queue
      * @return a future which will be completed when the element is safely saved or encounter some exceptions
      */
-    public CompletableFuture<Void> produce(E element) {
+    public CompletableFuture<Void> produce(@Nonnull E element) {
         requireNonNull(element, "element");
 
         if (stopped) {

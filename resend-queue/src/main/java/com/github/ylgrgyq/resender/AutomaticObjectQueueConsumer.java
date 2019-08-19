@@ -3,25 +3,27 @@ package com.github.ylgrgyq.resender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Objects;
+import javax.annotation.Nonnull;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadFactory;
 
 import static java.util.Objects.requireNonNull;
 
-public final class BackupQueueResender<E extends Payload> implements AutoCloseable {
-    private static final Logger logger = LoggerFactory.getLogger(BackupQueueResender.class);
+public final class AutomaticObjectQueueConsumer<E extends Payload> implements AutoCloseable {
+    private static final Logger logger = LoggerFactory.getLogger(AutomaticObjectQueueConsumer.class);
+    private static final ThreadFactory threadFactory = new NamedThreadFactory("automatic-object-queue-consumer-");
 
-    private final ResendQueueConsumer<E> backupQueue;
-    private final BackupQueueHandler<E> handler;
-    private final ResenderListener<E> listener;
+    private final ObjectQueueConsumer<E> backupQueue;
+    private final ConsumeObjectHandler<E> handler;
+    private final ConsumeObjectListener<E> listener;
     private final Executor listenerExecutor;
     private final Thread worker;
     private volatile boolean stop;
 
-    public BackupQueueResender(ResendQueueConsumer<E> consumer,
-                               BackupQueueHandler<E> handler,
-                               ResenderListener<E> listener,
-                               Executor listenerExecutor) {
+    public AutomaticObjectQueueConsumer(@Nonnull ObjectQueueConsumer<E> consumer,
+                                        @Nonnull ConsumeObjectHandler<E> handler,
+                                        @Nonnull ConsumeObjectListener<E> listener,
+                                        @Nonnull Executor listenerExecutor) {
         requireNonNull(consumer, "consumer");
         requireNonNull(handler, "handler");
         requireNonNull(listener, "listener");
@@ -29,16 +31,18 @@ public final class BackupQueueResender<E extends Payload> implements AutoCloseab
 
         this.backupQueue = consumer;
         this.handler = handler;
-        this.worker = new NamedThreadFactory("resend-queue-resender-").newThread(new Worker());
+        this.worker = threadFactory.newThread(new Worker());
         this.listener = listener;
         this.listenerExecutor = listenerExecutor;
     }
 
     public void start() {
+        if (stop) {
+            throw new IllegalStateException("consumer already stopped");
+        }
+
         worker.start();
     }
-
-
 
     @Override
     public void close() throws Exception {

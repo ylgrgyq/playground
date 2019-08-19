@@ -13,12 +13,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-public class ResendQueueProducerTest {
+public class ObjectQueueProducerTest {
 
     @Test
     public void simpleProduceAndFlush() {
         final TestingProducerStorage storage = new TestingProducerStorage();
-        final ResendQueueProducer<TestingPayload> producer = new ResendQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
+        final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 64; i++) {
@@ -43,7 +43,7 @@ public class ResendQueueProducerTest {
     @Test
     public void simpleProduceAndAutoFlush() {
         final TestingProducerStorage storage = new TestingProducerStorage();
-        final ResendQueueProducer<TestingPayload> producer = new ResendQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
+        final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 1024; i++) {
@@ -66,7 +66,7 @@ public class ResendQueueProducerTest {
     @Test
     public void close() throws Exception {
         final TestingProducerStorage storage = new TestingProducerStorage();
-        final ResendQueueProducer<TestingPayload> producer = new ResendQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
+        final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 64; i++) {
@@ -85,7 +85,7 @@ public class ResendQueueProducerTest {
     @Test
     public void produceWhenProducerStopped() throws Exception {
         final TestingProducerStorage storage = new TestingProducerStorage();
-        final ResendQueueProducer<TestingPayload> producer = new ResendQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
+        final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
 
         producer.close();
 
@@ -98,7 +98,7 @@ public class ResendQueueProducerTest {
     @Test
     public void produceWhenSerializeElementFailed() {
         final TestingProducerStorage storage = new TestingProducerStorage();
-        final ResendQueueProducer<TestingPayload> producer = new ResendQueueProducer<TestingPayload>(storage, bs -> {
+        final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, bs -> {
             throw new SerializationException();
         });
 

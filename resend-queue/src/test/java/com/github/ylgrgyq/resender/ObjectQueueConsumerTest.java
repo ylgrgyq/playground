@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-public class ResendQueueConsumerTest {
+public class ObjectQueueConsumerTest {
 
     @Test
     public void fetchWithManualCommit() throws Exception {
@@ -24,7 +24,7 @@ public class ResendQueueConsumerTest {
 
         storage.store(storedPayload);
 
-        ResendQueueConsumer<TestingPayload> consumer = new ResendQueueConsumer<>(storage,
+        ObjectQueueConsumer<TestingPayload> consumer = new ObjectQueueConsumer<>(storage,
                 TestingPayload::new,
                 false);
         TestingPayload payload = consumer.fetch();
@@ -45,7 +45,7 @@ public class ResendQueueConsumerTest {
 
         storage.store(storedPayload);
 
-        ResendQueueConsumer<TestingPayload> consumer = new ResendQueueConsumer<>(storage,
+        ObjectQueueConsumer<TestingPayload> consumer = new ObjectQueueConsumer<>(storage,
                 TestingPayload::new,
                 true);
         assertThat(consumer.fetch())
@@ -60,7 +60,7 @@ public class ResendQueueConsumerTest {
     public void timeoutOnFetchWithAutoCommit() throws Exception {
         final TestingProducerStorage storage = new TestingProducerStorage();
 
-        ResendQueueConsumer<TestingPayload> consumer = new ResendQueueConsumer<>(storage,
+        ObjectQueueConsumer<TestingPayload> consumer = new ObjectQueueConsumer<>(storage,
                 TestingPayload::new,
                 true);
 
@@ -71,7 +71,7 @@ public class ResendQueueConsumerTest {
     public void timeoutOnFetchWithManualCommit() throws Exception {
         final TestingProducerStorage storage = new TestingProducerStorage();
 
-        ResendQueueConsumer<TestingPayload> consumer = new ResendQueueConsumer<>(storage,
+        ObjectQueueConsumer<TestingPayload> consumer = new ObjectQueueConsumer<>(storage,
                 TestingPayload::new,
                 false);
 
@@ -85,7 +85,7 @@ public class ResendQueueConsumerTest {
         final TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
         storedPayload.add(first.createPayloweWithId());
 
-        ResendQueueConsumer<TestingPayload> consumer = new ResendQueueConsumer<>(storage,
+        ObjectQueueConsumer<TestingPayload> consumer = new ObjectQueueConsumer<>(storage,
                 TestingPayload::new,
                 true);
 
@@ -114,7 +114,7 @@ public class ResendQueueConsumerTest {
         final TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
         storedPayload.add(first.createPayloweWithId());
 
-        ResendQueueConsumer<TestingPayload> consumer = new ResendQueueConsumer<>(storage,
+        ObjectQueueConsumer<TestingPayload> consumer = new ObjectQueueConsumer<>(storage,
                 TestingPayload::new,
                 false);
 

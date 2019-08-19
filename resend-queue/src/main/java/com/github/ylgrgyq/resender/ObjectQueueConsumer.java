@@ -3,10 +3,13 @@ package com.github.ylgrgyq.resender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
@@ -14,8 +17,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static java.util.Objects.requireNonNull;
 
-public final class ResendQueueConsumer<E> implements AutoCloseable {
-    private static final Logger logger = LoggerFactory.getLogger(ResendQueueConsumer.class);
+public final class ObjectQueueConsumer<E> implements AutoCloseable {
+    private static final Logger logger = LoggerFactory.getLogger(ObjectQueueConsumer.class);
+    private static final ThreadFactory threadFactory = new NamedThreadFactory("object-queue-consumer-");
 
     private final ConsumerStorage storage;
     private final BlockingQueue<E> queue;
@@ -28,15 +32,15 @@ public final class ResendQueueConsumer<E> implements AutoCloseable {
 
     private volatile boolean stop;
 
-    public ResendQueueConsumer(ConsumerStorage storage, Deserializer<E> deserializer) {
+    public ObjectQueueConsumer(@Nonnull ConsumerStorage storage, @Nonnull Deserializer<E> deserializer) {
         this(storage, deserializer, true);
     }
 
-    public ResendQueueConsumer(ConsumerStorage storage, Deserializer<E> deserializer, boolean autoCommit) {
+    public ObjectQueueConsumer(@Nonnull ConsumerStorage storage, @Nonnull Deserializer<E> deserializer, boolean autoCommit) {
         this(storage, deserializer, autoCommit, 1024);
     }
 
-    public ResendQueueConsumer(ConsumerStorage storage, Deserializer<E> deserializer, boolean autoCommit, int batchSize) {
+    public ObjectQueueConsumer(@Nonnull ConsumerStorage storage, @Nonnull Deserializer<E> deserializer, boolean autoCommit, int batchSize) {
         requireNonNull(storage, "storage");
         requireNonNull(deserializer, "deserializer");
 
@@ -45,14 +49,15 @@ public final class ResendQueueConsumer<E> implements AutoCloseable {
         this.autoCommit = autoCommit;
         final long offset = storage.getLastCommittedId();
         this.offset = new AtomicLong(offset);
-        this.worker = new NamedThreadFactory("resend-queue-consumer-").newThread(new FetchWorker(offset, deserializer));
+        this.worker = threadFactory.newThread(new FetchWorker(offset, deserializer));
         this.worker.start();
         this.lock = new ReentrantLock();
         this.notEmpty = this.lock.newCondition();
         this.batchSize = batchSize;
     }
 
-    public E fetch() throws InterruptedException {
+    public @Nonnull
+    E fetch() throws InterruptedException {
         E element;
 
         if (autoCommit) {
@@ -74,7 +79,8 @@ public final class ResendQueueConsumer<E> implements AutoCloseable {
         return element;
     }
 
-    public E fetch(long timeout, TimeUnit unit) throws InterruptedException {
+    public @Nullable
+    E fetch(long timeout, @Nonnull TimeUnit unit) throws InterruptedException {
         requireNonNull(unit);
 
         E element = null;
