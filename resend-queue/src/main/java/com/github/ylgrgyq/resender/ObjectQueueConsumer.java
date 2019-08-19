@@ -30,7 +30,7 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
     private final Condition notEmpty;
     private final int batchSize;
 
-    private volatile boolean stop;
+    private volatile boolean stopped;
 
     ObjectQueueConsumer(ObjectQueueConsumerBuilder builder) {
         requireNonNull(builder, "builder");
@@ -107,12 +107,12 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
     }
 
     public boolean stopped() {
-        return stop;
+        return stopped;
     }
 
     @Override
     public void close() throws Exception {
-        stop = true;
+        stopped = true;
 
         if (Thread.currentThread() != worker) {
             worker.interrupt();
@@ -133,16 +133,16 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
 
         @Override
         public void run() {
-            while (!stop) {
+            while (!stopped) {
                 try {
                     final Collection<? extends ObjectWithId> payloads = storage.read(lastId, batchSize);
-                    if (payloads != null && !payloads.isEmpty()) {
+                    if (!payloads.isEmpty()) {
                         for (ObjectWithId p : payloads) {
                             final byte[] pInBytes = p.getObjectInBytes();
                             try {
                                 final E pObj = deserializer.deserialize(pInBytes);
                                 queue.put(pObj);
-                            } catch (DeserializationException ex) {
+                            } catch (Exception ex) {
                                 logger.error("Deserialize payload with id: {} failed. Content in Base64 string is: {}",
                                         lastId, Base64.getEncoder().encodeToString(pInBytes), ex);
                                 close();

@@ -79,7 +79,7 @@ public class ObjectQueueProducerTest {
         producer.close();
 
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
-        assertThat(storage.isStopped()).isTrue();
+        assertThat(storage.closed()).isTrue();
     }
 
     @Test

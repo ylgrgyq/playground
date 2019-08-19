@@ -8,7 +8,7 @@ public class TestingStorage implements ConsumerStorage, ProducerStorage {
     private final ArrayList<ObjectWithId> producedPayloads;
     private long lastProducedId;
     private long lastCommittedId;
-    private boolean stopped;
+    private boolean closed;
 
     public TestingStorage() {
         this.producedPayloads = new ArrayList<>();
@@ -76,10 +76,16 @@ public class TestingStorage implements ConsumerStorage, ProducerStorage {
 
     @Override
     public void close() throws Exception {
-        stopped = true;
+        closed = true;
     }
 
-    public boolean isStopped() {
-        return stopped;
+    boolean closed() {
+        return closed;
+    }
+
+    void clear() {
+        producedPayloads.clear();
+        lastProducedId = 0;
+        lastCommittedId = -1;
     }
 }

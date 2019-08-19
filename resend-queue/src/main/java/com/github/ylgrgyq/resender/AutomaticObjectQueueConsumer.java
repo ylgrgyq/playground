@@ -19,7 +19,7 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
     private final Thread worker;
     private final Executor listenerExecutor;
     private final Set<ConsumeObjectListener<E>> listeners;
-    private volatile boolean stopped;
+    private volatile boolean closed;
 
     AutomaticObjectQueueConsumer(AutomaticObjectQueueConsumerBuilder<E> builder) {
         requireNonNull(builder, "builder");
@@ -45,13 +45,17 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
 
     @Override
     public void close() throws Exception {
-        stopped = true;
+        closed = true;
 
         if (worker != Thread.currentThread()) {
             worker.interrupt();
             worker.join();
         }
         backupQueue.close();
+    }
+
+    boolean closed() {
+        return closed;
     }
 
     private final class Worker implements Runnable {
@@ -65,13 +69,14 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
         public void run() {
             final ConsumeObjectHandler<E> handler = this.handler;
             final ObjectQueueConsumer<E> consumer = AutomaticObjectQueueConsumer.this.backupQueue;
-            while (!stopped) {
+            while (!closed) {
                 boolean commit = false;
                 try {
                     final E obj = consumer.fetch();
 
                     if (!obj.isValid()) {
                         notifyInvalidObject(obj);
+                        commit = true;
                     } else {
                         try {
                             handler.onHandleObject(obj);
@@ -79,16 +84,7 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
                             commit = true;
                         } catch (Exception ex) {
                             notifyOnHandleFailed(obj);
-                            switch (handler.onHandleObjectFailed(obj, ex)) {
-                                case RETRY:
-                                    break;
-                                case IGNORE:
-                                    commit = true;
-                                    break;
-                                case SHUTDOWN:
-                                    close();
-                                    break;
-                            }
+                            commit = handleObjectFailed(handler, obj, ex);
                         }
                     }
                 } catch (InterruptedException ex) {
@@ -102,6 +98,36 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
                 }
             }
         }
+    }
+
+    private boolean handleObjectFailed(ConsumeObjectHandler<E> handler, E obj, Throwable ex) throws Exception {
+        boolean commit = false;
+        HandleFailedStrategy strategy;
+        try {
+            strategy = handler.onHandleObjectFailed(obj, ex);
+            if (strategy == null) {
+                logger.error("ConsumeObjectHandler.onHandleObjectFailed returned null on handle" +
+                                " object {}, and exception {}, shutdown anyway.",
+                        obj, ex);
+                strategy = HandleFailedStrategy.SHUTDOWN;
+            }
+        } catch (Exception ex2) {
+            logger.error("Got unexpected exception from ConsumeObjectHandler.onHandleObjectFailed on handle " +
+                    "object {}, and exception {}. Shutdown anyway.", obj, ex2);
+            strategy = HandleFailedStrategy.SHUTDOWN;
+        }
+
+        switch (strategy) {
+            case RETRY:
+                break;
+            case IGNORE:
+                commit = true;
+                break;
+            case SHUTDOWN:
+                close();
+                break;
+        }
+        return commit;
     }
 
     private void notifyInvalidObject(E obj) {

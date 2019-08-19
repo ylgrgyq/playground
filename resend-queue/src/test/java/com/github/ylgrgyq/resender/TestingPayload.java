@@ -7,23 +7,34 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class TestingPayload implements Verifiable {
     private static AtomicLong idGenerator = new AtomicLong();
+    private static TestingPayloadCodec codec = new TestingPayloadCodec();
 
+    private boolean valid;
     private long id;
     private byte[] content;
 
     public TestingPayload() {
         this.content = ("Hello").getBytes(StandardCharsets.UTF_8);
         this.id = idGenerator.incrementAndGet();
+        this.valid = true;
     }
 
     public TestingPayload(byte[] content) {
         this.content = content;
         this.id = idGenerator.incrementAndGet();
+        this.valid = true;
     }
 
     public TestingPayload(long id, byte[] content) {
         this.content = content;
         this.id = id;
+        this.valid = true;
+    }
+
+    public TestingPayload(long id, boolean valid, byte[] content) {
+        this.content = content;
+        this.id = id;
+        this.valid = valid;
     }
 
     public long getId() {
@@ -35,12 +46,21 @@ public class TestingPayload implements Verifiable {
     }
 
     public ObjectWithId createPayloweWithId() {
-        return new ObjectWithId(id, content);
+        try {
+            return new ObjectWithId(id, codec.serialize(this));
+        } catch (SerializationException ex) {
+            throw new RuntimeException(ex);
+        }
     }
 
     @Override
     public boolean isValid() {
-        return true;
+        return valid;
+    }
+
+    public TestingPayload setValid(boolean valid) {
+        this.valid = valid;
+        return this;
     }
 
     @Override
@@ -59,6 +79,7 @@ public class TestingPayload implements Verifiable {
     @Override
     public String toString() {
         return "TestingPayload{" +
+                "id=" + id +
                 "content=" + Base64.getEncoder().encodeToString(content) +
                 '}';
     }

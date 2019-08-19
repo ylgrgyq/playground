@@ -1,5 +1,8 @@
 package com.github.ylgrgyq.resender;
 
+import javax.annotation.Nonnull;
+
 public interface Deserializer<T> {
-    T deserialize(byte[] bytes) throws DeserializationException;
+    @Nonnull
+    T deserialize(@Nonnull byte[] bytes) throws DeserializationException;
 }

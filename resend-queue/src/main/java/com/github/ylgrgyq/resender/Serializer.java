@@ -1,5 +1,8 @@
 package com.github.ylgrgyq.resender;
 
+import javax.annotation.Nonnull;
+
 public interface Serializer<T> {
-    byte[] serialize(T obj) throws SerializationException;
+    @Nonnull
+    byte[] serialize(@Nonnull T obj) throws SerializationException;
 }
