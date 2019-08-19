@@ -17,7 +17,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void simpleProduceAndFlush() {
-        final TestingProducerStorage storage = new TestingProducerStorage();
+        final TestingStorage storage = new TestingStorage();
         final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
@@ -42,7 +42,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void simpleProduceAndAutoFlush() {
-        final TestingProducerStorage storage = new TestingProducerStorage();
+        final TestingStorage storage = new TestingStorage();
         final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
@@ -65,7 +65,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void close() throws Exception {
-        final TestingProducerStorage storage = new TestingProducerStorage();
+        final TestingStorage storage = new TestingStorage();
         final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
@@ -84,7 +84,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void produceWhenProducerStopped() throws Exception {
-        final TestingProducerStorage storage = new TestingProducerStorage();
+        final TestingStorage storage = new TestingStorage();
         final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
 
         producer.close();
@@ -97,7 +97,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void produceWhenSerializeElementFailed() {
-        final TestingProducerStorage storage = new TestingProducerStorage();
+        final TestingStorage storage = new TestingStorage();
         final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, bs -> {
             throw new SerializationException();
         });

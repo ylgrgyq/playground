@@ -4,13 +4,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-public class TestingProducerStorage implements ConsumerStorage, ProducerStorage {
+public class TestingStorage implements ConsumerStorage, ProducerStorage {
     private final ArrayList<ElementWithId> producedPayloads;
     private long lastProducedId;
     private long lastCommittedId;
     private boolean stopped;
 
-    public TestingProducerStorage() {
+    public TestingStorage() {
         this.producedPayloads = new ArrayList<>();
         this.lastProducedId = 0;
         this.lastCommittedId = -1;

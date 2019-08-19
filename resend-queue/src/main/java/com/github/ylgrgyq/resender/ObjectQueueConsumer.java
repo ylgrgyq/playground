@@ -32,32 +32,23 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
 
     private volatile boolean stop;
 
-    public ObjectQueueConsumer(@Nonnull ConsumerStorage storage, @Nonnull Deserializer<E> deserializer) {
-        this(storage, deserializer, true);
-    }
+    ObjectQueueConsumer(ObjectQueueConsumerBuilder builder) {
+        requireNonNull(builder, "builder");
 
-    public ObjectQueueConsumer(@Nonnull ConsumerStorage storage, @Nonnull Deserializer<E> deserializer, boolean autoCommit) {
-        this(storage, deserializer, autoCommit, 1024);
-    }
-
-    public ObjectQueueConsumer(@Nonnull ConsumerStorage storage, @Nonnull Deserializer<E> deserializer, boolean autoCommit, int batchSize) {
-        requireNonNull(storage, "storage");
-        requireNonNull(deserializer, "deserializer");
-
-        this.storage = storage;
-        this.queue = new ArrayBlockingQueue<>(batchSize);
-        this.autoCommit = autoCommit;
+        this.storage = builder.getStorage();
+        this.batchSize = builder.getBatchSize();
+        this.queue = new ArrayBlockingQueue<>(this.batchSize);
+        this.autoCommit = builder.isAutoCommit();
         final long offset = storage.getLastCommittedId();
         this.offset = new AtomicLong(offset);
-        this.worker = threadFactory.newThread(new FetchWorker(offset, deserializer));
+        this.worker = threadFactory.newThread(new FetchWorker(offset, builder.getDeserializer()));
         this.worker.start();
         this.lock = new ReentrantLock();
         this.notEmpty = this.lock.newCondition();
-        this.batchSize = batchSize;
     }
 
-    public @Nonnull
-    E fetch() throws InterruptedException {
+    @Nonnull
+    public E fetch() throws InterruptedException {
         E element;
 
         if (autoCommit) {
@@ -79,8 +70,8 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
         return element;
     }
 
-    public @Nullable
-    E fetch(long timeout, @Nonnull TimeUnit unit) throws InterruptedException {
+    @Nullable
+    public E fetch(long timeout, @Nonnull TimeUnit unit) throws InterruptedException {
         requireNonNull(unit);
 
         E element = null;

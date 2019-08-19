@@ -22,16 +22,12 @@ public final class AutomaticObjectQueueConsumer<E extends Payload> implements Au
     private final Set<ConsumeObjectListener<E>> listeners;
     private volatile boolean stop;
 
-    public AutomaticObjectQueueConsumer(@Nonnull ObjectQueueConsumer<E> consumer,
-                                        @Nonnull ConsumeObjectHandler<E> handler,
-                                        @Nonnull Executor listenerExecutor) {
-        requireNonNull(consumer, "consumer");
-        requireNonNull(handler, "handler");
-        requireNonNull(listenerExecutor, "listenerExecutor");
+    AutomaticObjectQueueConsumer(ObjectQueueConsumer<E> consumer, AutomaticObjectQueueConsumerBuilder builder) {
+        requireNonNull(builder, "builder");
 
         this.backupQueue = consumer;
-        this.worker = threadFactory.newThread(new Worker(handler));
-        this.listenerExecutor = listenerExecutor;
+        this.worker = threadFactory.newThread(new Worker(builder.getHandler()));
+        this.listenerExecutor = builder.getListenerExecutor();
         this.listeners = new CopyOnWriteArraySet<>();
     }
 
