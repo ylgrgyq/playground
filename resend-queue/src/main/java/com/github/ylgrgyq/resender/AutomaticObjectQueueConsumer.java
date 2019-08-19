@@ -7,7 +7,7 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
 
@@ -83,7 +83,7 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
                             notifyOnHandleSuccess(obj);
                             commit = true;
                         } catch (Exception ex) {
-                            notifyOnHandleFailed(obj);
+                            notifyOnHandleFailed(obj, ex);
                             commit = handleObjectFailed(handler, obj, ex);
                         }
                     }
@@ -131,23 +131,23 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
     }
 
     private void notifyInvalidObject(E obj) {
-        sendNotification(ConsumeObjectListener::onInvalidObject, obj);
+        sendNotification(l -> l.onInvalidObject(obj));
     }
 
-    private void notifyOnHandleSuccess(E failedPayload) {
-        sendNotification(ConsumeObjectListener::onHandleSuccess, failedPayload);
+    private void notifyOnHandleSuccess(E obj) {
+        sendNotification(l -> l.onHandleSuccess(obj));
     }
 
-    private void notifyOnHandleFailed(E failedPayload) {
-        sendNotification(ConsumeObjectListener::onHandleFailed, failedPayload);
+    private void notifyOnHandleFailed(E obj, Throwable ex) {
+        sendNotification(l -> l.onHandleFailed(obj, ex));
     }
 
-    private void sendNotification(BiConsumer<ConsumeObjectListener<E>, E> consumer, E payload) {
+    private void sendNotification(Consumer<ConsumeObjectListener<E>> consumer) {
         try {
             listenerExecutor.execute(() -> {
                 for (ConsumeObjectListener<E> l : listeners) {
                     try {
-                        consumer.accept(l, payload);
+                        consumer.accept(l);
                     } catch (Exception ex) {
                         l.onListenerNotificationFailed(ex);
                     }

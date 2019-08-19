@@ -7,7 +7,7 @@ public interface ConsumeObjectListener<E extends Verifiable> {
 
     void onHandleSuccess(@Nonnull E obj);
 
-    void onHandleFailed(@Nonnull E obj);
+    void onHandleFailed(@Nonnull E obj, @Nonnull Throwable throwable);
 
     void onListenerNotificationFailed(@Nonnull Throwable throwable);
 }
