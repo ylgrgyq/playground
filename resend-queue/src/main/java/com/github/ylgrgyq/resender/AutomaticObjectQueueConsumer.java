@@ -4,8 +4,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
+import java.util.function.BiConsumer;
 
 import static java.util.Objects.requireNonNull;
 
@@ -14,26 +17,22 @@ public final class AutomaticObjectQueueConsumer<E extends Payload> implements Au
     private static final ThreadFactory threadFactory = new NamedThreadFactory("automatic-object-queue-consumer-");
 
     private final ObjectQueueConsumer<E> backupQueue;
-    private final ConsumeObjectHandler<E> handler;
-    private final ConsumeObjectListener<E> listener;
-    private final Executor listenerExecutor;
     private final Thread worker;
+    private final Executor listenerExecutor;
+    private final Set<ConsumeObjectListener<E>> listeners;
     private volatile boolean stop;
 
     public AutomaticObjectQueueConsumer(@Nonnull ObjectQueueConsumer<E> consumer,
                                         @Nonnull ConsumeObjectHandler<E> handler,
-                                        @Nonnull ConsumeObjectListener<E> listener,
                                         @Nonnull Executor listenerExecutor) {
         requireNonNull(consumer, "consumer");
         requireNonNull(handler, "handler");
-        requireNonNull(listener, "listener");
         requireNonNull(listenerExecutor, "listenerExecutor");
 
         this.backupQueue = consumer;
-        this.handler = handler;
-        this.worker = threadFactory.newThread(new Worker());
-        this.listener = listener;
+        this.worker = threadFactory.newThread(new Worker(handler));
         this.listenerExecutor = listenerExecutor;
+        this.listeners = new CopyOnWriteArraySet<>();
     }
 
     public void start() {
@@ -44,30 +43,64 @@ public final class AutomaticObjectQueueConsumer<E extends Payload> implements Au
         worker.start();
     }
 
+    public void addListener(ConsumeObjectListener<E> listener) {
+        requireNonNull(listener, "listener");
+
+        listeners.add(listener);
+    }
+
+    public boolean removeListener(ConsumeObjectListener<E> listener) {
+        requireNonNull(listener, "listener");
+
+        return listeners.remove(listener);
+    }
+
     @Override
     public void close() throws Exception {
         stop = true;
 
-        worker.join();
+        if (worker != Thread.currentThread()) {
+            worker.interrupt();
+            worker.join();
+        }
+        backupQueue.close();
     }
 
     private final class Worker implements Runnable {
+        private final ConsumeObjectHandler<E> handler;
+
+        public Worker(ConsumeObjectHandler<E> handler) {
+            this.handler = handler;
+        }
+
         @Override
         public void run() {
+            final ConsumeObjectHandler<E> handler = this.handler;
+            final ObjectQueueConsumer<E> backupQueue = AutomaticObjectQueueConsumer.this.backupQueue;
             while (!stop) {
                 boolean commit = false;
                 try {
                     final E payload = backupQueue.fetch();
+
                     if (payload.isValid()) {
-                        onInvalidPayload(payload);
+                        notifyInvalidPayload(payload);
                     } else {
                         try {
-                            handler.handleBackupPayload(payload);
-                            onPayloadSendSuccess(payload);
+                            handler.onReceivedObject(payload);
+                            notifyOnPayloadSendSuccess(payload);
                             commit = true;
                         } catch (Exception ex) {
-                            onPayloadSendFailed(payload);
-                            commit = handler.handleFailedPayload(payload, ex);
+                            notifyOnPayloadSendFailed(payload);
+                            switch (handler.onReceivedObjectFailed(payload, ex)) {
+                                case RETRY:
+                                    break;
+                                case IGNORE:
+                                    commit = true;
+                                    break;
+                                case SHUTDOWN:
+                                    close();
+                                    break;
+                            }
                         }
                     }
                 } catch (InterruptedException ex) {
@@ -83,30 +116,31 @@ public final class AutomaticObjectQueueConsumer<E extends Payload> implements Au
         }
     }
 
-    private void onInvalidPayload(E payload) {
-        notification(() -> listener.onInvalidPayload(payload));
+    private void notifyInvalidPayload(E failedPayload) {
+        sendNotification(ConsumeObjectListener::onInvalidPayload, failedPayload);
     }
 
-    private void onPayloadSendSuccess(E payload) {
-        notification(() -> listener.onPayloadSendSuccess(payload));
+    private void notifyOnPayloadSendSuccess(E failedPayload) {
+        sendNotification(ConsumeObjectListener::onPayloadSendSuccess, failedPayload);
     }
 
-    private void onPayloadSendFailed(E payload) {
-        notification(() -> listener.onPayloadSendFailed(payload));
+    private void notifyOnPayloadSendFailed(E failedPayload) {
+        sendNotification(ConsumeObjectListener::onPayloadSendFailed, failedPayload);
     }
 
-    private void notification(Runnable runnable) {
+    private void sendNotification(BiConsumer<ConsumeObjectListener<E>, E> consumer, E payload) {
         try {
             listenerExecutor.execute(() -> {
-                try {
-                    runnable.run();
-                } catch (Exception ex) {
-                    listener.onNotificationFailed(ex);
+                for (ConsumeObjectListener<E> l : listeners) {
+                    try {
+                        consumer.accept(l, payload);
+                    } catch (Exception ex) {
+                        l.onNotificationFailed(ex);
+                    }
                 }
             });
         } catch (Exception ex) {
             logger.error("Notification failed", ex);
         }
-
     }
 }
