@@ -1,6 +1,5 @@
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
-import javax.annotation.Nonnull;
 import java.nio.ByteBuffer;
 
 public class TestingPayloadCodec implements Serializer<TestingPayload>, Deserializer<TestingPayload> {

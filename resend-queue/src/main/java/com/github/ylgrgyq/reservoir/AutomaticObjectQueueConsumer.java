@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,7 +90,7 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
                 } catch (InterruptedException ex) {
                     // do nothing
                 } catch (Exception ex) {
-                    logger.warn("Got unexpected exception on processing payload in backup queue resender.", ex);
+                    logger.warn("Got unexpected exception on processing payload in backup queue reservoir.", ex);
                 } finally {
                     if (commit) {
                         consumer.commit();

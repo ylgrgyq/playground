@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
 import com.spotify.futures.CompletableFutures;
 import org.junit.Before;

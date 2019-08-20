@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
 import org.assertj.core.api.Condition;
 import org.junit.Before;

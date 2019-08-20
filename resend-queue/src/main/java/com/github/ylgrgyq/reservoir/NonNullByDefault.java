@@ -13,7 +13,7 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;

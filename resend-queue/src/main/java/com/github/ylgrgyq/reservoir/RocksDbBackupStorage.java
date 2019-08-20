@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
 import org.rocksdb.*;
 import org.rocksdb.util.SizeUnit;
@@ -18,7 +18,7 @@ import static java.util.Objects.requireNonNull;
 
 public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStorage {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbBackupStorage.class);
-    private static final String DEFAULT_QUEUE_NAME = "resend_queue";
+    private static final String DEFAULT_QUEUE_NAME = "reservior_queue";
     private static final byte[] CONSUMER_COMMIT_ID_META_KEY = "consumer_committed_id".getBytes(StandardCharsets.UTF_8);
 
     private final BlockingQueue<TruncateQueueEntry> truncateJobsQueue;

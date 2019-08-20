@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
 import java.util.Arrays;
 import java.util.Base64;

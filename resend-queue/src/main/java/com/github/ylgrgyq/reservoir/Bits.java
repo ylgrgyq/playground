@@ -22,7 +22,7 @@
  *
  *
  */
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
 public final class Bits {
     public static int getInt(byte[] b, int off) {

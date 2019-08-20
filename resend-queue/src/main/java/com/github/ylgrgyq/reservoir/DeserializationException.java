@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
 public final class DeserializationException extends Exception {
     public DeserializationException() {

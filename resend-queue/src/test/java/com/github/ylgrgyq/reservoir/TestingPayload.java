@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;

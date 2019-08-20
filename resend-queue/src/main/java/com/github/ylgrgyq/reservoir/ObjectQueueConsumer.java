@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +28,6 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
     private final ReentrantLock lock;
     private final Condition notEmpty;
     private final int batchSize;
-    private final Deserializer<E> deserializer;
 
     private volatile boolean closed;
 
@@ -41,7 +40,6 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
         this.autoCommit = builder.isAutoCommit();
         final long offset = storage.getLastCommittedId();
         this.offset = new AtomicLong(offset);
-        this.deserializer = builder.getDeserializer();
         this.worker = threadFactory.newThread(new FetchWorker(offset, builder.getDeserializer()));
         this.worker.start();
         this.lock = new ReentrantLock();

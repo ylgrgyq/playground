@@ -1,4 +1,4 @@
-package com.github.ylgrgyq.resender;
+package com.github.ylgrgyq.reservoir;
 
 public interface ConsumeObjectListener<E extends Verifiable> {
     void onInvalidObject( E obj);
