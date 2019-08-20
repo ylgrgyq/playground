@@ -45,7 +45,7 @@ public class TestingPayload implements Verifiable {
         return content;
     }
 
-    public ObjectWithId createPayloweWithId() {
+    public ObjectWithId createObjectWithId() {
         try {
             return new ObjectWithId(id, codec.serialize(this));
         } catch (SerializationException ex) {

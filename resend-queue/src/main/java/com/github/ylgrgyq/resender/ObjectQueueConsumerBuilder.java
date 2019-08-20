@@ -2,7 +2,7 @@ package com.github.ylgrgyq.resender;
 
 import static java.util.Objects.requireNonNull;
 
-public class ObjectQueueConsumerBuilder<E> {
+public final class ObjectQueueConsumerBuilder<E> {
     private boolean autoCommit = true;
     private int batchSize = 1024;
 

@@ -4,7 +4,6 @@ import org.assertj.core.api.Condition;
 import org.junit.Before;
 import org.junit.Test;
 
-import javax.annotation.Nonnull;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +20,6 @@ public class AutomaticObjectQueueConsumerTest {
     private final AutomaticObjectQueueConsumerBuilder<TestingPayload> builder = AutomaticObjectQueueConsumerBuilder.<TestingPayload>newBuilder()
             .setStorage(storage)
             .setDeserializer(new TestingPayloadCodec())
-            .addConsumeElementListener(listener)
             .setAutoCommit(false)
             .setListenerExecutor(Executors.newSingleThreadExecutor());
 
@@ -39,11 +37,9 @@ public class AutomaticObjectQueueConsumerTest {
 
         await().until(() -> handler.getReceivedObjects().size() == storedPayload.size());
         assertThat(handler.getReceivedObjects().stream()
-                .map(TestingPayload::createPayloweWithId)
+                .map(TestingPayload::createObjectWithId)
                 .collect(Collectors.toList()))
                 .isEqualTo(storedPayload);
-        assertThat(listener.getSuccessObjects())
-                .isEqualTo(handler.getReceivedObjects());
         consumer.close();
     }
 
@@ -60,7 +56,7 @@ public class AutomaticObjectQueueConsumerTest {
 
         await().until(() -> listener.getInvalidObjects().size() == storedPayload.size());
         assertThat(listener.getInvalidObjects().stream()
-                .map(TestingPayload::createPayloweWithId)
+                .map(TestingPayload::createObjectWithId)
                 .collect(Collectors.toList()))
                 .isEqualTo(storedPayload);
         consumer.close();
@@ -68,29 +64,23 @@ public class AutomaticObjectQueueConsumerTest {
 
     @Test
     public void shutdownAfterConsumeObjectFailed() {
-        final List<ObjectWithId> storedPayload = generateTestingPayload(1, true);
+        generateTestingPayload(1, true);
 
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
                 .setConsumeObjectHandler(new AlwaysThrowsExceptionHandler<TestingPayload>() {
-                    @Nonnull
                     @Override
-                    public HandleFailedStrategy onHandleObjectFailed(@Nonnull TestingPayload obj, @Nonnull Throwable throwable) {
+                    public HandleFailedStrategy onHandleObjectFailed(TestingPayload obj, Throwable throwable) {
                         return HandleFailedStrategy.SHUTDOWN;
                     }
                 })
                 .build();
 
-        assertThat(listener.getFailedObjects().stream()
-                .map(TestingPayload::createPayloweWithId)
-                .collect(Collectors.toList()))
-                .isEqualTo(storedPayload);
-        assertThat(listener.getFailedExceptions()).hasSize(1).are(runtimeException);
         await().until(consumer::closed);
     }
 
     @Test
     public void retryAfterConsumeObjectFailed() throws Exception {
-        final List<ObjectWithId> storedObjects = generateTestingPayload(1, true);
+        generateTestingPayload(1, true);
 
         RetryAfterFailedHandler<TestingPayload> handler = new RetryAfterFailedHandler<>(10);
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
@@ -98,9 +88,6 @@ public class AutomaticObjectQueueConsumerTest {
                 .build();
 
         await().until(() -> handler.getHandleTimes() == 10);
-        assertThat(listener.getFailedObjects()).hasSize(9).allMatch(o ->
-                o.createPayloweWithId().equals(storedObjects.get(0)));
-        assertThat(listener.getFailedExceptions()).hasSize(9).are(runtimeException);
         consumer.close();
     }
 
@@ -111,9 +98,8 @@ public class AutomaticObjectQueueConsumerTest {
         final List<TestingPayload> handledPayloads = new ArrayList<>();
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
                 .setConsumeObjectHandler(new AlwaysThrowsExceptionHandler<TestingPayload>() {
-                    @Nonnull
                     @Override
-                    public HandleFailedStrategy onHandleObjectFailed(@Nonnull TestingPayload obj, @Nonnull Throwable throwable) {
+                    public HandleFailedStrategy onHandleObjectFailed(TestingPayload obj, Throwable throwable) {
                         handledPayloads.add(obj);
                         return HandleFailedStrategy.IGNORE;
                     }
@@ -122,61 +108,85 @@ public class AutomaticObjectQueueConsumerTest {
 
         await().until(() -> handledPayloads.size() == storedObjects.size());
         assertThat(handledPayloads.stream()
-                .map(TestingPayload::createPayloweWithId)
+                .map(TestingPayload::createObjectWithId)
                 .collect(Collectors.toList()))
                 .isEqualTo(storedObjects);
-        assertThat(listener.getFailedObjects().stream()
-                .map(TestingPayload::createPayloweWithId)
-                .collect(Collectors.toList()))
-                .isEqualTo(storedObjects);
-        assertThat(listener.getFailedExceptions()).hasSameSizeAs(storedObjects).are(runtimeException);
         consumer.close();
     }
 
     @Test
     public void onHandleObjectFailedThrowsException() {
-        final List<ObjectWithId> storedObjects = generateTestingPayload(1, true);
+        generateTestingPayload(1, true);
 
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
                 .setConsumeObjectHandler(new AlwaysThrowsExceptionHandler<TestingPayload>() {})
                 .build();
 
         await().until(consumer::closed);
-        assertThat(listener.getFailedObjects().stream()
-                .map(TestingPayload::createPayloweWithId)
-                .collect(Collectors.toList()))
-                .isEqualTo(storedObjects);
-        assertThat(listener.getFailedExceptions()).hasSize(1).are(runtimeException);
     }
 
     @Test
     public void onHandleObjectFailedReturnsNull() {
-        final List<ObjectWithId> storedObjects = generateTestingPayload(1, true);
+        generateTestingPayload(1, true);
 
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
                 .setConsumeObjectHandler(new AlwaysThrowsExceptionHandler<TestingPayload>() {
-                    @Nonnull
                     @Override
                     @SuppressWarnings("ConstantConditions")
-                    public HandleFailedStrategy onHandleObjectFailed(@Nonnull TestingPayload obj, @Nonnull Throwable throwable) {
+                    public HandleFailedStrategy onHandleObjectFailed(TestingPayload obj, Throwable throwable) {
                         return null;
                     }
                 })
                 .build();
 
+        await().until(consumer::closed);
+    }
+
+    @Test
+    public void testListenerOnSuccessObjectsCalled() throws Exception {
+        final List<ObjectWithId> storedPayload = generateTestingPayload(64, true);
+        final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
+                .setConsumeObjectHandler(new AlwaysSuccessConsumeObjectHandler<>())
+                .addConsumeElementListener(listener)
+                .build();
+
+        await().until(() -> listener.getSuccessObjects().size() == storedPayload.size());
+        assertThat(listener.getSuccessObjects().stream()
+                .map(TestingPayload::createObjectWithId)
+                .collect(Collectors.toList()))
+                .isEqualTo(storedPayload);
+        consumer.close();
+    }
+
+    @Test
+    public void testListenerOnFailedObjectsCalled() throws Exception {
+        List<ObjectWithId> storedObjects = generateTestingPayload(1, true);
+
+        final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
+                .addConsumeElementListener(listener)
+                .setConsumeObjectHandler(new AlwaysThrowsExceptionHandler<TestingPayload>() {
+                    @Override
+                    public HandleFailedStrategy onHandleObjectFailed(TestingPayload obj, Throwable throwable) {
+                        return HandleFailedStrategy.SHUTDOWN;
+                    }
+                })
+                .build();
+
+        await().until(() -> listener.getFailedObjects().size() == 1);
+        await().until(consumer::closed);
         assertThat(listener.getFailedObjects().stream()
-                .map(TestingPayload::createPayloweWithId)
+                .map(TestingPayload::createObjectWithId)
                 .collect(Collectors.toList()))
                 .isEqualTo(storedObjects);
-        assertThat(listener.getFailedExceptions()).hasSize(1).are(runtimeException);
-        await().until(consumer::closed);
+        assertThat(listener.getFailedExceptions()).are(runtimeException);
+        consumer.close();
     }
 
     private List<ObjectWithId> generateTestingPayload(int size, boolean valid) {
         final List<ObjectWithId> storedPayload = new ArrayList<>();
         for (int i = 1; i < size + 1; i++) {
             TestingPayload payload = new TestingPayload(i, ("" + i).getBytes(StandardCharsets.UTF_8)).setValid(valid);
-            storedPayload.add(payload.createPayloweWithId());
+            storedPayload.add(payload.createObjectWithId());
         }
         storage.store(storedPayload);
         return storedPayload;
@@ -194,26 +204,26 @@ public class AutomaticObjectQueueConsumerTest {
         }
 
         @Override
-        public void onHandleObject(@Nonnull E obj) {
+        public void onHandleObject(E obj) {
             receivedPayloads.add(obj);
         }
 
-        @Nonnull
+
         @Override
-        public HandleFailedStrategy onHandleObjectFailed(@Nonnull E obj, @Nonnull Throwable throwable) {
+        public HandleFailedStrategy onHandleObjectFailed(E obj, Throwable throwable) {
             throw new IllegalStateException("can't be here");
         }
     }
 
     private static abstract class AlwaysThrowsExceptionHandler<E extends Verifiable> extends AlwaysSuccessConsumeObjectHandler<E> {
         @Override
-        public void onHandleObject(@Nonnull E obj) {
+        public void onHandleObject(E obj) {
             throw new RuntimeException();
         }
 
-        @Nonnull
+
         @Override
-        public HandleFailedStrategy onHandleObjectFailed(@Nonnull E obj, @Nonnull Throwable throwable) {
+        public HandleFailedStrategy onHandleObjectFailed(E obj, Throwable throwable) {
             throw new RuntimeException();
         }
     }
@@ -231,15 +241,15 @@ public class AutomaticObjectQueueConsumerTest {
         }
 
         @Override
-        public void onHandleObject(@Nonnull E obj) {
+        public void onHandleObject(E obj) {
             if (++handleTimes < expectHandleTimes) {
                 throw new RuntimeException();
             }
         }
 
-        @Nonnull
+
         @Override
-        public HandleFailedStrategy onHandleObjectFailed(@Nonnull E obj, @Nonnull Throwable throwable) {
+        public HandleFailedStrategy onHandleObjectFailed(E obj, Throwable throwable) {
             return HandleFailedStrategy.RETRY;
         }
     }
@@ -281,23 +291,23 @@ public class AutomaticObjectQueueConsumerTest {
         }
 
         @Override
-        public void onInvalidObject(@Nonnull E obj) {
+        public void onInvalidObject(E obj) {
             invalidObjects.add(obj);
         }
 
         @Override
-        public void onHandleSuccess(@Nonnull E obj) {
+        public void onHandleSuccess(E obj) {
             successObjects.add(obj);
         }
 
         @Override
-        public void onHandleFailed(@Nonnull E obj, @Nonnull Throwable throwable) {
+        public void onHandleFailed(E obj, Throwable throwable) {
             failedObjects.add(obj);
             failedExceptions.add(throwable);
         }
 
         @Override
-        public void onListenerNotificationFailed(@Nonnull Throwable throwable) {
+        public void onListenerNotificationFailed(Throwable throwable) {
             failedExceptions.add(throwable);
         }
     }

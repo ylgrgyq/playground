@@ -6,7 +6,7 @@ import java.util.concurrent.Executor;
 
 import static java.util.Objects.requireNonNull;
 
-public class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
+public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
     private final List<ConsumeObjectListener<E>> listeners;
     private final ObjectQueueConsumerBuilder<E> consumerBuilder;
 

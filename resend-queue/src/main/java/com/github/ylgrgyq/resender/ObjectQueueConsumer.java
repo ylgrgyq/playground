@@ -3,7 +3,6 @@ package com.github.ylgrgyq.resender;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Base64;
 import java.util.Collection;
@@ -30,7 +29,7 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
     private final Condition notEmpty;
     private final int batchSize;
 
-    private volatile boolean stopped;
+    private volatile boolean closed;
 
     ObjectQueueConsumer(ObjectQueueConsumerBuilder builder) {
         requireNonNull(builder, "builder");
@@ -47,7 +46,7 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
         this.notEmpty = this.lock.newCondition();
     }
 
-    @Nonnull
+
     public E fetch() throws InterruptedException {
         E obj;
 
@@ -71,7 +70,7 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
     }
 
     @Nullable
-    public E fetch(long timeout, @Nonnull TimeUnit unit) throws InterruptedException {
+    public E fetch(long timeout,  TimeUnit unit) throws InterruptedException {
         requireNonNull(unit);
 
         E obj = null;
@@ -106,13 +105,13 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
         }
     }
 
-    public boolean stopped() {
-        return stopped;
+    public boolean closed() {
+        return closed;
     }
 
     @Override
     public void close() throws Exception {
-        stopped = true;
+        closed = true;
 
         if (Thread.currentThread() != worker) {
             worker.interrupt();
@@ -133,7 +132,7 @@ public final class ObjectQueueConsumer<E> implements AutoCloseable {
 
         @Override
         public void run() {
-            while (!stopped) {
+            while (!closed) {
                 try {
                     final Collection<? extends ObjectWithId> payloads = storage.read(lastId, batchSize);
                     if (!payloads.isEmpty()) {

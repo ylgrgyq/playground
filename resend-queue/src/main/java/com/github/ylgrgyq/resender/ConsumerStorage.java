@@ -1,6 +1,5 @@
 package com.github.ylgrgyq.resender;
 
-import javax.annotation.Nonnull;
 import java.util.Collection;
 
 public interface ConsumerStorage extends AutoCloseable{
@@ -8,6 +7,6 @@ public interface ConsumerStorage extends AutoCloseable{
 
     long getLastCommittedId();
 
-    @Nonnull
+
     Collection<ObjectWithId> read(long fromId, int limit) throws InterruptedException;
 }

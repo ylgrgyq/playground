@@ -1,6 +1,7 @@
 package com.github.ylgrgyq.resender;
 
 import com.spotify.futures.CompletableFutures;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -14,11 +15,19 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 public class ObjectQueueProducerTest {
+    private final TestingStorage storage = new TestingStorage();
+    private final ObjectQueueProducerBuilder<TestingPayload> builder = ObjectQueueProducerBuilder.<TestingPayload>newBuilder()
+            .setStorage(storage)
+            .setSerializer(TestingPayload::getContent);
+
+    @Before
+    public void setUp() {
+        storage.clear();
+    }
 
     @Test
     public void simpleProduceAndFlush() {
-        final TestingStorage storage = new TestingStorage();
-        final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
+        final ObjectQueueProducer<TestingPayload> producer = builder.build();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 64; i++) {
@@ -42,8 +51,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void simpleProduceAndAutoFlush() {
-        final TestingStorage storage = new TestingStorage();
-        final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
+        final ObjectQueueProducer<TestingPayload> producer = builder.build();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 1024; i++) {
@@ -65,8 +73,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void close() throws Exception {
-        final TestingStorage storage = new TestingStorage();
-        final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
+        final ObjectQueueProducer<TestingPayload> producer = builder.build();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 64; i++) {
@@ -84,23 +91,22 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void produceWhenProducerStopped() throws Exception {
-        final TestingStorage storage = new TestingStorage();
-        final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, TestingPayload::getContent);
+        final ObjectQueueProducer<TestingPayload> producer = builder.build();
 
         producer.close();
 
         assertThatThrownBy(() -> producer.produce(new TestingPayload()).join())
                 .isInstanceOf(CompletionException.class)
                 .hasCauseInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("producer has been stopped");
+                .hasMessageContaining("producer has been closed");
     }
 
     @Test
     public void produceWhenSerializeElementFailed() {
-        final TestingStorage storage = new TestingStorage();
-        final ObjectQueueProducer<TestingPayload> producer = new ObjectQueueProducer<TestingPayload>(storage, bs -> {
-            throw new SerializationException();
-        });
+        final ObjectQueueProducer<TestingPayload> producer = builder
+                .setSerializer(bs -> {
+                    throw new SerializationException();
+                }).build();
 
         assertThatThrownBy(() -> producer.produce(new TestingPayload()).join())
                 .isInstanceOf(CompletionException.class)

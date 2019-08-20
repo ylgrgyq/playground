@@ -35,7 +35,7 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
     private final ReadOptions totalOrderReadOptions;
     private final DBOptions dbOptions;
 
-    private volatile boolean stopped;
+    private volatile boolean closed;
 
     static {
         RocksDB.loadLibrary();

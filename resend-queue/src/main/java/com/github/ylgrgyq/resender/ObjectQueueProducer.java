@@ -5,7 +5,6 @@ import com.lmax.disruptor.EventTranslatorThreeArg;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 
-import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -23,22 +22,21 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
     private final EventTranslatorThreeArg<ProducerEvent, byte[], CompletableFuture<Void>, Boolean> translator;
     private final Executor executor;
     private final Serializer<E> serializer;
-    private volatile boolean stopped;
+    private volatile boolean closed;
 
-    public ObjectQueueProducer(@Nonnull ProducerStorage storage, @Nonnull Serializer<E> serializer) {
-        requireNonNull(storage, "storage");
-        requireNonNull(serializer, "serializer");
+    public ObjectQueueProducer( ObjectQueueProducerBuilder<E> builder) {
+        requireNonNull(builder, "builder");
 
-        this.storage = storage;
+        this.storage = builder.getStorage();
         final long lastId = storage.getLastProducedId();
-        this.disruptor = new Disruptor<>(ProducerEvent::new, 512,
+        this.disruptor = new Disruptor<>(ProducerEvent::new, builder.getRingBufferSize(),
                 new NamedThreadFactory("producer-worker-"));
-        this.disruptor.handleEventsWith(new ProduceHandler(128));
+        this.disruptor.handleEventsWith(new ProduceHandler(builder.getBatchSize()));
         this.disruptor.start();
         this.translator = new ProducerTranslator(lastId);
         this.ringBuffer = disruptor.getRingBuffer();
         this.executor = Executors.newSingleThreadExecutor();
-        this.serializer = serializer;
+        this.serializer = builder.getSerializer();
     }
 
     /**
@@ -48,11 +46,11 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
      * @param object The object to put into the queue
      * @return a future which will be completed when the object is safely saved or encounter some exceptions
      */
-    public CompletableFuture<Void> produce(@Nonnull E object) {
+    public CompletableFuture<Void> produce( E object) {
         requireNonNull(object, "object");
 
-        if (stopped) {
-            return exceptionallyCompletedFuture(new IllegalStateException("producer has been stopped"));
+        if (closed) {
+            return exceptionallyCompletedFuture(new IllegalStateException("producer has been closed"));
         }
 
         final CompletableFuture<Void> future = new CompletableFuture<>();
@@ -74,7 +72,7 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
 
     @Override
     public void close() throws Exception {
-        stopped = true;
+        closed = true;
 
         final CompletableFuture<Void> future = flush();
         future.join();
@@ -130,7 +128,7 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
         }
 
         @Override
-        public void onEvent(ProducerEvent event, long sequence, boolean endOfBatch) throws Exception {
+        public void onEvent(ProducerEvent event, long sequence, boolean endOfBatch) {
             if (event.flush) {
                 if (!batchPayload.isEmpty()) {
                     flush();
