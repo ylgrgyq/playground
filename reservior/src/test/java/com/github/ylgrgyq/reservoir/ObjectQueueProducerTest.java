@@ -74,11 +74,22 @@ public class ObjectQueueProducerTest {
     }
 
     @Test
-    public void close() throws Exception {
-        final ObjectQueueProducer<TestingPayload> producer = builder.build();
+    public void flushAllProducedObjectOnClose() throws Exception {
+        final ObjectQueueProducer<TestingPayload> producer = builder
+                .setBatchSize(5)
+                .setStorage(new AbstractTestingStorage() {
+                    @Override
+                    public void store(Collection<ObjectWithId> batch) throws StorageException {
+                        try {
+                            Thread.sleep(200);
+                        } catch (Exception ex) {
+                            throw new StorageException(ex);
+                        }
+                    }
+                }).build();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
-        for (int i = 0; i < 64; i++) {
+        for (int i = 0; i < 10; i++) {
             TestingPayload payload = new TestingPayload(("" + i).getBytes(StandardCharsets.UTF_8));
             CompletableFuture<Void> f = producer.produce(payload);
             assertThat(f).isNotNull();
@@ -86,9 +97,7 @@ public class ObjectQueueProducerTest {
         }
 
         producer.close();
-
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
-        assertThat(storage.closed()).isTrue();
     }
 
     @Test
@@ -143,33 +152,5 @@ public class ObjectQueueProducerTest {
         CompletableFuture<Void> f = producer.produce(payload);
         await().until(f::isDone);
         assertThat(f).hasFailedWithThrowableThat().hasMessageContaining("store failed").isInstanceOf(RuntimeException.class);
-    }
-
-    @Test
-    public void flushAllProducedObjectOnClose() throws Exception {
-        final ObjectQueueProducer<TestingPayload> producer = builder
-                .setBatchSize(5)
-                .setStorage(new AbstractTestingStorage() {
-                    @Override
-                    public void store(Collection<ObjectWithId> batch) {
-                        try {
-                            Thread.sleep(200);
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                        }
-                    }
-                }).build();
-
-        ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            TestingPayload payload = new TestingPayload(("" + i).getBytes(StandardCharsets.UTF_8));
-            CompletableFuture<Void> f = producer.produce(payload);
-            assertThat(f).isNotNull();
-            futures.add(f);
-        }
-
-        producer.close();
-        Condition<CompletableFuture<Void>> completed = new Condition<>(CompletableFuture::isDone, "completed");
-        assertThat(futures).are(completed);
     }
 }
