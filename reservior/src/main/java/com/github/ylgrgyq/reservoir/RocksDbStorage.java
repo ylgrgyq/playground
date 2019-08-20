@@ -13,11 +13,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
 
-public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStorage {
-    private static final Logger logger = LoggerFactory.getLogger(RocksDbBackupStorage.class);
+public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
+    private static final Logger logger = LoggerFactory.getLogger(RocksDbStorage.class);
     private static final String DEFAULT_QUEUE_NAME = "reservior_queue";
     private static final byte[] CONSUMER_COMMIT_ID_META_KEY = "consumer_committed_id".getBytes(StandardCharsets.UTF_8);
 
@@ -41,7 +42,7 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
         RocksDB.loadLibrary();
     }
 
-    public RocksDbBackupStorage(String path, boolean destroyPreviousDbFiles, long readRetryIntervalMillis) throws InterruptedException {
+    public RocksDbStorage(String path, boolean destroyPreviousDbFiles, long readRetryIntervalMillis) throws InterruptedException {
         this.path = path;
         this.cfOptions = new ArrayList<>();
         this.truncateJobsQueue = new LinkedBlockingQueue<>();
@@ -132,8 +133,10 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
     }
 
     @Override
-    public Collection<ObjectWithId> read(long fromId, int limit) throws InterruptedException {
-        fromId = Math.max(fromId, 0);
+    public Collection<ObjectWithId> fetch(final long fromId, final int limit) throws InterruptedException {
+        if (fromId < 0) {
+            throw new IllegalArgumentException("fromId: " + fromId + " (expect: >=0)");
+        }
 
         final List<ObjectWithId> entries = new ArrayList<>(limit);
         while (true) {
@@ -151,6 +154,40 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
                 break;
             }
         }
+
+        return Collections.unmodifiableCollection(entries);
+    }
+
+    @Override
+    public Collection<ObjectWithId> fetch(final long fromId, final int limit, final long timeout, final TimeUnit unit)
+            throws InterruptedException {
+        if (fromId < 0) {
+            throw new IllegalArgumentException("fromId: " + fromId + " (expect: >=0)");
+        }
+
+        final long end = System.nanoTime() + unit.toNanos(timeout);
+        final List<ObjectWithId> entries = new ArrayList<>(limit);
+        while (true) {
+            try (RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions)) {
+                for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
+                    final long id = Bits.getLong(it.key(), 0);
+                    final ObjectWithId entry = new ObjectWithId(id, it.value());
+                    entries.add(entry);
+                }
+            }
+
+            if (!entries.isEmpty()) {
+                break;
+            }
+
+            final long remain = TimeUnit.NANOSECONDS.toMillis(end - System.nanoTime());
+            if (remain <= 0) {
+                break;
+            }
+
+            Thread.sleep(Math.min(remain, readRetryIntervalMillis));
+        }
+
         return Collections.unmodifiableCollection(entries);
     }
 
@@ -251,7 +288,7 @@ public final class RocksDbBackupStorage implements ProducerStorage, ConsumerStor
         }
         cfOptions.clear();
 
-        // 3. close write/read options
+        // 3. close write/fetch options
         if (writeOptions != null) {
             writeOptions.close();
         }

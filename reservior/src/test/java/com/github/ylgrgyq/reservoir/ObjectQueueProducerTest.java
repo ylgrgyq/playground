@@ -26,7 +26,7 @@ public class ObjectQueueProducerTest {
     }
 
     @Test
-    public void simpleProduceAndFlush() {
+    public void simpleProduceAndFlush() throws Exception{
         final ObjectQueueProducer<TestingPayload> producer = builder.build();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
@@ -50,7 +50,7 @@ public class ObjectQueueProducerTest {
     }
 
     @Test
-    public void simpleProduceAndAutoFlush() {
+    public void simpleProduceAndAutoFlush() throws Exception{
         final ObjectQueueProducer<TestingPayload> producer = builder.build();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
@@ -102,7 +102,7 @@ public class ObjectQueueProducerTest {
     }
 
     @Test
-    public void produceWhenSerializeElementFailed() {
+    public void produceWhenSerializeElementFailed() throws Exception{
         final ObjectQueueProducer<TestingPayload> producer = builder
                 .setSerializer(bs -> {
                     throw new SerializationException();

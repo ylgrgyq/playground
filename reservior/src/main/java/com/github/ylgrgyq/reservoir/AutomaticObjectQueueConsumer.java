@@ -61,7 +61,7 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
     private final class Worker implements Runnable {
         private final ConsumeObjectHandler<E> handler;
 
-        public Worker(ConsumeObjectHandler<E> handler) {
+        Worker(ConsumeObjectHandler<E> handler) {
             this.handler = handler;
         }
 
@@ -70,31 +70,33 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
             final ConsumeObjectHandler<E> handler = this.handler;
             final ObjectQueueConsumer<E> consumer = AutomaticObjectQueueConsumer.this.backupQueue;
             while (!closed) {
-                boolean commit = false;
                 try {
-                    final E obj = consumer.fetch();
+                    boolean commit = false;
+                    try {
+                        final E obj = consumer.fetch();
 
-                    if (!obj.isValid()) {
-                        notifyInvalidObject(obj);
-                        commit = true;
-                    } else {
-                        try {
-                            handler.onHandleObject(obj);
-                            notifyOnHandleSuccess(obj);
+                        if (!obj.isValid()) {
+                            notifyInvalidObject(obj);
                             commit = true;
-                        } catch (Exception ex) {
-                            notifyOnHandleFailed(obj, ex);
-                            commit = handleObjectFailed(handler, obj, ex);
+                        } else {
+                            try {
+                                handler.onHandleObject(obj);
+                                notifyOnHandleSuccess(obj);
+                                commit = true;
+                            } catch (Exception ex) {
+                                notifyOnHandleFailed(obj, ex);
+                                commit = handleObjectFailed(handler, obj, ex);
+                            }
+                        }
+                    } finally {
+                        if (commit) {
+                            consumer.commit();
                         }
                     }
                 } catch (InterruptedException ex) {
                     // do nothing
                 } catch (Exception ex) {
                     logger.warn("Got unexpected exception on processing payload in backup queue reservoir.", ex);
-                } finally {
-                    if (commit) {
-                        consumer.commit();
-                    }
                 }
             }
         }

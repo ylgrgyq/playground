@@ -94,7 +94,7 @@ public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
         return this;
     }
 
-    public AutomaticObjectQueueConsumer<E> build() {
+    public AutomaticObjectQueueConsumer<E> build() throws StorageException{
         requireNonNull(consumeObjectHandler, "please provide consume object handler");
         requireNonNull(listenerExecutor, "please provide listener executor");
 

@@ -60,7 +60,7 @@ public final class ObjectQueueConsumerBuilder<E> {
         return this;
     }
 
-    public ObjectQueueConsumer<E> build() {
+    public ObjectQueueConsumer<E> build() throws StorageException{
         requireNonNull(storage, "storage");
         requireNonNull(deserializer, "deserializer");
 

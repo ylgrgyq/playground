@@ -4,12 +4,15 @@ import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslatorThreeArg;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -17,26 +20,27 @@ import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFutur
 import static java.util.Objects.requireNonNull;
 
 public final class ObjectQueueProducer<E> implements AutoCloseable {
+    private static final Logger logger = LoggerFactory.getLogger(ObjectQueueProducer.class);
+
     private final ProducerStorage storage;
     private final Disruptor<ProducerEvent> disruptor;
     private final RingBuffer<ProducerEvent> ringBuffer;
     private final EventTranslatorThreeArg<ProducerEvent, byte[], CompletableFuture<Void>, Boolean> translator;
-    private final Executor executor;
+    private final ExecutorService executor;
     private final Serializer<E> serializer;
     private volatile boolean closed;
 
-    public ObjectQueueProducer( ObjectQueueProducerBuilder<E> builder) {
+    public ObjectQueueProducer(ObjectQueueProducerBuilder<E> builder) throws StorageException {
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
-        final long lastId = storage.getLastProducedId();
         this.disruptor = new Disruptor<>(ProducerEvent::new, builder.getRingBufferSize(),
                 new NamedThreadFactory("producer-worker-"));
         this.disruptor.handleEventsWith(new ProduceHandler(builder.getBatchSize()));
         this.disruptor.start();
-        this.translator = new ProducerTranslator(lastId);
+        this.translator = new ProducerTranslator(storage.getLastProducedId());
         this.ringBuffer = disruptor.getRingBuffer();
-        this.executor = Executors.newSingleThreadExecutor();
+        this.executor = builder.getExecutorService();
         this.serializer = builder.getSerializer();
     }
 
@@ -47,7 +51,7 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
      * @param object The object to put into the queue
      * @return a future which will be completed when the object is safely saved or encounter some exceptions
      */
-    public CompletableFuture<Void> produce( E object) {
+    public CompletableFuture<Void> produce(E object) {
         requireNonNull(object, "object");
 
         if (closed) {
@@ -65,22 +69,35 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
         return future;
     }
 
+    /**
+     * Flush any pending object stayed on the internal buffer.
+     * @return a future which will be completed when the flush task is done
+     */
     public CompletableFuture<Void> flush() {
-        final CompletableFuture<Void> future = new CompletableFuture<>();
-        ringBuffer.publishEvent(translator, null, future, Boolean.TRUE);
-        return future;
+        if (closed) {
+            return exceptionallyCompletedFuture(new IllegalStateException("producer has been closed"));
+        }
+
+        return doFlush();
     }
 
     @Override
     public void close() throws Exception {
         closed = true;
 
-        final CompletableFuture<Void> future = flush();
+        final CompletableFuture<Void> future = doFlush();
         future.join();
 
         disruptor.shutdown();
-
+        executor.shutdown();
         storage.close();
+    }
+
+    private CompletableFuture<Void> doFlush() {
+        final CompletableFuture<Void> future = new CompletableFuture<>();
+
+        ringBuffer.publishEvent(translator, null, future, Boolean.TRUE);
+        return future;
     }
 
     private final static class ProducerTranslator
@@ -132,11 +149,12 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
 
         @Override
         public void onEvent(ProducerEvent event, long sequence, boolean endOfBatch) {
+            assert event.future != null;
+
             if (event.flush) {
                 if (!batchPayload.isEmpty()) {
                     flush();
                 }
-                assert event.future != null;
                 executor.execute(() -> event.future.complete(null));
             } else {
                 batchPayload.add(event.objectWithId);
@@ -151,15 +169,36 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
         }
 
         private void flush() {
-            storage.store(batchPayload);
+            try {
+                storage.store(batchPayload);
 
-            batchPayload.clear();
-
-            for (final CompletableFuture<Void> future : batchFutures) {
-                executor.execute(() -> future.complete(null));
+                completeFutures(batchFutures);
+            } catch (StorageException ex) {
+                completeFutures(batchFutures, ex);
             }
 
+            batchPayload.clear();
             batchFutures.clear();
+        }
+
+        private void completeFutures(List<CompletableFuture<Void>> futures) {
+            for (final CompletableFuture<Void> future : futures) {
+                try {
+                    executor.execute(() -> future.complete(null));
+                } catch (Exception ex) {
+                    logger.error("Submit complete future task failed", ex);
+                }
+            }
+        }
+
+        private void completeFutures(List<CompletableFuture<Void>> futures, Throwable t) {
+            for (final CompletableFuture<Void> future : futures) {
+                try {
+                    executor.execute(() -> future.completeExceptionally(t));
+                } catch (Exception ex) {
+                    logger.error("Submit complete future task failed", ex);
+                }
+            }
         }
     }
 }

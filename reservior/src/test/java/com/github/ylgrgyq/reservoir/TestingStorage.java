@@ -1,8 +1,10 @@
 package com.github.ylgrgyq.reservoir;
 
+import java.sql.Time;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class TestingStorage implements ConsumerStorage, ProducerStorage {
     private final ArrayList<ObjectWithId> producedPayloads;
@@ -31,7 +33,7 @@ public class TestingStorage implements ConsumerStorage, ProducerStorage {
     }
 
     @Override
-    public synchronized Collection<ObjectWithId> read(long fromId, int limit) throws InterruptedException {
+    public synchronized Collection<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException {
         ArrayList<ObjectWithId> ret = new ArrayList<>();
         while (true) {
             while (producedPayloads.isEmpty()) {
@@ -49,6 +51,43 @@ public class TestingStorage implements ConsumerStorage, ProducerStorage {
 
             if (ret.isEmpty()) {
                 wait();
+                continue;
+            }
+
+            return ret;
+        }
+    }
+
+    @Override
+    public synchronized Collection<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException {
+        final long endNanos = System.nanoTime() + unit.toNanos(timeout);
+        final ArrayList<ObjectWithId> ret = new ArrayList<>();
+        while (true) {
+            while (producedPayloads.isEmpty()) {
+                long millisRemain = TimeUnit.NANOSECONDS.toMillis(endNanos - System.nanoTime());
+                if (millisRemain <= 0) {
+                    return ret;
+                }
+
+                wait(millisRemain);
+            }
+
+            ObjectWithId firstPayload = producedPayloads.get(0);
+            int start = (int) (fromId - firstPayload.getId()) + 1;
+            start = Math.max(0, start);
+            int end = Math.min(start + limit, producedPayloads.size());
+
+            if (start < end) {
+                ret.addAll(producedPayloads.subList(start, end));
+            }
+
+            if (ret.isEmpty()) {
+                long millisRemain = TimeUnit.NANOSECONDS.toMillis(endNanos - System.nanoTime());
+                if (millisRemain <= 0) {
+                    return ret;
+                }
+
+                wait(millisRemain);
                 continue;
             }
 

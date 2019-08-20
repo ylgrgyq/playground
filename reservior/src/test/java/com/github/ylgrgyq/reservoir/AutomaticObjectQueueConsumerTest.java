@@ -63,7 +63,7 @@ public class AutomaticObjectQueueConsumerTest {
     }
 
     @Test
-    public void shutdownAfterConsumeObjectFailed() {
+    public void shutdownAfterConsumeObjectFailed() throws StorageException {
         generateTestingPayload(1, true);
 
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
@@ -115,7 +115,7 @@ public class AutomaticObjectQueueConsumerTest {
     }
 
     @Test
-    public void onHandleObjectFailedThrowsException() {
+    public void onHandleObjectFailedThrowsException() throws StorageException {
         generateTestingPayload(1, true);
 
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
@@ -126,7 +126,7 @@ public class AutomaticObjectQueueConsumerTest {
     }
 
     @Test
-    public void onHandleObjectFailedReturnsNull() {
+    public void onHandleObjectFailedReturnsNull() throws StorageException {
         generateTestingPayload(1, true);
 
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder

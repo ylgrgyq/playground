@@ -30,7 +30,7 @@ final class ManualCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E>
 
     private volatile boolean closed;
 
-    ManualCommitObjectQueueConsumer(ObjectQueueConsumerBuilder<E> builder) {
+    ManualCommitObjectQueueConsumer(ObjectQueueConsumerBuilder<E> builder) throws StorageException {
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
@@ -80,7 +80,7 @@ final class ManualCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E>
         return obj;
     }
 
-    public void commit() {
+    public void commit() throws StorageException{
         final E payload = queue.poll();
         assert payload != null;
         final long id = offset.incrementAndGet();
@@ -116,7 +116,7 @@ final class ManualCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E>
         public void run() {
             while (!closed) {
                 try {
-                    final Collection<? extends ObjectWithId> payloads = storage.read(lastId, batchSize);
+                    final Collection<? extends ObjectWithId> payloads = storage.fetch(lastId, batchSize);
                     if (!payloads.isEmpty()) {
                         for (ObjectWithId p : payloads) {
                             final byte[] pInBytes = p.getObjectInBytes();

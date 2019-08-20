@@ -2,6 +2,9 @@ package com.github.ylgrgyq.reservoir;
 
 import javax.annotation.Nullable;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import static java.util.Objects.requireNonNull;
 
 public final class ObjectQueueProducerBuilder<E> {
@@ -9,6 +12,7 @@ public final class ObjectQueueProducerBuilder<E> {
     private ProducerStorage storage;
     @Nullable
     private Serializer<E> serializer;
+    private ExecutorService executorService = Executors.newSingleThreadExecutor(new NamedThreadFactory("object-queue-producer-executor-"));
     private int ringBufferSize = 512;
     private int batchSize = 128;
 
@@ -66,7 +70,21 @@ public final class ObjectQueueProducerBuilder<E> {
         return this;
     }
 
-    public ObjectQueueProducer<E> build() {
+    ExecutorService getExecutorService() {
+        return executorService;
+    }
+
+    public void setExecutorService(ExecutorService executorService) {
+        requireNonNull(executorService, "executorService");
+
+        this.executorService = executorService;
+    }
+
+    public ObjectQueueProducer<E> build() throws StorageException {
+        requireNonNull(storage, "storage");
+        requireNonNull(serializer, "serializer");
+        requireNonNull(executorService, "executorService");
+
         return new ObjectQueueProducer<>(this);
     }
 }
