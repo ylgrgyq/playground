@@ -64,6 +64,10 @@ public final class ObjectQueueConsumerBuilder<E> {
         requireNonNull(storage, "storage");
         requireNonNull(deserializer, "deserializer");
 
-        return new ObjectQueueConsumer<>(this);
+        if (autoCommit) {
+            return new AutoCommitObjectQueueConsumer<>(this);
+        } else {
+            return new ManualCommitObjectQueueConsumer<>(this);
+        }
     }
 }
