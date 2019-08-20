@@ -1,9 +1,13 @@
 package com.github.ylgrgyq.resender;
 
+import javax.annotation.Nullable;
+
 import static java.util.Objects.requireNonNull;
 
 public final class ObjectQueueProducerBuilder<E> {
+    @Nullable
     private ProducerStorage storage;
+    @Nullable
     private Serializer<E> serializer;
     private int ringBufferSize = 512;
     private int batchSize = 128;
@@ -14,6 +18,7 @@ public final class ObjectQueueProducerBuilder<E> {
     }
 
     ProducerStorage getStorage() {
+        assert storage != null;
         return storage;
     }
 
@@ -25,6 +30,7 @@ public final class ObjectQueueProducerBuilder<E> {
     }
 
     Serializer<E> getSerializer() {
+        assert serializer != null;
         return serializer;
     }
 

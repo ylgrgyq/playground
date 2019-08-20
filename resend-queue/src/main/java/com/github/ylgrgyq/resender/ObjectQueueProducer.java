@@ -5,6 +5,7 @@ import com.lmax.disruptor.EventTranslatorThreeArg;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -105,7 +106,9 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
     }
 
     private final static class ProducerEvent {
+        @Nullable
         private ObjectWithId objectWithId;
+        @Nullable
         private CompletableFuture<Void> future;
         private boolean flush;
 
@@ -133,6 +136,7 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
                 if (!batchPayload.isEmpty()) {
                     flush();
                 }
+                assert event.future != null;
                 executor.execute(() -> event.future.complete(null));
             } else {
                 batchPayload.add(event.objectWithId);

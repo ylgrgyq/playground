@@ -1,12 +1,16 @@
 package com.github.ylgrgyq.resender;
 
+import javax.annotation.Nullable;
+
 import static java.util.Objects.requireNonNull;
 
 public final class ObjectQueueConsumerBuilder<E> {
     private boolean autoCommit = true;
     private int batchSize = 1024;
 
+    @Nullable
     private ConsumerStorage storage;
+    @Nullable
     private Deserializer<E> deserializer;
 
     private ObjectQueueConsumerBuilder() {}
@@ -16,6 +20,7 @@ public final class ObjectQueueConsumerBuilder<E> {
     }
 
     ConsumerStorage getStorage() {
+        assert storage != null;
         return storage;
     }
 
@@ -27,6 +32,7 @@ public final class ObjectQueueConsumerBuilder<E> {
 
 
     Deserializer<E> getDeserializer() {
+        assert deserializer != null;
         return deserializer;
     }
 
