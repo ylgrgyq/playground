@@ -5,11 +5,13 @@ import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 public class AutoCommitObjectQueueConsumerTest {
@@ -25,7 +27,7 @@ public class AutoCommitObjectQueueConsumerTest {
     }
 
     @Test
-    public void fetchWithAutoCommit() throws Exception {
+    public void simpleFetch() throws Exception {
         final ArrayList<ObjectWithId> storedPayload = new ArrayList<>();
         TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
         TestingPayload second = new TestingPayload(2, "second".getBytes(StandardCharsets.UTF_8));
@@ -42,11 +44,34 @@ public class AutoCommitObjectQueueConsumerTest {
         assertThat(consumer.fetch())
                 .isEqualTo(second)
                 .isNotEqualTo(first);
+        assertThat(storage.getLastCommittedId()).isEqualTo(2);
         consumer.close();
     }
 
     @Test
-    public void timeoutOnFetchWithAutoCommit() throws Exception {
+    public void fetchAfterClose() throws Exception {
+        ObjectQueueConsumer<TestingPayload> consumer = builder.build();
+        consumer.close();
+        assertThatThrownBy(consumer::fetch).isInstanceOf(InterruptedException.class);
+    }
+
+    @Test
+    public void deserializeObjectFailed() throws Exception {
+        ObjectQueueConsumer<TestingPayload> consumer = builder
+                .setDeserializer(o -> {throw new RuntimeException("deserialize failed");})
+                .build();
+
+        TestingPayload first = new TestingPayload(12345, "first".getBytes(StandardCharsets.UTF_8));
+        storage.add(first.createObjectWithId());
+
+        assertThatThrownBy(consumer::fetch)
+                .isInstanceOf(DeserializationException.class)
+                .hasMessageContaining("deserialize object with id: 12345 failed. Content in Base64 string is: ");
+        consumer.close();
+    }
+
+    @Test
+    public void timeoutOnFetch() throws Exception {
         ObjectQueueConsumer<TestingPayload> consumer = ObjectQueueConsumerBuilder.<TestingPayload>newBuilder()
                 .setStorage(storage)
                 .setDeserializer(new TestingPayloadCodec())
@@ -56,7 +81,7 @@ public class AutoCommitObjectQueueConsumerTest {
     }
 
     @Test
-    public void blockFetchWithAutoCommit() throws Exception {
+    public void blockFetch() throws Exception {
         final ArrayList<ObjectWithId> storedPayload = new ArrayList<>();
         final TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
         storedPayload.add(first.createObjectWithId());
@@ -77,6 +102,7 @@ public class AutoCommitObjectQueueConsumerTest {
 
         await().until(f::isDone);
         assertThat(f).isCompletedWithValue(first);
+        assertThat(storage.getLastCommittedId()).isEqualTo(1);
 
         consumer.close();
     }

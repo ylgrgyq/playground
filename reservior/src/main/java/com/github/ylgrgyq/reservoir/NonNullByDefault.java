@@ -20,7 +20,6 @@ import javax.annotation.Nullable;
 import javax.annotation.meta.TypeQualifierDefault;
 import java.lang.annotation.*;
 
-
 /**
  * An annotation that signifies the return values, parameters and fields are non-nullable by default
  * leveraging the JSR-305 {@link Nonnull} annotation. Annotate a package with this annotation and

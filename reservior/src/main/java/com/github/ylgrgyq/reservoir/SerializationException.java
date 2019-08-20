@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.reservoir;
 
-public final class SerializationException extends Exception {
+public final class SerializationException extends StorageException {
     public SerializationException() {
         super();
     }

@@ -1,6 +1,5 @@
 package com.github.ylgrgyq.reservoir;
 
-import java.sql.Time;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -103,13 +102,13 @@ public class TestingStorage implements ConsumerStorage, ProducerStorage {
     @Override
     public synchronized void store(Collection<ObjectWithId> batch) {
         for (ObjectWithId objectWithId : batch) {
-            producedPayloads.add(objectWithId);
-            assert lastProducedId != objectWithId.getId() :
-                    "lastProducedId: " + lastProducedId + " payloadId:" + objectWithId.getId();
-            if (objectWithId.getId() > lastProducedId) {
-                lastProducedId = objectWithId.getId();
-            }
+            doAdd(objectWithId);
         }
+        notify();
+    }
+
+    synchronized void add(ObjectWithId obj) {
+        doAdd(obj);
         notify();
     }
 
@@ -126,5 +125,14 @@ public class TestingStorage implements ConsumerStorage, ProducerStorage {
         producedPayloads.clear();
         lastProducedId = 0;
         lastCommittedId = -1;
+    }
+
+    private void doAdd(ObjectWithId obj) {
+        producedPayloads.add(obj);
+        assert lastProducedId != obj.getId() :
+                "lastProducedId: " + lastProducedId + " payloadId:" + obj.getId();
+        if (obj.getId() > lastProducedId) {
+            lastProducedId = obj.getId();
+        }
     }
 }

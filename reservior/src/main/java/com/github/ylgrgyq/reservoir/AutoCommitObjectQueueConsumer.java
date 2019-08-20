@@ -1,8 +1,5 @@
 package com.github.ylgrgyq.reservoir;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.annotation.Nullable;
 import java.util.Base64;
 import java.util.Collection;
@@ -14,8 +11,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import static java.util.Objects.requireNonNull;
 
 final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
-    private static final Logger logger = LoggerFactory.getLogger(ObjectQueueConsumer.class);
-
     private final ConsumerStorage storage;
     private final BlockingQueue<E> queue;
     private final int batchSize;
@@ -36,6 +31,7 @@ final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
         this.deserializer = builder.getDeserializer();
     }
 
+    @Override
     public E fetch() throws InterruptedException, StorageException {
         E obj;
         while ((obj = queue.poll()) == null) {
@@ -46,6 +42,7 @@ final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
     }
 
     @Nullable
+    @Override
     public E fetch(long timeout, TimeUnit unit) throws InterruptedException, StorageException {
         requireNonNull(unit);
 
@@ -59,10 +56,12 @@ final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
         return obj;
     }
 
+    @Override
     public void commit() {
         // id of the object at the head of the queue is already committed when it's fetched from the storage
     }
 
+    @Override
     public boolean closed() {
         return closed;
     }
@@ -89,7 +88,7 @@ final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
      * @throws StorageException     when some bad things happened in the internal storage
      */
     private boolean blockFetchFromStorage(long timeout, TimeUnit unit) throws InterruptedException, StorageException {
-        lock.lockInterruptibly();
+        lock.lock();
         try {
             if (closed) {
                 throw new InterruptedException("consumer closed");
@@ -114,11 +113,9 @@ final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
                         final E pObj = deserializer.deserialize(pInBytes);
                         queue.put(pObj);
                     } catch (Exception ex) {
-                        String msg = "deserialize payload with id: " + p.getId() +
+                        String msg = "deserialize object with id: " + p.getId() +
                                 " failed. Content in Base64 string is: " + Base64.getEncoder().encodeToString(pInBytes);
-                        logger.error(msg, ex);
-                        closed = true;
-                        return false;
+                        throw new DeserializationException(msg, ex);
                     }
 
                     lastId = p.getId();
