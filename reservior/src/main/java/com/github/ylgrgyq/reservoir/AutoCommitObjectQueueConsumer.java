@@ -30,8 +30,7 @@ final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
         this.storage = builder.getStorage();
         this.batchSize = builder.getBatchSize();
         this.queue = new ArrayBlockingQueue<>(this.batchSize);
-        final long offset = storage.getLastCommittedId();
-        this.worker = threadFactory.newThread(new FetchWorker(offset, builder.getDeserializer()));
+        this.worker = threadFactory.newThread(new FetchWorker(storage.getLastCommittedId(), builder.getDeserializer()));
         this.worker.start();
     }
 
