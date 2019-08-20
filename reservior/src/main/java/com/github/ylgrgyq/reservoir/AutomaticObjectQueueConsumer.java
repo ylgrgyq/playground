@@ -96,7 +96,7 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
                 } catch (InterruptedException ex) {
                     // do nothing
                 } catch (Exception ex) {
-                    logger.warn("Got unexpected exception on processing payload in backup queue reservoir.", ex);
+                    logger.warn("Got unexpected exception on processing object in reservoir queue.", ex);
                 }
             }
         }

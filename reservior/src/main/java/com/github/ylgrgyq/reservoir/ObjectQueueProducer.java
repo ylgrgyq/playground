@@ -2,6 +2,7 @@ package com.github.ylgrgyq.reservoir;
 
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslatorThreeArg;
+import com.lmax.disruptor.ExceptionHandler;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import org.slf4j.Logger;
@@ -11,9 +12,7 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFuture;
@@ -37,6 +36,7 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
         this.disruptor = new Disruptor<>(ProducerEvent::new, builder.getRingBufferSize(),
                 new NamedThreadFactory("producer-worker-"));
         this.disruptor.handleEventsWith(new ProduceHandler(builder.getBatchSize()));
+        this.disruptor.setDefaultExceptionHandler(new ProducerDisruptorExceptionHandler());
         this.disruptor.start();
         this.translator = new ProducerTranslator(storage.getLastProducedId());
         this.ringBuffer = disruptor.getRingBuffer();
@@ -71,6 +71,7 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
 
     /**
      * Flush any pending object stayed on the internal buffer.
+     *
      * @return a future which will be completed when the flush task is done
      */
     public CompletableFuture<Void> flush() {
@@ -133,6 +134,14 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
             objectWithId = null;
             future = null;
             flush = false;
+        }
+
+        @Override
+        public String toString() {
+            return "ProducerEvent{" +
+                    "objectWithId=" + objectWithId +
+                    ", flush=" + flush +
+                    '}';
         }
     }
 
@@ -198,6 +207,27 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
                 } catch (Exception ex) {
                     logger.error("Submit complete future task failed", ex);
                 }
+            }
+        }
+    }
+
+    private final class ProducerDisruptorExceptionHandler implements ExceptionHandler<ProducerEvent> {
+        @Override
+        public void handleOnStartException(Throwable ex) {
+            logger.error("Start disruptor in producer failed.", ex);
+        }
+
+        @Override
+        public void handleOnShutdownException(Throwable ex) {
+            logger.error("Shutdown disruptor in producer failed.", ex);
+
+        }
+
+        @Override
+        public void handleEventException(Throwable ex, long sequence, ProducerEvent event) {
+            logger.error("Handle event: {} on disruptor in producer failed.", event, ex);
+            if (event.future != null) {
+                event.future.completeExceptionally(ex);
             }
         }
     }

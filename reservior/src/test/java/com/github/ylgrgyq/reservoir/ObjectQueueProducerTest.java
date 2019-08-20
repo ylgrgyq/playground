@@ -1,11 +1,13 @@
 package com.github.ylgrgyq.reservoir;
 
 import com.spotify.futures.CompletableFutures;
+import org.assertj.core.api.Condition;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -26,7 +28,7 @@ public class ObjectQueueProducerTest {
     }
 
     @Test
-    public void simpleProduceAndFlush() throws Exception{
+    public void simpleProduceAndFlush() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder.build();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
@@ -50,7 +52,7 @@ public class ObjectQueueProducerTest {
     }
 
     @Test
-    public void simpleProduceAndAutoFlush() throws Exception{
+    public void simpleProduceAndAutoFlush() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder.build();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
@@ -90,7 +92,7 @@ public class ObjectQueueProducerTest {
     }
 
     @Test
-    public void produceWhenProducerStopped() throws Exception {
+    public void produceAfterClose() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder.build();
 
         producer.close();
@@ -102,7 +104,7 @@ public class ObjectQueueProducerTest {
     }
 
     @Test
-    public void produceWhenSerializeElementFailed() throws Exception{
+    public void produceWhenSerializeElementFailed() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder
                 .setSerializer(bs -> {
                     throw new SerializationException();
@@ -111,5 +113,63 @@ public class ObjectQueueProducerTest {
         assertThatThrownBy(() -> producer.produce(new TestingPayload()).join())
                 .isInstanceOf(CompletionException.class)
                 .hasCauseInstanceOf(SerializationException.class);
+    }
+
+    @Test
+    public void storageThrowsStorageException() throws Exception {
+        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
+            @Override
+            public void store(Collection<ObjectWithId> batch) throws StorageException {
+                throw new StorageException("store failed");
+            }
+        }).build();
+
+        TestingPayload payload = new TestingPayload(("Hello").getBytes(StandardCharsets.UTF_8));
+        CompletableFuture<Void> f = producer.produce(payload);
+        await().until(f::isDone);
+        assertThat(f).hasFailedWithThrowableThat().hasMessageContaining("store failed").isInstanceOf(StorageException.class);
+    }
+
+    @Test
+    public void storageThrowsOtherException() throws Exception {
+        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
+            @Override
+            public void store(Collection<ObjectWithId> batch) {
+                throw new RuntimeException("store failed");
+            }
+        }).build();
+
+        TestingPayload payload = new TestingPayload(("Hello").getBytes(StandardCharsets.UTF_8));
+        CompletableFuture<Void> f = producer.produce(payload);
+        await().until(f::isDone);
+        assertThat(f).hasFailedWithThrowableThat().hasMessageContaining("store failed").isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    public void flushAllProducedObjectOnClose() throws Exception {
+        final ObjectQueueProducer<TestingPayload> producer = builder
+                .setBatchSize(5)
+                .setStorage(new AbstractTestingStorage() {
+                    @Override
+                    public void store(Collection<ObjectWithId> batch) {
+                        try {
+                            Thread.sleep(200);
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                }).build();
+
+        ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            TestingPayload payload = new TestingPayload(("" + i).getBytes(StandardCharsets.UTF_8));
+            CompletableFuture<Void> f = producer.produce(payload);
+            assertThat(f).isNotNull();
+            futures.add(f);
+        }
+
+        producer.close();
+        Condition<CompletableFuture<Void>> completed = new Condition<>(CompletableFuture::isDone, "completed");
+        assertThat(futures).are(completed);
     }
 }

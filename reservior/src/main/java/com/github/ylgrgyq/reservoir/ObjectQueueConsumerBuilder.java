@@ -5,6 +5,10 @@ import javax.annotation.Nullable;
 import static java.util.Objects.requireNonNull;
 
 public final class ObjectQueueConsumerBuilder<E> {
+    public static <E> ObjectQueueConsumerBuilder<E> newBuilder() {
+        return new ObjectQueueConsumerBuilder<>();
+    }
+
     private boolean autoCommit = true;
     private int batchSize = 1024;
 
@@ -14,10 +18,6 @@ public final class ObjectQueueConsumerBuilder<E> {
     private Deserializer<E> deserializer;
 
     private ObjectQueueConsumerBuilder() {}
-
-    public static <E> ObjectQueueConsumerBuilder<E> newBuilder() {
-        return new ObjectQueueConsumerBuilder<>();
-    }
 
     ConsumerStorage getStorage() {
         assert storage != null;
@@ -56,6 +56,10 @@ public final class ObjectQueueConsumerBuilder<E> {
     }
 
     public ObjectQueueConsumerBuilder<E> setBatchSize(int batchSize) {
+        if (batchSize <= 0) {
+            throw new IllegalArgumentException("batchSize: " + batchSize + " (expected: > 0)");
+        }
+
         this.batchSize = batchSize;
         return this;
     }

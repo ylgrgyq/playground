@@ -95,6 +95,7 @@ public class ManualCommitObjectQueueConsumerTest {
 
         await().until(f::isDone);
         assertThat(f).isCompletedWithValue(first);
+        consumer.commit();
         assertThat(storage.getLastCommittedId()).isEqualTo(1);
 
         consumer.close();

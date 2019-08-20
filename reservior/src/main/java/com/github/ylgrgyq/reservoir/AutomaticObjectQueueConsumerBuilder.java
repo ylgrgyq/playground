@@ -1,5 +1,6 @@
 package com.github.ylgrgyq.reservoir;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -7,11 +8,18 @@ import java.util.concurrent.Executor;
 import static java.util.Objects.requireNonNull;
 
 public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
+    public static <E extends Verifiable> AutomaticObjectQueueConsumerBuilder<E> newBuilder() {
+        return new AutomaticObjectQueueConsumerBuilder<>();
+    }
+
     private final List<ConsumeObjectListener<E>> listeners;
     private final ObjectQueueConsumerBuilder<E> consumerBuilder;
 
+    @Nullable
     private ConsumeObjectHandler<E> consumeObjectHandler;
+    @Nullable
     private Executor listenerExecutor;
+    @Nullable
     private ObjectQueueConsumer<E> consumer;
 
     private AutomaticObjectQueueConsumerBuilder() {
@@ -19,11 +27,8 @@ public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
         this.listeners = new ArrayList<>();
     }
 
-    public static <E extends Verifiable> AutomaticObjectQueueConsumerBuilder<E> newBuilder() {
-        return new AutomaticObjectQueueConsumerBuilder<>();
-    }
-
     ObjectQueueConsumer<E> getConsumer() {
+        assert consumer != null;
         return consumer;
     }
 
@@ -72,34 +77,43 @@ public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
     }
 
     public AutomaticObjectQueueConsumerBuilder<E> setBatchSize(int batchSize) {
+        if (batchSize <= 0) {
+            throw new IllegalArgumentException("batchSize: " + batchSize + " (expected: > 0)");
+        }
+
         consumerBuilder.setBatchSize(batchSize);
         return this;
     }
 
     ConsumeObjectHandler<E> getConsumeObjectHandler() {
+        assert consumeObjectHandler != null;
         return consumeObjectHandler;
     }
 
     public AutomaticObjectQueueConsumerBuilder<E> setConsumeObjectHandler(ConsumeObjectHandler<E> consumeObjectHandler) {
+        requireNonNull(consumeObjectHandler, "consumeObjectHandler");
+
         this.consumeObjectHandler = consumeObjectHandler;
         return this;
     }
 
     Executor getListenerExecutor() {
+        assert listenerExecutor != null;
         return listenerExecutor;
     }
 
     public AutomaticObjectQueueConsumerBuilder<E> setListenerExecutor(Executor listenerExecutor) {
+        requireNonNull(listenerExecutor, "listenerExecutor");
+
         this.listenerExecutor = listenerExecutor;
         return this;
     }
 
-    public AutomaticObjectQueueConsumer<E> build() throws StorageException{
-        requireNonNull(consumeObjectHandler, "please provide consume object handler");
-        requireNonNull(listenerExecutor, "please provide listener executor");
+    public AutomaticObjectQueueConsumer<E> build() throws StorageException {
+        requireNonNull(consumeObjectHandler, "consumeObjectHandler");
+        requireNonNull(listenerExecutor, "listenerExecutor");
 
-        this.consumer = consumerBuilder.build();
-
+        consumer = consumerBuilder.build();
         return new AutomaticObjectQueueConsumer<>(this);
     }
 }

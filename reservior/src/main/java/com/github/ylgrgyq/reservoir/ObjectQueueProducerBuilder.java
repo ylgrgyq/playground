@@ -4,22 +4,25 @@ import javax.annotation.Nullable;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 import static java.util.Objects.requireNonNull;
 
 public final class ObjectQueueProducerBuilder<E> {
-    @Nullable
-    private ProducerStorage storage;
-    @Nullable
-    private Serializer<E> serializer;
-    private ExecutorService executorService = Executors.newSingleThreadExecutor(new NamedThreadFactory("object-queue-producer-executor-"));
-    private int ringBufferSize = 512;
-    private int batchSize = 128;
-
+    private static final ThreadFactory threadFactory = new NamedThreadFactory("object-queue-producer-executor-");
 
     public static <E> ObjectQueueProducerBuilder<E> newBuilder() {
         return new ObjectQueueProducerBuilder<>();
     }
+
+    private ExecutorService executorService = Executors.newSingleThreadExecutor(threadFactory);
+    private int ringBufferSize = 512;
+    private int batchSize = 128;
+
+    @Nullable
+    private ProducerStorage storage;
+    @Nullable
+    private Serializer<E> serializer;
 
     ProducerStorage getStorage() {
         assert storage != null;
@@ -44,7 +47,7 @@ public final class ObjectQueueProducerBuilder<E> {
 
     public ObjectQueueProducerBuilder<E> setRingBufferSize(int ringBufferSize) {
         if (ringBufferSize <= 0) {
-            throw new IllegalArgumentException("ringBufferSize should greater than zero, actual: " + ringBufferSize);
+            throw new IllegalArgumentException("ringBufferSize: " + ringBufferSize + " (expected: > 0)");
         }
 
         this.ringBufferSize = ringBufferSize;
@@ -57,7 +60,7 @@ public final class ObjectQueueProducerBuilder<E> {
 
     public ObjectQueueProducerBuilder<E> setBatchSize(int batchSize) {
         if (batchSize <= 0) {
-            throw new IllegalArgumentException("batchSize should greater than zero, actual: " + batchSize);
+            throw new IllegalArgumentException("batchSize: " + batchSize + " (expected: > 0)");
         }
 
         this.batchSize = batchSize;
