@@ -11,8 +11,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
@@ -21,10 +20,9 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbStorage.class);
     private static final String DEFAULT_QUEUE_NAME = "reservior_queue";
     private static final byte[] CONSUMER_COMMIT_ID_META_KEY = "consumer_committed_id".getBytes(StandardCharsets.UTF_8);
+    private static final ThreadFactory threadFactory = new NamedThreadFactory("storage-background-truncate-handler-");
 
-    private final BlockingQueue<TruncateQueueEntry> truncateJobsQueue;
-    private final String path;
-    private final BackgroundTruncateHandler backgroundTruncateHandler;
+    private final Thread backgroundTruncateHandler;
 
     private final List<ColumnFamilyOptions> cfOptions;
     private final long readRetryIntervalMillis;
@@ -32,8 +30,9 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
     private final RocksDB db;
     private final ColumnFamilyHandle defaultColumnFamilyHandle;
     private final ColumnFamilyHandle columnFamilyHandle;
+    private final List<ColumnFamilyHandle> columnFamilyHandles;
     private final WriteOptions writeOptions;
-    private final ReadOptions totalOrderReadOptions;
+    private final ReadOptions readOptions;
     private final DBOptions dbOptions;
 
     private volatile boolean closed;
@@ -42,12 +41,20 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
         RocksDB.loadLibrary();
     }
 
+    public RocksDbStorage(String path) throws InterruptedException {
+        this(path, false, 500, TimeUnit.MINUTES.toMillis(1));
+    }
+
+    public RocksDbStorage(String path, boolean destroyPreviousDbFiles) throws InterruptedException {
+        this(path, destroyPreviousDbFiles, 500, TimeUnit.MINUTES.toMillis(1));
+    }
+
     public RocksDbStorage(String path, boolean destroyPreviousDbFiles, long readRetryIntervalMillis) throws InterruptedException {
-        this.path = path;
+        this(path, destroyPreviousDbFiles, readRetryIntervalMillis, TimeUnit.MINUTES.toMillis(1));
+    }
+
+    public RocksDbStorage(String path, boolean destroyPreviousDbFiles, long readRetryIntervalMillis, long detectTruncateIntervalMillis) throws InterruptedException {
         this.cfOptions = new ArrayList<>();
-        this.truncateJobsQueue = new LinkedBlockingQueue<>();
-        this.backgroundTruncateHandler = new BackgroundTruncateHandler("StorageBackgroundTruncateHandler");
-        this.backgroundTruncateHandler.start();
         this.readRetryIntervalMillis = readRetryIntervalMillis;
 
         try {
@@ -62,15 +69,7 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
 
             final ReadOptions totalOrderReadOptions = new ReadOptions();
             totalOrderReadOptions.setTotalOrderSeek(true);
-            this.totalOrderReadOptions = totalOrderReadOptions;
-
-            final BlockBasedTableConfig tableConfig = new BlockBasedTableConfig(). //
-                    setIndexType(IndexType.kHashSearch). // use hash search(btree) for prefix scan.
-                    setBlockSize(4 * SizeUnit.KB).//
-                    setFilter(new BloomFilter(16, false)). //
-                    setCacheIndexAndFilterBlocks(true). //
-                    setBlockCacheSize(512 * SizeUnit.MB). //
-                    setCacheNumShardBits(8);
+            this.readOptions = totalOrderReadOptions;
 
             final File dir = new File(path);
             if (dir.exists() && !dir.isDirectory()) {
@@ -89,10 +88,13 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
             ColumnFamilyOptions options = createDefaultColumnFamilyOptions();
             columnFamilyDescriptors.add(new ColumnFamilyDescriptor(DEFAULT_QUEUE_NAME.getBytes(), options));
 
-            final List<ColumnFamilyHandle> columnFamilyHandles = new ArrayList<>();
+            this.columnFamilyHandles = new ArrayList<>();
             this.db = RocksDB.open(dbOptions, path, columnFamilyDescriptors, columnFamilyHandles);
             this.defaultColumnFamilyHandle = columnFamilyHandles.get(0);
             this.columnFamilyHandle = columnFamilyHandles.get(1);
+
+            this.backgroundTruncateHandler = threadFactory.newThread(new BackgroundTruncateHandler(detectTruncateIntervalMillis));
+            this.backgroundTruncateHandler.start();
         } catch (final RocksDBException ex) {
             String msg = String.format("init RocksDb on path %s failed", path);
             close();
@@ -114,8 +116,12 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
     @Override
     public long getLastCommittedId() {
         try {
-            final byte[] commitIdInBytes = db.get(defaultColumnFamilyHandle, totalOrderReadOptions, CONSUMER_COMMIT_ID_META_KEY);
-            return Bits.getLong(commitIdInBytes, 0);
+            final byte[] commitIdInBytes = db.get(defaultColumnFamilyHandle, readOptions, CONSUMER_COMMIT_ID_META_KEY);
+            if (commitIdInBytes != null) {
+                return Bits.getLong(commitIdInBytes, 0);
+            } else {
+                return 0;
+            }
         } catch (RocksDBException ex) {
             throw new IllegalStateException("fail to get last committed id: ", ex);
         }
@@ -123,7 +129,7 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
 
     @Override
     public long getLastProducedId() {
-        try (final RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions)) {
+        try (final RocksIterator it = db.newIterator(columnFamilyHandle, readOptions)) {
             it.seekToLast();
             if (it.isValid()) {
                 return Bits.getLong(it.key(), 0);
@@ -140,7 +146,7 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
 
         final List<ObjectWithId> entries = new ArrayList<>(limit);
         while (true) {
-            try (RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions)) {
+            try (RocksIterator it = db.newIterator(columnFamilyHandle, readOptions)) {
                 for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
                     final long id = Bits.getLong(it.key(), 0);
                     final ObjectWithId entry = new ObjectWithId(id, it.value());
@@ -168,7 +174,7 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
         final long end = System.nanoTime() + unit.toNanos(timeout);
         final List<ObjectWithId> entries = new ArrayList<>(limit);
         while (true) {
-            try (RocksIterator it = db.newIterator(columnFamilyHandle, totalOrderReadOptions)) {
+            try (RocksIterator it = db.newIterator(columnFamilyHandle, readOptions)) {
                 for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
                     final long id = Bits.getLong(it.key(), 0);
                     final ObjectWithId entry = new ObjectWithId(id, it.value());
@@ -208,9 +214,12 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
 
     @Override
     public void close() throws InterruptedException {
-        backgroundTruncateHandler.shutdown();
-        wakeupTruncateHandler();
-        backgroundTruncateHandler.join();
+        closed = true;
+
+        if (backgroundTruncateHandler != null) {
+            backgroundTruncateHandler.interrupt();
+            backgroundTruncateHandler.join();
+        }
 
         // The shutdown order is matter.
         // 1. close db and column family handles
@@ -249,27 +258,23 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
     }
 
     private ColumnFamilyOptions createDefaultColumnFamilyOptions() {
-        final ColumnFamilyOptions options = new ColumnFamilyOptions();
+        final BlockBasedTableConfig tableConfig = new BlockBasedTableConfig(). //
+                setIndexType(IndexType.kHashSearch). // use hash search(btree) for prefix scan.
+                setBlockSize(4 * SizeUnit.KB).//
+                setFilterPolicy(new BloomFilter(16, false)).
+                setCacheIndexAndFilterBlocks(true). //
+                setBlockCache(new LRUCache(512 * SizeUnit.MB, 8));
 
+        final ColumnFamilyOptions options = new ColumnFamilyOptions();
+//        options.setTableFormatConfig(tableConfig);
+//        options.useCappedPrefixExtractor()
         cfOptions.add(options);
 
         return options;
     }
 
-    private List<byte[]> listColumnFamilyNames(DBOptions dbOptions, ColumnFamilyOptions columnFamilyOptions)
-            throws RocksDBException {
-        try (Options options = new Options(dbOptions, columnFamilyOptions)) {
-            return RocksDB.listColumnFamilies(options, path);
-        }
-    }
-
     private void closeDB() {
-        ColumnFamilyHandle handle = defaultColumnFamilyHandle;
-        if (handle != null) {
-            handle.close();
-        }
-        handle = columnFamilyHandle;
-        if (handle != null) {
+        for (ColumnFamilyHandle handle : columnFamilyHandles) {
             handle.close();
         }
 
@@ -289,13 +294,8 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
         cfOptions.clear();
 
         // 3. close write/fetch options
-        if (writeOptions != null) {
-            writeOptions.close();
-        }
-
-        if (totalOrderReadOptions != null) {
-            totalOrderReadOptions.close();
-        }
+        writeOptions.close();
+        readOptions.close();
     }
 
 
@@ -305,104 +305,33 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
         return ks;
     }
 
+    private class BackgroundTruncateHandler implements Runnable {
+        private final long detectTruncateIntervalMillis;
 
-    public long trimToId(long firstIdToKeep) {
-//        readLock.lock();
-//        try {
-//            final long startId = getFirstLogId(handle);
-//            if (firstIdToKeep > startId) {
-//                RocksIterator it = db.newIterator(handle.getColumnFamilyHandle(), totalOrderReadOptions);
-//                it.seek(getKeyBytes(firstIdToKeep));
-//                if (it.isValid()) {
-//                    firstIdToKeep = Bits.getLong(it.key(), 0);
-//                }
-//                truncatePrefixInBackground(handle, startId, firstIdToKeep);
-//                return firstIdToKeep;
-//            }
-//            return startId;
-//        } finally {
-//            readLock.unlock();
-//        }
-        return 0;
-    }
-
-    interface TruncateQueueEntry {
-    }
-
-    private static class WakeUpJob implements TruncateQueueEntry {
-    }
-
-    private static class TruncateJob implements TruncateQueueEntry {
-        private long startId;
-        private long firstIdToKeep;
-        private ColumnFamilyHandle handle;
-
-        public TruncateJob(ColumnFamilyHandle handle, long startId, long firstIdToKeep) {
-            this.startId = startId;
-            this.firstIdToKeep = firstIdToKeep;
-            this.handle = handle;
-        }
-
-        long getStartId() {
-            return startId;
-        }
-
-        long getFirstIdToKeep() {
-            return firstIdToKeep;
-        }
-
-        ColumnFamilyHandle getHandle() {
-            return handle;
-        }
-    }
-
-    private class BackgroundTruncateHandler extends Thread {
-        private volatile boolean shutdown = false;
-
-        BackgroundTruncateHandler(String name) {
-            super(name);
+        BackgroundTruncateHandler(long detectTruncateIntervalMillis) {
+            this.detectTruncateIntervalMillis = detectTruncateIntervalMillis;
         }
 
         @Override
         public void run() {
-            while (!shutdown) {
-                TruncateQueueEntry entry = null;
+            while (!closed) {
                 try {
-                    entry = truncateJobsQueue.take();
-                    if (entry instanceof TruncateJob) {
-                        TruncateJob job = (TruncateJob) entry;
-                        try {
-                            if (db == null) {
-                                break;
-                            }
-                            db.deleteRange(job.getHandle(), getKeyBytes(job.getStartId()), getKeyBytes(job.getFirstIdToKeep()));
-                        } catch (final RocksDBException e) {
-                            logger.error("Fail to truncatePrefix {}", job, e);
-                        }
+                    long lastCommittedId = getLastCommittedId();
+                    long truncateId = Math.max(0, lastCommittedId - 1000);
+                    try {
+                        db.deleteRange(columnFamilyHandle, getKeyBytes(0), getKeyBytes(truncateId));
+                    } catch (final RocksDBException e) {
+                        logger.error("Fail to truncatePrefix {}", truncateId, e);
                     }
+
+                    Thread.sleep(detectTruncateIntervalMillis);
                 } catch (InterruptedException ex) {
                     // continue
                 } catch (Exception ex) {
-                    logger.error("Truncate handler failed for entry {}", entry, ex);
+                    logger.error("Truncate handler failed for entry", ex);
                     break;
                 }
             }
-
-            logger.info(getName() + " exit.");
-        }
-
-        void shutdown() {
-            shutdown = true;
         }
     }
-
-    private void wakeupTruncateHandler() {
-        truncateJobsQueue.offer(new WakeUpJob());
-    }
-
-    private void truncatePrefixInBackground(final long startId, final long firstIdToKeep) {
-        truncateJobsQueue.offer(new TruncateJob(columnFamilyHandle, startId, firstIdToKeep));
-    }
-
-
 }

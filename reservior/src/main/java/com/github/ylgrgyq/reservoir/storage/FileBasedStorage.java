@@ -1,14 +1,10 @@
 //package com.github.ylgrgyq.reservoir.storage;
 //
+//import com.github.ylgrgyq.reservoir.ConsumerStorage;
 //import com.github.ylgrgyq.reservoir.NamedThreadFactory;
+//import com.github.ylgrgyq.reservoir.ProducerStorage;
 //import org.slf4j.Logger;
 //import org.slf4j.LoggerFactory;
-//import raft.server.log.LogsCompactedException;
-//import raft.server.log.PersistentStorage;
-//import raft.server.log.StorageInternalError;
-//import raft.server.proto.LogEntry;
-//import raft.server.util.Strings;
-//import raft.server.util.ThreadFactoryImpl;
 //
 //import java.io.File;
 //import java.io.IOException;
@@ -20,14 +16,7 @@
 //import java.util.concurrent.*;
 //import java.util.stream.Collectors;
 //
-//import static raft.server.util.Preconditions.checkArgument;
-//import static raft.server.util.Preconditions.checkNotNull;
-//
-///**
-// * Author: ylgrgyq
-// * Date: 18/6/8
-// */
-//public class FileBasedStorage implements PersistentStorage {
+//public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
 //    private static final Logger logger = LoggerFactory.getLogger(FileBasedStorage.class.getName());
 //
 //    private final ExecutorService sstableWriterPool = Executors.newSingleThreadScheduledExecutor(

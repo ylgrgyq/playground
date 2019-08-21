@@ -26,7 +26,7 @@ final class ManualCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E>
 
         this.storage = builder.getStorage();
         this.batchSize = builder.getBatchSize();
-        this.queue = new ArrayBlockingQueue<>(this.batchSize);
+        this.queue = new ArrayBlockingQueue<>(2 * this.batchSize);
         this.lastCommittedId = storage.getLastCommittedId();
         this.deserializer = builder.getDeserializer();
         this.lock = new ReentrantLock();
@@ -54,11 +54,7 @@ final class ManualCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E>
             }
         }
 
-        if (payload == null) {
-            return null;
-        } else {
-            return payload.object;
-        }
+        return payload == null ? null : payload.object;
     }
 
     @Override

@@ -129,7 +129,7 @@ public class ObjectQueueProducerTest {
         ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
             @Override
             public void store(Collection<ObjectWithId> batch) throws StorageException {
-                throw new StorageException("store failed");
+                throw new StorageException("deliberate store failed");
             }
         }).build();
 
@@ -144,7 +144,7 @@ public class ObjectQueueProducerTest {
         ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
             @Override
             public void store(Collection<ObjectWithId> batch) {
-                throw new RuntimeException("store failed");
+                throw new RuntimeException("deliberate store failed");
             }
         }).build();
 

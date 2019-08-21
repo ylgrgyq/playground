@@ -5,6 +5,7 @@ import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
@@ -45,6 +46,13 @@ public class ManualCommitObjectQueueConsumerTest {
     }
 
     @Test
+    public void commitWithoutFetch() throws Exception {
+        ObjectQueueConsumer<TestingPayload> consumer = builder.build();
+
+        assertThatThrownBy(consumer::commit).isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
     public void fetchAfterClose() throws Exception {
         ObjectQueueConsumer<TestingPayload> consumer = builder.build();
         consumer.close();
@@ -71,6 +79,7 @@ public class ManualCommitObjectQueueConsumerTest {
         ObjectQueueConsumer<TestingPayload> consumer = builder.build();
 
         assertThat(consumer.fetch(100, TimeUnit.MILLISECONDS)).isNull();
+        consumer.close();
     }
 
     @Test

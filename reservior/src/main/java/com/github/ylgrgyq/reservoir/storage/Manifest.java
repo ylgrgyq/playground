@@ -54,7 +54,7 @@
 //        } finally {
 //            metasLock.unlock();
 //        }
-//    }
+////    }
 //
 //    synchronized void logRecord(ManifestRecord record) throws IOException {
 //        assert record.getType() != ManifestRecord.Type.PLAIN || record.getLogNumber() >= logNumber;

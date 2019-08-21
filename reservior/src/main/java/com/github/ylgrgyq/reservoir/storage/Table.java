@@ -1,9 +1,7 @@
 //package com.github.ylgrgyq.reservoir.storage;
 //
-//import com.google.common.cache.Cache;
-//import com.google.common.cache.CacheBuilder;
-//import raft.server.log.StorageInternalError;
-//import raft.server.proto.LogEntry;
+//import com.github.ylgrgyq.reservoir.ObjectWithId;
+//import com.github.ylgrgyq.reservoir.StorageException;
 //
 //import java.io.IOException;
 //import java.nio.ByteBuffer;
@@ -12,13 +10,11 @@
 //import java.util.List;
 //import java.util.zip.CRC32;
 //
-//import static raft.server.util.Preconditions.checkArgument;
-//
 ///**
 // * Author: ylgrgyq
 // * Date: 18/6/10
 // */
-//class Table implements Iterable<LogEntry> {
+//class Table implements Iterable<ObjectWithId> {
 //    private final Cache<Long, Block> dataBlockCache = CacheBuilder.newBuilder()
 //            .initialCapacity(1024)
 //            .maximumSize(2048)
@@ -66,13 +62,13 @@
 //        return new Block(content);
 //    }
 //
-//    List<LogEntry> getEntries(long start, long end) {
-//        SeekableIterator<Long, LogEntry> itr = iterator();
+//    List<ObjectWithId> getEntries(long start, long end) {
+//        SeekableIterator<Long, ObjectWithId> itr = iterator();
 //        itr.seek(start);
 //
-//        List<LogEntry> ret = new ArrayList<>();
+//        List<ObjectWithId> ret = new ArrayList<>();
 //        while (itr.hasNext()) {
-//            LogEntry v = itr.next();
+//            ObjectWithId v = itr.next();
 //            long k = v.getIndex();
 //            if (k >= start && k < end) {
 //                ret.add(v);
@@ -95,11 +91,11 @@
 //    }
 //
 //    @Override
-//    public SeekableIterator<Long, LogEntry> iterator() {
+//    public SeekableIterator<Long, ObjectWithId> iterator() {
 //        return new Itr(indexBlock);
 //    }
 //
-//    private class Itr implements SeekableIterator<Long, LogEntry> {
+//    private class Itr implements SeekableIterator<Long, ObjectWithId> {
 //        private final SeekableIterator<Long, KeyValueEntry<Long, byte[]>> indexBlockIter;
 //        private SeekableIterator<Long, KeyValueEntry<Long, byte[]>> innerBlockIter;
 //
@@ -136,19 +132,19 @@
 //                Block block = getBlock(handle);
 //                return block.iterator();
 //            } catch (IOException ex) {
-//                throw new StorageInternalError("create inner block iterator failed", ex);
+//                throw new StorageException("create inner block iterator failed", ex);
 //            }
 //        }
 //
 //        @Override
-//        public LogEntry next() {
+//        public ObjectWithId next() {
 //            assert innerBlockIter != null;
 //            assert innerBlockIter.hasNext();
 //            try {
 //                KeyValueEntry<Long, byte[]> ret = innerBlockIter.next();
-//                return LogEntry.parseFrom(ret.getVal());
+//                return new ObjectWithId(ret.getKey(), ret.getVal());
 //            } catch (IOException ex) {
-//                throw new StorageInternalError(ex);
+//                throw new StorageException(ex);
 //            }
 //        }
 //    }

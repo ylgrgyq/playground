@@ -1,5 +1,6 @@
 //package com.github.ylgrgyq.reservoir.storage;
 //
+//import com.github.ylgrgyq.reservoir.ObjectWithId;
 //import com.google.common.cache.Cache;
 //import com.google.common.cache.CacheBuilder;
 //import raft.server.proto.LogEntry;
@@ -45,7 +46,7 @@
 //        return t;
 //    }
 //
-//    SeekableIterator<Long, LogEntry> iterator(int fileNumber, long fileSize) throws IOException {
+//    SeekableIterator<Long, ObjectWithId> iterator(int fileNumber, long fileSize) throws IOException {
 //        Table t = findTable(fileNumber, fileSize);
 //        assert t != null;
 //        return t.iterator();

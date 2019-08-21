@@ -1,5 +1,6 @@
 package com.github.ylgrgyq.reservoir;
 
+import com.github.ylgrgyq.reservoir.LogExceptionHandler.OnEventException;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventTranslatorThreeArg;
 import com.lmax.disruptor.ExceptionHandler;
@@ -36,9 +37,18 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
         this.disruptor = new Disruptor<>(ProducerEvent::new, builder.getRingBufferSize(),
                 new NamedThreadFactory("producer-worker-"));
         this.disruptor.handleEventsWith(new ProduceHandler(builder.getBatchSize()));
-        this.disruptor.setDefaultExceptionHandler(new ProducerDisruptorExceptionHandler());
+        this.disruptor.setDefaultExceptionHandler(new LogExceptionHandler<>("object-queue-producer",
+                (event, ex) -> {
+                    if (event.future != null) {
+                        event.future.completeExceptionally(ex);
+                    }
+                }
+        ));
+
         this.disruptor.start();
-        this.translator = new ProducerTranslator(storage.getLastProducedId());
+        this.translator = new
+
+                ProducerTranslator(storage.getLastProducedId());
         this.ringBuffer = disruptor.getRingBuffer();
         this.executor = builder.getExecutorService();
         this.serializer = builder.getSerializer();
@@ -207,27 +217,6 @@ public final class ObjectQueueProducer<E> implements AutoCloseable {
                 } catch (Exception ex) {
                     logger.error("Submit complete future task failed", ex);
                 }
-            }
-        }
-    }
-
-    private final class ProducerDisruptorExceptionHandler implements ExceptionHandler<ProducerEvent> {
-        @Override
-        public void handleOnStartException(Throwable ex) {
-            logger.error("Start disruptor in producer failed.", ex);
-        }
-
-        @Override
-        public void handleOnShutdownException(Throwable ex) {
-            logger.error("Shutdown disruptor in producer failed.", ex);
-
-        }
-
-        @Override
-        public void handleEventException(Throwable ex, long sequence, ProducerEvent event) {
-            logger.error("Handle event: {} on disruptor in producer failed.", event, ex);
-            if (event.future != null) {
-                event.future.completeExceptionally(ex);
             }
         }
     }
