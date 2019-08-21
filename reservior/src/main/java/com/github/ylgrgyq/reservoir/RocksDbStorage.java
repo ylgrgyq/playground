@@ -285,17 +285,25 @@ public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
 
     private void closeOptions() {
         // 1. close db options
-        dbOptions.close();
+        if(dbOptions!= null) {
+            dbOptions.close();
+        }
 
         // 2. close column family options.
-        for (final ColumnFamilyOptions opt : cfOptions) {
-            opt.close();
+        if (cfOptions != null) {
+            for (final ColumnFamilyOptions opt : cfOptions) {
+                opt.close();
+            }
+            cfOptions.clear();
         }
-        cfOptions.clear();
 
         // 3. close write/fetch options
-        writeOptions.close();
-        readOptions.close();
+        if (writeOptions != null) {
+            writeOptions.close();
+        }
+        if (readOptions != null) {
+            readOptions.close();
+        }
     }
 
 

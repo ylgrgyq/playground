@@ -1,5 +1,6 @@
 package com.github.ylgrgyq.reservoir;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
@@ -15,14 +16,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 public class RocksDbStorageTest {
-    @Test
-    public void commitId() throws Exception {
+    private File tempFile;
+
+    @Before
+    public void setUp() throws Exception {
         String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
                 File.separator + "replicator_server_test_" + System.nanoTime();
-        File tempFile = new File(tempDir);
+        tempFile = new File(tempDir);
         FileUtils.forceMkdir(tempFile);
+    }
 
-        RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true, 500);
+    @Test
+    public void commitId() throws Exception {
+        RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true);
         storage.commitId(100);
         assertThat(storage.getLastCommittedId()).isEqualTo(100);
         storage.close();
@@ -30,12 +36,7 @@ public class RocksDbStorageTest {
 
     @Test
     public void simpleStore() throws Exception {
-        String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
-                File.separator + "replicator_server_test_" + System.nanoTime();
-        File tempFile = new File(tempDir);
-        FileUtils.forceMkdir(tempFile);
-
-        RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true, 500);
+        RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true);
         final int expectSize = 64;
         List<ObjectWithId> objs = new ArrayList<>();
         for (int i = 1; i < expectSize + 1; i++) {
@@ -51,12 +52,7 @@ public class RocksDbStorageTest {
 
     @Test
     public void blockFetch() throws Exception {
-        String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
-                File.separator + "replicator_server_test_" + System.nanoTime();
-        File tempFile = new File(tempDir);
-        FileUtils.forceMkdir(tempFile);
-
-        RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true);
+        RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true, 50);
         CyclicBarrier barrier = new CyclicBarrier(2);
         CompletableFuture<Collection<ObjectWithId>> f = CompletableFuture.supplyAsync(() -> {
             try {
@@ -83,11 +79,6 @@ public class RocksDbStorageTest {
 
     @Test
     public void blockFetchTimeout() throws Exception {
-        String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
-                File.separator + "replicator_server_test_" + System.nanoTime();
-        File tempFile = new File(tempDir);
-        FileUtils.forceMkdir(tempFile);
-
         RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true);
 
         assertThat(storage.fetch(0, 100, 100, TimeUnit.MILLISECONDS)).hasSize(0);
@@ -96,11 +87,6 @@ public class RocksDbStorageTest {
 
     @Test
     public void truncate() throws Exception {
-        String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
-                File.separator + "replicator_server_test_" + System.nanoTime();
-        File tempFile = new File(tempDir);
-        FileUtils.forceMkdir(tempFile);
-
         RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true, 500, 100);
         final int expectSize = 2000;
         List<ObjectWithId> objs = new ArrayList<>();
@@ -114,6 +100,25 @@ public class RocksDbStorageTest {
             Collection<ObjectWithId> actualObjs = storage.fetch(0, 100);
             return actualObjs.iterator().next().getId() == 1000;
         });
+        storage.close();
+    }
+
+    @Test
+    public void simpleProducenAndConsume() throws Exception {
+        RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true);
+        ObjectQueueProducer<TestingPayload> producer = ObjectQueueProducerBuilder.<TestingPayload>newBuilder()
+                .setStorage(storage)
+                .setSerializer(new TestingPayloadCodec())
+                .build();
+        TestingPayload payload = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
+        producer.produce(payload);
+
+        ObjectQueueConsumer<TestingPayload> consumer = ObjectQueueConsumerBuilder.<TestingPayload>newBuilder()
+                .setStorage(storage)
+                .setDeserializer(new TestingPayloadCodec())
+                .build();
+
+        assertThat(consumer.fetch()).isEqualTo(payload);
         storage.close();
     }
 }
