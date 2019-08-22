@@ -16,10 +16,10 @@ import static org.awaitility.Awaitility.await;
 
 public class ManualCommitObjectQueueConsumerTest {
     private final TestingStorage storage = new TestingStorage();
-    private final ObjectQueueConsumerBuilder<TestingPayload> builder = ObjectQueueConsumerBuilder.<TestingPayload>newBuilder()
+    private final ObjectQueueBuilder<TestingPayload> builder = ObjectQueueBuilder.<TestingPayload>newBuilder()
             .setStorage(storage)
             .setAutoCommit(false)
-            .setDeserializer(new TestingPayloadCodec());
+            .setCodec(new TestingPayloadCodec());
 
     @Before
     public void setUp() {
@@ -36,7 +36,7 @@ public class ManualCommitObjectQueueConsumerTest {
 
         storage.store(storedPayload);
 
-        ObjectQueueConsumer<TestingPayload> consumer = builder.build();
+        ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
 
         TestingPayload payload = consumer.fetch();
         assertThat(consumer.fetch()).isSameAs(payload).isEqualTo(first);
@@ -47,14 +47,14 @@ public class ManualCommitObjectQueueConsumerTest {
 
     @Test
     public void commitWithoutFetch() throws Exception {
-        ObjectQueueConsumer<TestingPayload> consumer = builder.build();
+        ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
 
         assertThatThrownBy(consumer::commit).isInstanceOf(NoSuchElementException.class);
     }
 
     @Test
     public void fetchAfterClose() throws Exception {
-        ObjectQueueConsumer<TestingPayload> consumer = builder.build();
+        ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
         consumer.close();
         assertThatThrownBy(consumer::fetch).isInstanceOf(InterruptedException.class);
     }
@@ -62,8 +62,8 @@ public class ManualCommitObjectQueueConsumerTest {
     @Test
     public void deserializeObjectFailed() throws Exception {
         ObjectQueueConsumer<TestingPayload> consumer = builder
-                .setDeserializer(o -> {throw new RuntimeException("deserialize failed");})
-                .build();
+                .setCodec(new BadTestingPayloadCodec())
+                .buildConsumer();
 
         TestingPayload first = new TestingPayload(12345, "first".getBytes(StandardCharsets.UTF_8));
         storage.add(first.createObjectWithId());
@@ -76,7 +76,7 @@ public class ManualCommitObjectQueueConsumerTest {
 
     @Test
     public void timeoutOnFetch() throws Exception {
-        ObjectQueueConsumer<TestingPayload> consumer = builder.build();
+        ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
 
         assertThat(consumer.fetch(100, TimeUnit.MILLISECONDS)).isNull();
         consumer.close();
@@ -88,7 +88,7 @@ public class ManualCommitObjectQueueConsumerTest {
         final TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
         storedPayload.add(first.createObjectWithId());
 
-        ObjectQueueConsumer<TestingPayload> consumer = builder.build();
+        ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
 
         CyclicBarrier barrier = new CyclicBarrier(2);
         CompletableFuture<TestingPayload> f = CompletableFuture.supplyAsync(() -> {

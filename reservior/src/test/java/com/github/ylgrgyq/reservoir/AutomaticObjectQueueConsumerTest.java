@@ -19,7 +19,7 @@ public class AutomaticObjectQueueConsumerTest {
     private final TestingConsumeObjectListener<TestingPayload> listener = new TestingConsumeObjectListener<>();
     private final AutomaticObjectQueueConsumerBuilder<TestingPayload> builder = AutomaticObjectQueueConsumerBuilder.<TestingPayload>newBuilder()
             .setStorage(storage)
-            .setDeserializer(new TestingPayloadCodec())
+            .setCodec(new TestingPayloadCodec())
             .setAutoCommit(false)
             .setListenerExecutor(Executors.newSingleThreadExecutor());
 

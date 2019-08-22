@@ -17,9 +17,19 @@ import static org.awaitility.Awaitility.await;
 
 public class DisruptorBackedObjectQueueProducerTest {
     private final TestingStorage storage = new TestingStorage();
-    private final ObjectQueueProducerBuilder<TestingPayload> builder = ObjectQueueProducerBuilder.<TestingPayload>newBuilder()
+    private final ObjectQueueBuilder<TestingPayload> builder = ObjectQueueBuilder.<TestingPayload>newBuilder()
             .setStorage(storage)
-            .setSerializer(TestingPayload::getContent);
+            .setCodec(new Codec<TestingPayload>() {
+                @Override
+                public TestingPayload deserialize(byte[] bytes) throws DeserializationException {
+                    return new TestingPayload(bytes);
+                }
+
+                @Override
+                public byte[] serialize(TestingPayload obj) throws SerializationException {
+                    return obj.getContent();
+                }
+            });
 
     @Before
     public void setUp() {
@@ -28,7 +38,7 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void simpleProduceAndFlush() throws Exception {
-        final DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder.build();
+        final ObjectQueueProducer<TestingPayload> producer = builder.buildProducer();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 64; i++) {
@@ -52,7 +62,7 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void simpleProduceAndAutoFlush() throws Exception {
-        final DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder.build();
+        final ObjectQueueProducer<TestingPayload> producer = builder.buildProducer();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 1024; i++) {
@@ -74,7 +84,7 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void flushAllProducedObjectOnClose() throws Exception {
-        final DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder
+        final ObjectQueueProducer<TestingPayload> producer = builder
                 .setBatchSize(5)
                 .setStorage(new AbstractTestingStorage() {
                     @Override
@@ -85,7 +95,7 @@ public class DisruptorBackedObjectQueueProducerTest {
                             throw new StorageException(ex);
                         }
                     }
-                }).build();
+                }).buildProducer();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
@@ -101,7 +111,7 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void produceAfterClose() throws Exception {
-        final DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder.build();
+        final ObjectQueueProducer<TestingPayload> producer = builder.buildProducer();
 
         producer.close();
 
@@ -113,10 +123,9 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void produceWhenSerializeElementFailed() throws Exception {
-        final DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder
-                .setSerializer(bs -> {
-                    throw new SerializationException();
-                }).build();
+        final ObjectQueueProducer<TestingPayload> producer = builder
+                .setCodec(new BadTestingPayloadCodec())
+                .buildProducer();
 
         assertThatThrownBy(() -> producer.produce(new TestingPayload()).join())
                 .isInstanceOf(CompletionException.class)
@@ -125,12 +134,12 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void storageThrowsStorageException() throws Exception {
-        DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
+        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
             @Override
             public void store(Collection<ObjectWithId> batch) throws StorageException {
                 throw new StorageException("deliberate store failed");
             }
-        }).build();
+        }).buildProducer();
 
         TestingPayload payload = new TestingPayload(("Hello").getBytes(StandardCharsets.UTF_8));
         CompletableFuture<Void> f = producer.produce(payload);
@@ -140,12 +149,12 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void storageThrowsOtherException() throws Exception {
-        DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
+        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
             @Override
             public void store(Collection<ObjectWithId> batch) {
                 throw new RuntimeException("deliberate store failed");
             }
-        }).build();
+        }).buildProducer();
 
         TestingPayload payload = new TestingPayload(("Hello").getBytes(StandardCharsets.UTF_8));
         CompletableFuture<Void> f = producer.produce(payload);

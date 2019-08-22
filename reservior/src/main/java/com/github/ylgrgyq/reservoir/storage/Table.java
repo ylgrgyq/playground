@@ -18,7 +18,7 @@
 //    private final Cache<Long, Block> dataBlockCache = CacheBuilder.newBuilder()
 //            .initialCapacity(1024)
 //            .maximumSize(2048)
-//            .build();
+//            .buildQueue();
 //
 //    private final FileChannel fileChannel;
 //    private final Block indexBlock;

@@ -106,19 +106,14 @@ public class RocksDbStorageTest {
     @Test
     public void simpleProducenAndConsume() throws Exception {
         RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true);
-        DisruptorBackedObjectQueueProducer<TestingPayload> producer = ObjectQueueProducerBuilder.<TestingPayload>newBuilder()
+        ObjectQueue<TestingPayload> queue = ObjectQueueBuilder.<TestingPayload>newBuilder()
                 .setStorage(storage)
-                .setSerializer(new TestingPayloadCodec())
-                .build();
+                .setCodec(new TestingPayloadCodec())
+                .buildQueue();
         TestingPayload payload = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
-        producer.produce(payload);
+        queue.produce(payload);
 
-        ObjectQueueConsumer<TestingPayload> consumer = ObjectQueueConsumerBuilder.<TestingPayload>newBuilder()
-                .setStorage(storage)
-                .setDeserializer(new TestingPayloadCodec())
-                .build();
-
-        assertThat(consumer.fetch()).isEqualTo(payload);
+        assertThat(queue.fetch()).isEqualTo(payload);
         storage.close();
     }
 }

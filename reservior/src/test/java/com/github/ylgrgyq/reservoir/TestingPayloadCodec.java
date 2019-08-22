@@ -2,7 +2,7 @@ package com.github.ylgrgyq.reservoir;
 
 import java.nio.ByteBuffer;
 
-public class TestingPayloadCodec implements Serializer<TestingPayload>, Deserializer<TestingPayload> {
+public class TestingPayloadCodec implements Codec<TestingPayload> {
     private static final int MINIMUM_LENGTH = Long.BYTES + Integer.BYTES + 1;
 
 

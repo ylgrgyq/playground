@@ -5,7 +5,6 @@ import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
@@ -16,10 +15,10 @@ import static org.awaitility.Awaitility.await;
 
 public class AutoCommitObjectQueueConsumerTest {
     private final TestingStorage storage = new TestingStorage();
-    private final ObjectQueueConsumerBuilder<TestingPayload> builder = ObjectQueueConsumerBuilder.<TestingPayload>newBuilder()
+    private final ObjectQueueBuilder<TestingPayload> builder = ObjectQueueBuilder.<TestingPayload>newBuilder()
             .setStorage(storage)
             .setAutoCommit(true)
-            .setDeserializer(new TestingPayloadCodec());
+            .setCodec(new TestingPayloadCodec());
 
     @Before
     public void setUp() {
@@ -37,7 +36,7 @@ public class AutoCommitObjectQueueConsumerTest {
         storage.store(storedPayload);
 
 
-        ObjectQueueConsumer<TestingPayload> consumer = builder.build();
+        ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
 
         assertThat(consumer.fetch())
                 .isEqualTo(first);
@@ -50,7 +49,7 @@ public class AutoCommitObjectQueueConsumerTest {
 
     @Test
     public void fetchAfterClose() throws Exception {
-        ObjectQueueConsumer<TestingPayload> consumer = builder.build();
+        ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
         consumer.close();
         assertThatThrownBy(consumer::fetch).isInstanceOf(InterruptedException.class);
     }
@@ -58,8 +57,8 @@ public class AutoCommitObjectQueueConsumerTest {
     @Test
     public void deserializeObjectFailed() throws Exception {
         ObjectQueueConsumer<TestingPayload> consumer = builder
-                .setDeserializer(o -> {throw new RuntimeException("deserialize failed");})
-                .build();
+                .setCodec(new BadTestingPayloadCodec())
+                .buildConsumer();
 
         TestingPayload first = new TestingPayload(12345, "first".getBytes(StandardCharsets.UTF_8));
         storage.add(first.createObjectWithId());
@@ -72,10 +71,10 @@ public class AutoCommitObjectQueueConsumerTest {
 
     @Test
     public void timeoutOnFetch() throws Exception {
-        ObjectQueueConsumer<TestingPayload> consumer = ObjectQueueConsumerBuilder.<TestingPayload>newBuilder()
+        ObjectQueueConsumer<TestingPayload> consumer = ObjectQueueBuilder.<TestingPayload>newBuilder()
                 .setStorage(storage)
-                .setDeserializer(new TestingPayloadCodec())
-                .build();
+                .setCodec(new TestingPayloadCodec())
+                .buildConsumer();
 
         assertThat(consumer.fetch(100, TimeUnit.MILLISECONDS)).isNull();
     }
@@ -86,7 +85,7 @@ public class AutoCommitObjectQueueConsumerTest {
         final TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
         storedPayload.add(first.createObjectWithId());
 
-        ObjectQueueConsumer<TestingPayload> consumer = builder.build();
+        ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
 
         CyclicBarrier barrier = new CyclicBarrier(2);
         CompletableFuture<TestingPayload> f = CompletableFuture.supplyAsync(() -> {

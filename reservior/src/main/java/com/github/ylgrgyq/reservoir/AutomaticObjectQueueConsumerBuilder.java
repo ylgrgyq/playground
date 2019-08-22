@@ -13,7 +13,7 @@ public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
     }
 
     private final List<ConsumeObjectListener<E>> listeners;
-    private final ObjectQueueConsumerBuilder<E> consumerBuilder;
+    private final ObjectQueueBuilder<E> consumerBuilder;
 
     @Nullable
     private ConsumeObjectHandler<E> consumeObjectHandler;
@@ -23,7 +23,7 @@ public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
     private ObjectQueueConsumer<E> consumer;
 
     private AutomaticObjectQueueConsumerBuilder() {
-        this.consumerBuilder = ObjectQueueConsumerBuilder.newBuilder();
+        this.consumerBuilder = ObjectQueueBuilder.newBuilder();
         this.listeners = new ArrayList<>();
     }
 
@@ -53,13 +53,13 @@ public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
         return this;
     }
 
-    Deserializer<E> getDeserializer() {
-        return consumerBuilder.getDeserializer();
+    Codec<E> getCodec() {
+        return consumerBuilder.getCodec();
     }
 
-    public AutomaticObjectQueueConsumerBuilder<E> setDeserializer(Deserializer<E> deserializer) {
-        requireNonNull(deserializer, "deserializer");
-        consumerBuilder.setDeserializer(deserializer);
+    public AutomaticObjectQueueConsumerBuilder<E> setCodec(Codec<E> codec) {
+        requireNonNull(codec, "codec");
+        consumerBuilder.setCodec(codec);
         return this;
     }
 
@@ -113,7 +113,7 @@ public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
         requireNonNull(consumeObjectHandler, "consumeObjectHandler");
         requireNonNull(listenerExecutor, "listenerExecutor");
 
-        consumer = consumerBuilder.build();
+        consumer = consumerBuilder.buildConsumer();
         return new AutomaticObjectQueueConsumer<>(this);
     }
 }

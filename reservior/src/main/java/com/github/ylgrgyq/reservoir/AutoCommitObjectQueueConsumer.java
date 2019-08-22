@@ -15,12 +15,12 @@ final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
     private final BlockingQueue<E> queue;
     private final int batchSize;
     private final ReentrantLock lock;
-    private final Deserializer<E> deserializer;
+    private final Codec<E> deserializer;
     private long lastCommittedId;
 
     private volatile boolean closed;
 
-    AutoCommitObjectQueueConsumer(ObjectQueueConsumerBuilder<E> builder) throws StorageException {
+    AutoCommitObjectQueueConsumer(ObjectQueueBuilder<E> builder) throws StorageException {
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
@@ -28,7 +28,7 @@ final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
         this.queue = new ArrayBlockingQueue<>(2 * this.batchSize);
         this.lock = new ReentrantLock();
         this.lastCommittedId = storage.getLastCommittedId();
-        this.deserializer = builder.getDeserializer();
+        this.deserializer = builder.getCodec();
     }
 
     @Override

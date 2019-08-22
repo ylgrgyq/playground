@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFuture;
 import static java.util.Objects.requireNonNull;
 
-public final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer<E> {
+final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer<E> {
     private static final Logger logger = LoggerFactory.getLogger(DisruptorBackedObjectQueueProducer.class);
 
     private final ObjectQueueStorage storage;
@@ -25,10 +25,10 @@ public final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueP
     private final RingBuffer<ProducerEvent> ringBuffer;
     private final EventTranslatorThreeArg<ProducerEvent, byte[], CompletableFuture<Void>, Boolean> translator;
     private final ExecutorService executor;
-    private final Serializer<E> serializer;
+    private final Codec<E> serializer;
     private volatile boolean closed;
 
-    public DisruptorBackedObjectQueueProducer(ObjectQueueProducerBuilder<E> builder) throws StorageException {
+    public DisruptorBackedObjectQueueProducer(ObjectQueueBuilder<E> builder) throws StorageException {
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
@@ -49,7 +49,7 @@ public final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueP
                 ProducerTranslator(storage.getLastProducedId());
         this.ringBuffer = disruptor.getRingBuffer();
         this.executor = builder.getExecutorService();
-        this.serializer = builder.getSerializer();
+        this.serializer = builder.getCodec();
     }
 
     @Override

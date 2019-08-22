@@ -16,19 +16,19 @@ final class ManualCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E>
     private final BlockingQueue<DeserializedObjectWithId<E>> queue;
     private final ReentrantLock lock;
     private final int batchSize;
-    private final Deserializer<E> deserializer;
+    private final Codec<E> deserializer;
     private long lastCommittedId;
 
     private volatile boolean closed;
 
-    ManualCommitObjectQueueConsumer(ObjectQueueConsumerBuilder<E> builder) throws StorageException {
+    ManualCommitObjectQueueConsumer(ObjectQueueBuilder<E> builder) throws StorageException {
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
         this.batchSize = builder.getBatchSize();
         this.queue = new ArrayBlockingQueue<>(2 * this.batchSize);
         this.lastCommittedId = storage.getLastCommittedId();
-        this.deserializer = builder.getDeserializer();
+        this.deserializer = builder.getCodec();
         this.lock = new ReentrantLock();
     }
 
