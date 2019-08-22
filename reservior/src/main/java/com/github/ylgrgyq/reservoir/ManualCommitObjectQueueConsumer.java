@@ -12,7 +12,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import static java.util.Objects.requireNonNull;
 
 final class ManualCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
-    private final ConsumerStorage storage;
+    private final ObjectQueueStorage storage;
     private final BlockingQueue<DeserializedObjectWithId<E>> queue;
     private final ReentrantLock lock;
     private final int batchSize;

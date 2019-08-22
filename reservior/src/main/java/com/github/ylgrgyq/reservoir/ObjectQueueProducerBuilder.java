@@ -20,16 +20,16 @@ public final class ObjectQueueProducerBuilder<E> {
     private int batchSize = 128;
 
     @Nullable
-    private ProducerStorage storage;
+    private ObjectQueueStorage storage;
     @Nullable
     private Serializer<E> serializer;
 
-    ProducerStorage getStorage() {
+    ObjectQueueStorage getStorage() {
         assert storage != null;
         return storage;
     }
 
-    public ObjectQueueProducerBuilder<E> setStorage(ProducerStorage storage) {
+    public ObjectQueueProducerBuilder<E> setStorage(ObjectQueueStorage storage) {
         requireNonNull(storage, "storage");
 
         this.storage = storage;
@@ -83,11 +83,11 @@ public final class ObjectQueueProducerBuilder<E> {
         this.executorService = executorService;
     }
 
-    public ObjectQueueProducer<E> build() throws StorageException {
+    public DisruptorBackedObjectQueueProducer<E> build() throws StorageException {
         requireNonNull(storage, "storage");
         requireNonNull(serializer, "serializer");
         requireNonNull(executorService, "executorService");
 
-        return new ObjectQueueProducer<>(this);
+        return new DisruptorBackedObjectQueueProducer<>(this);
     }
 }

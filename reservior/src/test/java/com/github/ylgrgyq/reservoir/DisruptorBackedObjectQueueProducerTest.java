@@ -1,7 +1,6 @@
 package com.github.ylgrgyq.reservoir;
 
 import com.spotify.futures.CompletableFutures;
-import org.assertj.core.api.Condition;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -16,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
-public class ObjectQueueProducerTest {
+public class DisruptorBackedObjectQueueProducerTest {
     private final TestingStorage storage = new TestingStorage();
     private final ObjectQueueProducerBuilder<TestingPayload> builder = ObjectQueueProducerBuilder.<TestingPayload>newBuilder()
             .setStorage(storage)
@@ -29,7 +28,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void simpleProduceAndFlush() throws Exception {
-        final ObjectQueueProducer<TestingPayload> producer = builder.build();
+        final DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder.build();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 64; i++) {
@@ -53,7 +52,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void simpleProduceAndAutoFlush() throws Exception {
-        final ObjectQueueProducer<TestingPayload> producer = builder.build();
+        final DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder.build();
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 1024; i++) {
@@ -75,7 +74,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void flushAllProducedObjectOnClose() throws Exception {
-        final ObjectQueueProducer<TestingPayload> producer = builder
+        final DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder
                 .setBatchSize(5)
                 .setStorage(new AbstractTestingStorage() {
                     @Override
@@ -102,7 +101,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void produceAfterClose() throws Exception {
-        final ObjectQueueProducer<TestingPayload> producer = builder.build();
+        final DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder.build();
 
         producer.close();
 
@@ -114,7 +113,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void produceWhenSerializeElementFailed() throws Exception {
-        final ObjectQueueProducer<TestingPayload> producer = builder
+        final DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder
                 .setSerializer(bs -> {
                     throw new SerializationException();
                 }).build();
@@ -126,7 +125,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void storageThrowsStorageException() throws Exception {
-        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
+        DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
             @Override
             public void store(Collection<ObjectWithId> batch) throws StorageException {
                 throw new StorageException("deliberate store failed");
@@ -141,7 +140,7 @@ public class ObjectQueueProducerTest {
 
     @Test
     public void storageThrowsOtherException() throws Exception {
-        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
+        DisruptorBackedObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
             @Override
             public void store(Collection<ObjectWithId> batch) {
                 throw new RuntimeException("deliberate store failed");

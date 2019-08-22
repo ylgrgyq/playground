@@ -13,18 +13,18 @@ public final class ObjectQueueConsumerBuilder<E> {
     private int batchSize = 1024;
 
     @Nullable
-    private ConsumerStorage storage;
+    private ObjectQueueStorage storage;
     @Nullable
     private Deserializer<E> deserializer;
 
     private ObjectQueueConsumerBuilder() {}
 
-    ConsumerStorage getStorage() {
+    ObjectQueueStorage getStorage() {
         assert storage != null;
         return storage;
     }
 
-    public ObjectQueueConsumerBuilder<E> setStorage(ConsumerStorage storage) {
+    public ObjectQueueConsumerBuilder<E> setStorage(ObjectQueueStorage storage) {
         requireNonNull(storage, "storage");
         this.storage = storage;
         return this;

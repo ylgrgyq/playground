@@ -32,7 +32,7 @@ public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
         return consumer;
     }
 
-    ConsumerStorage getStorage() {
+    ObjectQueueStorage getStorage() {
         return consumerBuilder.getStorage();
     }
 
@@ -47,7 +47,7 @@ public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
         return listeners;
     }
 
-    public AutomaticObjectQueueConsumerBuilder<E> setStorage(ConsumerStorage storage) {
+    public AutomaticObjectQueueConsumerBuilder<E> setStorage(ObjectQueueStorage storage) {
         requireNonNull(storage, "storage");
         consumerBuilder.setStorage(storage);
         return this;

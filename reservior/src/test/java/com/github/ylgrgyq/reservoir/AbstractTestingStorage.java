@@ -4,7 +4,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
-abstract class AbstractTestingStorage  implements ConsumerStorage, ProducerStorage {
+abstract class AbstractTestingStorage  implements ObjectQueueStorage {
     @Override
     public void commitId(long id) throws StorageException {
 

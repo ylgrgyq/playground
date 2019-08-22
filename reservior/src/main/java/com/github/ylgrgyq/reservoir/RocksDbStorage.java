@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
 
-public final class RocksDbStorage implements ProducerStorage, ConsumerStorage {
+public final class RocksDbStorage implements ObjectQueueStorage {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbStorage.class);
     private static final String DEFAULT_QUEUE_NAME = "reservior_queue";
     private static final byte[] CONSUMER_COMMIT_ID_META_KEY = "consumer_committed_id".getBytes(StandardCharsets.UTF_8);

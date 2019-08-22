@@ -11,7 +11,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import static java.util.Objects.requireNonNull;
 
 final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
-    private final ConsumerStorage storage;
+    private final ObjectQueueStorage storage;
     private final BlockingQueue<E> queue;
     private final int batchSize;
     private final ReentrantLock lock;

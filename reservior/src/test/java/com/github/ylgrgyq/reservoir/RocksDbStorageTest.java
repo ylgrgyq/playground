@@ -106,7 +106,7 @@ public class RocksDbStorageTest {
     @Test
     public void simpleProducenAndConsume() throws Exception {
         RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true);
-        ObjectQueueProducer<TestingPayload> producer = ObjectQueueProducerBuilder.<TestingPayload>newBuilder()
+        DisruptorBackedObjectQueueProducer<TestingPayload> producer = ObjectQueueProducerBuilder.<TestingPayload>newBuilder()
                 .setStorage(storage)
                 .setSerializer(new TestingPayloadCodec())
                 .build();
