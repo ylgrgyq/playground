@@ -8,13 +8,11 @@ import java.util.zip.CRC32;
 
 final class LogWriter implements Closeable {
     private final FileChannel workingFileChannel;
+    private final ByteBuffer headerBuffer;
     private int blockOffset;
 
-    LogWriter(FileChannel workingFileChannel) {
-        assert workingFileChannel != null;
-
-        this.workingFileChannel = workingFileChannel;
-        this.blockOffset = 0;
+    LogWriter(FileChannel workingFileChannel) throws IOException {
+        this(workingFileChannel, 0);
     }
 
     LogWriter(FileChannel workingFileChannel, long writePosotion) throws IOException {
@@ -22,6 +20,7 @@ final class LogWriter implements Closeable {
 
         workingFileChannel.position(writePosotion);
         this.workingFileChannel = workingFileChannel;
+        this.headerBuffer = ByteBuffer.allocate(Constant.kHeaderSize);
         this.blockOffset = 0;
     }
 
@@ -93,7 +92,7 @@ final class LogWriter implements Closeable {
         assert blockOffset + Constant.kHeaderSize + blockPayload.length <= Constant.kBlockSize;
 
         // format header
-        final ByteBuffer headerBuffer = ByteBuffer.allocate(Constant.kHeaderSize);
+        headerBuffer.clear();
         // checksum includes the record type and record payload
         final CRC32 checksum = new CRC32();
         checksum.update(type.getCode());
