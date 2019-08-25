@@ -86,7 +86,7 @@ class ManifestRecord {
 //        return out.toByteArray();
     }
 
-    static ManifestRecord decode(byte[] bytes) {
+    static ManifestRecord decode(List<byte[]> bytes) {
         ManifestRecord record = new ManifestRecord(Type.PLAIN);
 
 //        ByteArrayDataInput in = ByteStreams.newDataInput(bytes);

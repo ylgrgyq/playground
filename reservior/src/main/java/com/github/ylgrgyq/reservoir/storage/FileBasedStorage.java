@@ -67,17 +67,58 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
 
     @Override
     public List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
-        return null;
+        if (status != StorageStatus.OK) {
+            throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
+        }
+
+        if (fromId < getFirstIndex()) {
+            throw new StorageException("log compacted exception");
+        }
+
+        if (!mm.isEmpty() && fromId >= mm.firstKey()) {
+            return mm.getEntries(fromId, limit);
+        }
+
+        Itr itr;
+        if (imm != null && fromId >= imm.firstKey()) {
+            List<SeekableIterator<Long, ObjectWithId>> itrs = Arrays.asList(imm.iterator(), mm.iterator());
+            for (SeekableIterator<Long, ObjectWithId> it : itrs) {
+                it.seek(fromId);
+            }
+
+            itr = new Itr(itrs);
+        } else {
+            itr = internalIterator(fromId, limit);
+        }
+
+        List<ObjectWithId> ret = new ArrayList<>();
+        while (itr.hasNext()) {
+            ObjectWithId e = itr.next();
+            if (ret.size() >= limit) {
+                break;
+            }
+
+            ret.add(e);
+        }
+
+        return ret;
     }
 
     @Override
     public List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
+
         return null;
     }
 
     @Override
     public long getLastProducedId() throws StorageException {
-        return 0;
+        if (status != StorageStatus.OK) {
+            throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
+        }
+
+        assert mm.isEmpty() || mm.lastKey() == lastIndexInStorage :
+                String.format("actual lastIndex:%s lastIndexInMm:%s", lastIndexInStorage, mm.lastKey());
+        return lastIndexInStorage;
     }
 
     @Override
@@ -97,30 +138,70 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
             firstIndexInStorage = first.getId();
         }
 
-//        try {
-//            long lastIndex = -1;
-//            for (LogEntry e : entries) {
-//                checkArgument(e.getIndex() > lastIndex,
-//                        "log entries being appended is not monotone increasing: %s", entries);
-//                lastIndex = e.getIndex();
-//                if (makeRoomForEntry(false)) {
-//                    byte[] data = e.toByteArray();
-//                    logWriter.append(data);
-//                    mm.add(e.getIndex(), e);
-//                    lastIndexInStorage = e.getIndex();
-//                } else {
-//                    throw new StorageInternalError("make room on file based storage failed");
-//                }
-//            }
-//            return getLastIndex();
-//        } catch (IOException ex) {
-//            throw new StorageInternalError("append log on file based storage failed", ex);
-//        }
+        try {
+            long lastIndex = -1;
+            for (ObjectWithId e : batch) {
+                if (e.getId() <= lastIndex) {
+                    throw new IllegalStateException("log entries being appended is not monotone increasing: " + batch);
+                }
+
+                lastIndex = e.getId();
+                if (makeRoomForEntry(false)) {
+                    byte[] data = e.getObjectInBytes();
+                    logWriter.append(data);
+                    mm.add(e.getId(), e);
+                    lastIndexInStorage = e.getId();
+                } else {
+                    throw new StorageException("make room on file based storage failed");
+                }
+            }
+        } catch (IOException ex) {
+            throw new StorageException("append log on file based storage failed", ex);
+        }
     }
 
     @Override
     public void close() throws Exception {
+        if (status == StorageStatus.SHUTTING_DOWN) {
+            return;
+        }
 
+        try {
+            status = StorageStatus.SHUTTING_DOWN;
+            shutdownLatch = new CountDownLatch(1);
+
+            sstableWriterPool.submit(() -> {
+                synchronized (FileBasedStorage.this) {
+                    try {
+                        logger.debug("shutting file based storage down");
+                        sstableWriterPool.shutdownNow();
+
+                        if (logWriter != null) {
+                            logWriter.close();
+                        }
+
+                        manifest.close();
+
+                        tableCache.evictAll();
+
+                        if (storageLock != null && storageLock.isValid()) {
+                            storageLock.release();
+                        }
+
+                        if (storageLockChannel != null && storageLockChannel.isOpen()) {
+                            storageLockChannel.close();
+                        }
+                        logger.debug("file based storage shutdown successfully");
+                    } catch (Exception ex) {
+                        logger.error("shutdown failed", ex);
+                    } finally {
+                        shutdownLatch.countDown();
+                    }
+                }
+            });
+        } catch (RejectedExecutionException ex) {
+            throw new StorageException(ex);
+        }
     }
 
     //    @Override
@@ -168,7 +249,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
                 lastIndexInStorage = manifest.getLastIndex();
             }
             status = StorageStatus.OK;
-        } catch (IOException t) {
+        } catch (IOException | StorageException t) {
             throw new IllegalStateException("init storage failed", t);
         } finally {
             if (status != StorageStatus.OK) {
@@ -197,7 +278,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         }
     }
 
-    private void recoverStorage(ManifestRecord record) throws IOException {
+    private void recoverStorage(ManifestRecord record) throws IOException, StorageException {
         Path currentFilePath = Paths.get(baseDir, FileName.getCurrentManifestFileName());
         assert Files.exists(currentFilePath);
         String currentManifestFileName = new String(Files.readAllBytes(currentFilePath), StandardCharsets.UTF_8);
@@ -224,7 +305,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         }
     }
 
-    private void recoverMmFromLogFiles(int fileNumber, ManifestRecord record, boolean lastLogFile) throws IOException {
+    private void recoverMmFromLogFiles(int fileNumber, ManifestRecord record, boolean lastLogFile) throws IOException, StorageException {
         Path logFilePath = Paths.get(baseDir, FileName.getLogFileName(fileNumber));
         if (Files.exists(logFilePath)) {
             throw new IllegalArgumentException("log file " + logFilePath + " was deleted");
@@ -234,10 +315,10 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         boolean noNewSSTable = true;
         Memtable mm = null;
         FileChannel ch = FileChannel.open(logFilePath, StandardOpenOption.READ);
-        try (LogReader reader = new LogReader(ch)) {
+        try (LogReader reader = new LogReader(ch, 0, true)) {
             while (true) {
-                Optional<byte[]> logOpt = reader.readLog();
-                if (logOpt.isPresent()) {
+                List<byte[]> logOpt = reader.readLog();
+                if (!logOpt.isEmpty()) {
 //                    LogEntry e = LogEntry.parseFrom(logOpt.get());
                     if (mm == null) {
                         mm = new Memtable();
@@ -277,97 +358,12 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         }
     }
 
-//    @Override
-    public synchronized long getTerm(long index) {
-//        checkArgument(status == StorageStatus.OK,
-//                "FileBasedStorage's status is not normal, currently: %s", status);
-//
-//        if (index < getFirstIndex()) {
-//            throw new LogsCompactedException(index);
-//        }
-//
-//        long lastIndex = getLastIndex();
-//        checkArgument(index <= lastIndex,
-//                "index: %s out of bound, lastIndex: %s",
-//                index, lastIndex);
-//
-//        LogEntry e;
-//        if (imm != null) {
-//            e = imm.get(index);
-//            if (e != null) {
-//                return e.getTerm();
-//            }
-//        }
-//
-//        e = mm.get(index);
-//        if (e != null) {
-//            return e.getTerm();
-//        }
-//
-//        List<LogEntry> entries = getEntries(index, index + 1);
-//        if (entries.isEmpty()) {
-//            return -1;
-//        } else {
-//            return entries.get(0).getTerm();
-//        }
-        return 0;
-    }
-
-//    @Override
-    public synchronized long getLastIndex() {
-//        checkArgument(status == StorageStatus.OK,
-//                "FileBasedStorage's status is not normal, currently: %s", status);
-
-        assert mm.isEmpty() || mm.lastKey() == lastIndexInStorage :
-                String.format("actual lastIndex:%s lastIndexInMm:%s", lastIndexInStorage, mm.lastKey());
-        return lastIndexInStorage;
-    }
-
-//    @Override
+    //    @Override
     public synchronized long getFirstIndex() {
 //        checkArgument(status == StorageStatus.OK,
 //                "FileBasedStorage's status is not normal, currently: %s", status);
         return firstIndexInStorage;
     }
-
-//    @Override
-//    public synchronized List<LogEntry> getEntries(long start, long end) {
-//        checkArgument(status == StorageStatus.OK,
-//                "FileBasedStorage's status is not normal, currently: %s", status);
-//        checkArgument(start < end, "end:%s should greater than start:%s", end, start);
-//
-//        if (start < getFirstIndex()) {
-//            throw new LogsCompactedException(start);
-//        }
-//
-//        if (!mm.isEmpty() && start >= mm.firstKey()) {
-//            return mm.getEntries(start, end);
-//        }
-//
-//        Itr itr;
-//        if (imm != null && start >= imm.firstKey()) {
-//            List<SeekableIterator<Long, LogEntry>> itrs = Arrays.asList(imm.iterator(), mm.iterator());
-//            for (SeekableIterator<Long, LogEntry> it : itrs) {
-//                it.seek(start);
-//            }
-//
-//            itr = new Itr(itrs);
-//        } else {
-//            itr = internalIterator(start, end);
-//        }
-//
-//        List<LogEntry> ret = new ArrayList<>();
-//        while (itr.hasNext()) {
-//            LogEntry e = itr.next();
-//            if (e.getIndex() >= end) {
-//                break;
-//            }
-//
-//            ret.add(e);
-//        }
-//
-//        return ret;
-//    }
 
     private boolean makeRoomForEntry(boolean force) {
         try {
@@ -534,71 +530,14 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         return meta;
     }
 
-//    @Override
     public Future<Long> compact(long toIndex) {
 //        checkArgument(toIndex > 0);
 
         return manifest.compact(toIndex);
     }
 
-    public synchronized void forceFlushMemtable() {
+    synchronized void forceFlushMemtable() {
         makeRoomForEntry(true);
-    }
-
-//    @Override
-    public synchronized void shutdown() throws StorageException{
-        if (status == StorageStatus.SHUTTING_DOWN) {
-            return;
-        }
-
-        try {
-            status = StorageStatus.SHUTTING_DOWN;
-            shutdownLatch = new CountDownLatch(1);
-
-            sstableWriterPool.submit(() -> {
-                synchronized (FileBasedStorage.this) {
-                    try {
-                        logger.debug("shutting file based storage down");
-                        sstableWriterPool.shutdownNow();
-
-                        if (logWriter != null) {
-                            logWriter.close();
-                        }
-
-                        manifest.close();
-
-                        tableCache.evictAll();
-
-                        if (storageLock != null && storageLock.isValid()) {
-                            storageLock.release();
-                        }
-
-                        if (storageLockChannel != null && storageLockChannel.isOpen()) {
-                            storageLockChannel.close();
-                        }
-                        logger.debug("file based storage shutdown successfully");
-                    } catch (Exception ex) {
-                        logger.error("shutdown failed", ex);
-                    } finally {
-                        shutdownLatch.countDown();
-                    }
-                }
-            });
-        } catch (RejectedExecutionException ex) {
-            throw new StorageException(ex);
-        }
-    }
-
-//    @Override
-    public void awaitTermination() throws InterruptedException, StorageException {
-        for (; ; ) {
-            if (shutdownLatch == null) {
-                shutdown();
-            } else {
-                shutdownLatch.await();
-                return;
-            }
-        }
     }
 
     synchronized void waitWriteSstableFinish() throws InterruptedException {
@@ -623,7 +562,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         return new Itr(itrs);
     }
 
-    private List<SeekableIterator<Long, ObjectWithId>> getSSTableIterators(long start, long end) throws StorageException{
+    private List<SeekableIterator<Long, ObjectWithId>> getSSTableIterators(long start, long end) throws StorageException {
         try {
             List<SSTableFileMetaInfo> metas = manifest.searchMetas(start, end);
             List<SeekableIterator<Long, ObjectWithId>> ret = new ArrayList<>(metas.size());

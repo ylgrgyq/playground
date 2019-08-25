@@ -1,5 +1,7 @@
 package com.github.ylgrgyq.reservoir.storage;
 
+import javax.annotation.Nullable;
+
 /**
  * Author: ylgrgyq
  * Date: 18/6/10
@@ -18,10 +20,8 @@ public enum RecordType {
     // EOF
     kEOF((byte)5),
 
-    // For unfinished record
-    kUnfinished((byte)6),
     // For corrupted record
-    kCorruptedRecord((byte)7);
+    kCorruptedRecord((byte)6);
 
     private final byte code;
 
@@ -33,6 +33,7 @@ public enum RecordType {
         return code;
     }
 
+    @Nullable
     public static RecordType getRecordTypeByCode(byte code) {
         for (RecordType type: RecordType.values()) {
             if (type.getCode() == code) {
@@ -40,6 +41,6 @@ public enum RecordType {
             }
         }
 
-        throw new IllegalArgumentException(String.format("type not found by code: %s", code));
+        return null;
     }
 }

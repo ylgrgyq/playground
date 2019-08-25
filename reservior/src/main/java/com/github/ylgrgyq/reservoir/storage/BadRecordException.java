@@ -1,6 +1,8 @@
 package com.github.ylgrgyq.reservoir.storage;
 
-public class BadRecordException extends Exception{
+import com.github.ylgrgyq.reservoir.StorageException;
+
+public class BadRecordException extends StorageException {
     private static final long serialVersionUID = -2307908210663868336L;
     private final RecordType type;
 

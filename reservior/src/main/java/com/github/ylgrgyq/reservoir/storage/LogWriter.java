@@ -6,11 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.zip.CRC32;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/10
- */
-public class LogWriter implements Closeable {
+final class LogWriter implements Closeable {
     private final FileChannel workingFileChannel;
     private int blockOffset;
 
@@ -29,11 +25,7 @@ public class LogWriter implements Closeable {
         this.blockOffset = 0;
     }
 
-    long getPosition() throws IOException{
-        return workingFileChannel.position();
-    }
-
-    void flush() throws IOException{
+    void flush() throws IOException {
         workingFileChannel.force(true);
     }
 
@@ -42,27 +34,28 @@ public class LogWriter implements Closeable {
         workingFileChannel.close();
     }
 
-    void append(byte[] data) throws IOException{
+    void append(byte[] data) throws IOException {
         assert data != null;
         assert data.length > 0;
 
-        ByteBuffer writeBuffer = ByteBuffer.wrap(data);
+        final ByteBuffer writeBuffer = ByteBuffer.wrap(data);
         int dataSizeRemain = writeBuffer.remaining();
         boolean begin = true;
 
         while (dataSizeRemain > 0) {
-            int blockLeft = Constant.kBlockSize - blockOffset;
+            final int blockLeft = Constant.kBlockSize - blockOffset;
+            assert blockLeft >= 0;
 
             if (blockLeft < Constant.kHeaderSize) {
                 paddingBlock(blockLeft);
                 blockOffset = 0;
-                continue;
             }
 
+            // Invariant: never leave < kHeaderSize bytes in a block
             assert Constant.kBlockSize - blockOffset - Constant.kHeaderSize >= 0;
 
             final RecordType type;
-            final int blockForDataAvailable = blockLeft - Constant.kHeaderSize;
+            final int blockForDataAvailable = Constant.kBlockSize - blockOffset - Constant.kHeaderSize;
             final int fragmentSize = Math.min(blockForDataAvailable, dataSizeRemain);
             final boolean end = fragmentSize == dataSizeRemain;
             if (begin && end) {
@@ -84,8 +77,8 @@ public class LogWriter implements Closeable {
         }
     }
 
-    private void paddingBlock(int blockLeft) throws IOException{
-        assert blockLeft >= 0 : String.format("blockLeft:%s", blockLeft);
+    private void paddingBlock(int blockLeft) throws IOException {
+        assert blockLeft >= 0 : "blockLeft: " + blockLeft;
 
         if (blockLeft > 0) {
             // padding with bytes array full of zero
@@ -94,17 +87,21 @@ public class LogWriter implements Closeable {
         }
     }
 
-    private void writeRecord(RecordType type, byte[] blockPayload) throws IOException{
+    private void writeRecord(RecordType type, byte[] blockPayload) throws IOException {
         assert blockOffset + Constant.kHeaderSize + blockPayload.length <= Constant.kBlockSize;
 
-        ByteBuffer headerBuffer = ByteBuffer.allocate(Constant.kHeaderSize);
-        CRC32 checksum = new CRC32();
+        // format header
+        final ByteBuffer headerBuffer = ByteBuffer.allocate(Constant.kHeaderSize);
+        // checksum includes the record type and record payload
+        final CRC32 checksum = new CRC32();
         checksum.update(type.getCode());
         checksum.update(blockPayload);
         headerBuffer.putLong(checksum.getValue());
         headerBuffer.putShort((short) blockPayload.length);
         headerBuffer.put(type.getCode());
         headerBuffer.flip();
+
+        // write hader and payload
         workingFileChannel.write(headerBuffer);
         workingFileChannel.write(ByteBuffer.wrap(blockPayload));
         blockOffset += blockPayload.length + Constant.kHeaderSize;

@@ -1,5 +1,6 @@
 package com.github.ylgrgyq.reservoir.storage;
 
+import com.github.ylgrgyq.reservoir.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,15 +127,15 @@ class Manifest {
         return future;
     }
 
-    synchronized void recover(String manifestFileName) throws IOException {
+    synchronized void recover(String manifestFileName) throws IOException, StorageException {
         Path manifestFilePath = Paths.get(baseDir, manifestFileName);
         FileChannel manifestFile = FileChannel.open(manifestFilePath, StandardOpenOption.READ);
-        try (LogReader reader = new LogReader(manifestFile)) {
+        try (LogReader reader = new LogReader(manifestFile, 0, true)) {
             List<SSTableFileMetaInfo> ms = new ArrayList<>();
             while (true) {
-                Optional<byte[]> logOpt = reader.readLog();
-                if (logOpt.isPresent()) {
-                    ManifestRecord record = ManifestRecord.decode(logOpt.get());
+                List<byte[]> logOpt = reader.readLog();
+                if (!logOpt.isEmpty()) {
+                    ManifestRecord record = ManifestRecord.decode(logOpt);
                     if (record.getType() == ManifestRecord.Type.PLAIN) {
                         nextFileNumber = record.getNextFileNumber();
                         logNumber = record.getLogNumber();

@@ -1,75 +1,81 @@
 package com.github.ylgrgyq.reservoir.storage;
 
+import com.github.ylgrgyq.reservoir.StorageException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.zip.CRC32;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/10
- */
-public class LogReader implements Closeable {
+final class LogReader implements Closeable {
+    private static final Logger logger = LoggerFactory.getLogger(LogReader.class);
     private static final ByteBuffer emptyBuffer = ByteBuffer.wrap(new byte[0]);
-    private FileChannel workingFileChannel;
-    private long initialOffset;
+    private final FileChannel workingFileChannel;
+    private final long initialOffset;
+    private final boolean checkChecksum;
     private ByteBuffer buffer;
     private boolean eof;
 
-    LogReader(FileChannel workingFileChannel) {
-        this(workingFileChannel, 0);
-    }
-
-    LogReader(FileChannel workingFileChannel, long initialOffset) {
+    LogReader(FileChannel workingFileChannel, long initialOffset, boolean checkChecksum) {
         this.workingFileChannel = workingFileChannel;
         this.initialOffset = initialOffset;
         this.buffer = emptyBuffer;
+        this.checkChecksum = checkChecksum;
     }
 
-    Optional<byte[]> readLog() throws IOException, BadRecordException {
+    List<byte[]> readLog() throws IOException, StorageException {
         if (initialOffset > 0) {
             skipToInitBlock();
         }
 
         boolean isFragmented = false;
-        ArrayList<byte[]> outPut = new ArrayList<>();
+        final ArrayList<byte[]> outPut = new ArrayList<>();
         while (true) {
-            RecordType type = readRecord(outPut);
+            final RecordType type = readRecord(outPut);
             switch (type) {
                 case kFullType:
                     if (isFragmented) {
-                        throw new IllegalStateException();
+                        throw new StorageException("partial record without end(1)");
                     }
-                    return Optional.of(compact(outPut));
+                    return outPut;
                 case kFirstType:
                     if (isFragmented) {
-                        throw new IllegalStateException();
+                        throw new StorageException("partial record without end(2)");
                     }
                     isFragmented = true;
                     break;
                 case kMiddleType:
                     if (!isFragmented) {
-                        throw new IllegalStateException();
+                        throw new StorageException("missing start of fragmented record");
                     }
                     break;
                 case kLastType:
                     if (!isFragmented) {
-                        throw new IllegalStateException();
+                        throw new StorageException("missing start for last fragmented record");
                     }
-                    return Optional.of(compact(outPut));
+                    return outPut;
                 case kCorruptedRecord:
-                case kUnfinished:
                     buffer = emptyBuffer;
                     throw new BadRecordException(type);
                 case kEOF:
                     buffer = emptyBuffer;
-                    return Optional.empty();
+                    return Collections.emptyList();
+                default:
+                    throw new StorageException("unknown record type: " + type);
             }
         }
+    }
+
+    @Override
+    public void close() throws IOException {
+        workingFileChannel.close();
+        buffer = emptyBuffer;
     }
 
     private void skipToInitBlock() throws IOException {
@@ -93,7 +99,10 @@ public class LogReader implements Closeable {
         outer:
         while (buffer.remaining() < Constant.kHeaderSize) {
             if (eof) {
-                return buffer.remaining() > 0 ? RecordType.kUnfinished : RecordType.kEOF;
+                // encounter a truncated header at the end of the file. This can be caused
+                // by writer crashing in the middle of writing the header. We condsider
+                // this is OK and only report kEOF
+                return RecordType.kEOF;
             } else {
                 buffer = ByteBuffer.allocate(Constant.kBlockSize);
                 while (buffer.hasRemaining()) {
@@ -109,42 +118,37 @@ public class LogReader implements Closeable {
             }
         }
 
-        CRC32 actualChecksum = new CRC32();
-        long expectChecksum = buffer.getLong();
-        short length = buffer.getShort();
+        // read header
+        assert buffer.remaining() > Constant.kHeaderSize;
+        final long expectChecksum = buffer.getLong();
+        final short length = buffer.getShort();
+        final byte typeCode = buffer.get();
 
         if (length > buffer.remaining()) {
-            return eof ? RecordType.kUnfinished : RecordType.kCorruptedRecord;
+            // if eof, this means writer crashing at the middle of writing the payload
+            // we consider this is OK and return kEOF
+            return eof ? RecordType.kEOF : RecordType.kCorruptedRecord;
         }
 
-        byte typeCode = buffer.get();
-        actualChecksum.update(typeCode);
-        RecordType type = RecordType.getRecordTypeByCode(typeCode);
-        byte[] buf = new byte[length];
-        buffer.get(buf);
-        actualChecksum.update(buf);
 
-        if (actualChecksum.getValue() != expectChecksum) {
+        final RecordType type = RecordType.getRecordTypeByCode(typeCode);
+        if (type == null) {
+            logger.debug("Got corrupted record with unknown record type code: {}", typeCode);
             return RecordType.kCorruptedRecord;
+        }
+
+        final byte[] buf = new byte[length];
+        buffer.get(buf);
+        if (checkChecksum) {
+            final CRC32 actualChecksum = new CRC32();
+            actualChecksum.update(typeCode);
+            actualChecksum.update(buf);
+            if (actualChecksum.getValue() != expectChecksum) {
+                return RecordType.kCorruptedRecord;
+            }
         }
 
         out.add(buf);
         return type;
-    }
-
-    // TODO find some way to avoid copy bytes
-    private byte[] compact(List<byte[]> output) {
-        int size = output.stream().mapToInt(b -> b.length).sum();
-        ByteBuffer buffer = ByteBuffer.allocate(size);
-        for (byte[] bytes : output) {
-            buffer.put(bytes);
-        }
-        return buffer.array();
-    }
-
-    @Override
-    public void close() throws IOException {
-        workingFileChannel.close();
-        buffer = emptyBuffer;
     }
 }
