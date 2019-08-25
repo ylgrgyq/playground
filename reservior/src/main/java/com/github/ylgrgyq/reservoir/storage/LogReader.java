@@ -15,17 +15,22 @@ import java.util.zip.CRC32;
 
 final class LogReader implements Closeable {
     private static final Logger logger = LoggerFactory.getLogger(LogReader.class);
-    private static final ByteBuffer emptyBuffer = ByteBuffer.wrap(new byte[0]);
     private final FileChannel workingFileChannel;
     private final long initialOffset;
     private final boolean checkChecksum;
-    private ByteBuffer buffer;
+    private final ByteBuffer buffer;
     private boolean eof;
 
     LogReader(FileChannel workingFileChannel, long initialOffset, boolean checkChecksum) {
         this.workingFileChannel = workingFileChannel;
         this.initialOffset = initialOffset;
-        this.buffer = emptyBuffer;
+        // we don't make the buffer to lazy allocate buffer
+        // because we think this way can save a check in read block, and we will always
+        // read block immediately after construct a LogReader
+        this.buffer = ByteBuffer.allocate(Constant.kBlockSize);
+        // flip to set the remaining bytes in buffer to zero. so next read will try to read
+        // the log file to file this buffer
+        this.buffer.flip();
         this.checkChecksum = checkChecksum;
     }
 
@@ -34,8 +39,8 @@ final class LogReader implements Closeable {
             skipToInitBlock();
         }
 
-        boolean isFragmented = false;
         final ArrayList<byte[]> outPut = new ArrayList<>();
+        boolean isFragmented = false;
         while (true) {
             final RecordType type = readRecord(outPut);
             switch (type) {
@@ -61,10 +66,12 @@ final class LogReader implements Closeable {
                     }
                     return outPut;
                 case kCorruptedRecord:
-                    buffer = emptyBuffer;
+                    buffer.clear();
                     throw new BadRecordException(type);
                 case kEOF:
-                    buffer = emptyBuffer;
+                    // we need to return kEOF consistently after encounter the kEOF for the first time.
+                    // so we do not clear the buffer, otherwise the next read will try to read the last block
+                    // of this log file one more time instead of return kEOF again
                     return Collections.emptyList();
                 default:
                     throw new StorageException("unknown record type: " + type);
@@ -75,7 +82,7 @@ final class LogReader implements Closeable {
     @Override
     public void close() throws IOException {
         workingFileChannel.close();
-        buffer = emptyBuffer;
+        buffer.clear();
     }
 
     private void skipToInitBlock() throws IOException {
@@ -102,11 +109,11 @@ final class LogReader implements Closeable {
         while (buffer.remaining() <= Constant.kHeaderSize) {
             if (eof) {
                 // encounter a truncated header at the end of the file. This can be caused
-                // by writer crashing in the middle of writing the header. We condsider
-                // this is OK and only report kEOF
+                // by writer crashing in the middle of writing the header. We consider
+                // this is OK and only return kEOF
                 return RecordType.kEOF;
             } else {
-                buffer = ByteBuffer.allocate(Constant.kBlockSize);
+                buffer.clear();
                 while (buffer.hasRemaining()) {
                     int readBs = workingFileChannel.read(buffer);
                     if (readBs == -1) {
