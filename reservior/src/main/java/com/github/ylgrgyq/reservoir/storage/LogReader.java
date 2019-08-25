@@ -16,6 +16,7 @@ final class LogReader implements Closeable {
     private final long initialOffset;
     private final boolean checkChecksum;
     private final ByteBuffer buffer;
+    private long bufferEndOffset;
     private boolean eof;
 
     LogReader(FileChannel workingFileChannel, long initialOffset, boolean checkChecksum) {
@@ -93,13 +94,13 @@ final class LogReader implements Closeable {
 
         if (blockStartPosition > 0) {
             workingFileChannel.position(blockStartPosition);
+            bufferEndOffset = blockStartPosition;
         }
     }
 
     private RecordType readRecord(List<byte[]> out) throws IOException, StorageException {
         // we don't expect empty data in log, so when remaining buffer is <= kHeaderSize
         // which means all of the bytes left in buffer is padding
-        outer:
         while (buffer.remaining() <= Constant.kHeaderSize) {
             if (eof) {
                 // encounter a truncated header at the end of the file. This can be caused
@@ -108,21 +109,12 @@ final class LogReader implements Closeable {
                 return RecordType.kEOF;
             } else {
                 buffer.clear();
-                while (buffer.hasRemaining()) {
-                    int readBs = workingFileChannel.read(buffer);
-                    if (readBs == -1) {
-                        eof = true;
-                        buffer.flip();
-                        continue outer;
-                    }
-                }
-                buffer.flip();
-                break;
+                readBlockFromChannel(buffer);
+                bufferEndOffset += buffer.remaining();
             }
         }
 
         // read header
-        assert buffer.remaining() > Constant.kHeaderSize;
         final long expectChecksum = buffer.getLong();
         final short length = buffer.getShort();
         final byte typeCode = buffer.get();
@@ -155,5 +147,16 @@ final class LogReader implements Closeable {
 
         out.add(buf);
         return type;
+    }
+
+    private void readBlockFromChannel(ByteBuffer buffer) throws IOException {
+        while (buffer.hasRemaining()) {
+            int readBs = workingFileChannel.read(buffer);
+            if (readBs == -1) {
+                eof = true;
+                break;
+            }
+        }
+        buffer.flip();
     }
 }

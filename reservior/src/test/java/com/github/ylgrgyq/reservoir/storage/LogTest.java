@@ -150,6 +150,14 @@ public class LogTest {
     }
 
     @Test
+    public void readUnfinishedHeader() throws Exception {
+        writeLog("Hello");
+
+        truncateLogFile(8);
+        assertThat(readLog()).isEqualTo("EOF");
+    }
+
+    @Test
     public void readLogFileFailed() throws Exception {
         writeLog("Hello");
 
