@@ -46,7 +46,9 @@ final class LogWriter implements Closeable {
             final int blockLeft = Constant.kBlockSize - blockOffset;
             assert blockLeft >= 0;
 
-            if (blockLeft < Constant.kHeaderSize) {
+            // we don't expect data.length == 0, so if blockLeft == kHeaderSize
+            // we need to allocate another block also
+            if (blockLeft <= Constant.kHeaderSize) {
                 paddingBlock(blockLeft);
                 blockOffset = 0;
             }
