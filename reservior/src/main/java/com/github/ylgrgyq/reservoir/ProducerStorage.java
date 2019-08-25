@@ -1,9 +1,9 @@
 package com.github.ylgrgyq.reservoir;
 
-import java.util.Collection;
+import java.util.List;
 
 public interface ProducerStorage extends AutoCloseable {
     long getLastProducedId() throws StorageException;
 
-    void store( Collection<ObjectWithId> batch) throws StorageException;
+    void store(List<ObjectWithId> batch) throws StorageException;
 }

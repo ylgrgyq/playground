@@ -2,6 +2,7 @@ package com.github.ylgrgyq.reservoir;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 abstract class AbstractTestingStorage  implements ObjectQueueStorage {
@@ -16,12 +17,12 @@ abstract class AbstractTestingStorage  implements ObjectQueueStorage {
     }
 
     @Override
-    public Collection<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
+    public List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
         return Collections.emptyList();
     }
 
     @Override
-    public Collection<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
+    public List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
         return Collections.emptyList();
     }
 
@@ -31,7 +32,7 @@ abstract class AbstractTestingStorage  implements ObjectQueueStorage {
     }
 
     @Override
-    public void store(Collection<ObjectWithId> batch) throws StorageException {
+    public void store(List<ObjectWithId> batch) throws StorageException {
 
     }
 

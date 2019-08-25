@@ -88,7 +88,7 @@ public class DisruptorBackedObjectQueueProducerTest {
                 .setBatchSize(5)
                 .setStorage(new AbstractTestingStorage() {
                     @Override
-                    public void store(Collection<ObjectWithId> batch) throws StorageException {
+                    public void store(List<ObjectWithId> batch) throws StorageException {
                         try {
                             Thread.sleep(200);
                         } catch (Exception ex) {
@@ -136,7 +136,7 @@ public class DisruptorBackedObjectQueueProducerTest {
     public void storageThrowsStorageException() throws Exception {
         ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
             @Override
-            public void store(Collection<ObjectWithId> batch) throws StorageException {
+            public void store(List<ObjectWithId> batch) throws StorageException {
                 throw new StorageException("deliberate store failed");
             }
         }).buildProducer();
@@ -151,7 +151,7 @@ public class DisruptorBackedObjectQueueProducerTest {
     public void storageThrowsOtherException() throws Exception {
         ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
             @Override
-            public void store(Collection<ObjectWithId> batch) {
+            public void store(List<ObjectWithId> batch) {
                 throw new RuntimeException("deliberate store failed");
             }
         }).buildProducer();

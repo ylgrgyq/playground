@@ -139,7 +139,7 @@ public final class RocksDbStorage implements ObjectQueueStorage {
     }
 
     @Override
-    public Collection<ObjectWithId> fetch(final long fromId, final int limit) throws InterruptedException {
+    public List<ObjectWithId> fetch(final long fromId, final int limit) throws InterruptedException {
         if (fromId < 0) {
             throw new IllegalArgumentException("fromId: " + fromId + " (expect: >=0)");
         }
@@ -161,11 +161,11 @@ public final class RocksDbStorage implements ObjectQueueStorage {
             }
         }
 
-        return Collections.unmodifiableCollection(entries);
+        return Collections.unmodifiableList(entries);
     }
 
     @Override
-    public Collection<ObjectWithId> fetch(final long fromId, final int limit, final long timeout, final TimeUnit unit)
+    public List<ObjectWithId> fetch(final long fromId, final int limit, final long timeout, final TimeUnit unit)
             throws InterruptedException {
         if (fromId < 0) {
             throw new IllegalArgumentException("fromId: " + fromId + " (expect: >=0)");
@@ -194,11 +194,11 @@ public final class RocksDbStorage implements ObjectQueueStorage {
             Thread.sleep(Math.min(remain, readRetryIntervalMillis));
         }
 
-        return Collections.unmodifiableCollection(entries);
+        return Collections.unmodifiableList(entries);
     }
 
     @Override
-    public void store(Collection<ObjectWithId> queue) {
+    public void store(List<ObjectWithId> queue) {
         requireNonNull(queue, "queue");
 
         try {

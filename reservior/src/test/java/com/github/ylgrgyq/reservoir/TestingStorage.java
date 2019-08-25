@@ -1,7 +1,6 @@
 package com.github.ylgrgyq.reservoir;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -32,7 +31,7 @@ public class TestingStorage extends AbstractTestingStorage{
     }
 
     @Override
-    public synchronized Collection<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException {
+    public synchronized List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException {
         ArrayList<ObjectWithId> ret = new ArrayList<>();
         while (true) {
             while (producedPayloads.isEmpty()) {
@@ -58,7 +57,7 @@ public class TestingStorage extends AbstractTestingStorage{
     }
 
     @Override
-    public synchronized Collection<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException {
+    public synchronized List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException {
         final long endNanos = System.nanoTime() + unit.toNanos(timeout);
         final ArrayList<ObjectWithId> ret = new ArrayList<>();
         while (true) {
@@ -100,7 +99,7 @@ public class TestingStorage extends AbstractTestingStorage{
     }
 
     @Override
-    public synchronized void store(Collection<ObjectWithId> batch) {
+    public synchronized void store(List<ObjectWithId> batch) {
         for (ObjectWithId objectWithId : batch) {
             doAdd(objectWithId);
         }

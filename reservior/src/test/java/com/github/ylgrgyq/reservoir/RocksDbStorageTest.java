@@ -54,7 +54,7 @@ public class RocksDbStorageTest {
     public void blockFetch() throws Exception {
         RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true, 50);
         CyclicBarrier barrier = new CyclicBarrier(2);
-        CompletableFuture<Collection<ObjectWithId>> f = CompletableFuture.supplyAsync(() -> {
+        CompletableFuture<List<ObjectWithId>> f = CompletableFuture.supplyAsync(() -> {
             try {
                 barrier.await();
                 return storage.fetch(0, 100);
@@ -97,7 +97,7 @@ public class RocksDbStorageTest {
         storage.store(objs);
         storage.commitId(2000);
         await().until(() -> {
-            Collection<ObjectWithId> actualObjs = storage.fetch(0, 100);
+            List<ObjectWithId> actualObjs = storage.fetch(0, 100);
             return actualObjs.iterator().next().getId() == 1000;
         });
         storage.close();

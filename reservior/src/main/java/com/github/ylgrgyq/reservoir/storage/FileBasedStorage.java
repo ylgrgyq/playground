@@ -66,12 +66,12 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     }
 
     @Override
-    public Collection<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
+    public List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
         return null;
     }
 
     @Override
-    public Collection<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
+    public List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
         return null;
     }
 
@@ -81,8 +81,41 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     }
 
     @Override
-    public void store(Collection<ObjectWithId> batch) throws StorageException {
+    public void store(List<ObjectWithId> batch) throws StorageException {
+        requireNonNull(batch, "batch");
+        if (status != StorageStatus.OK) {
+            throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
+        }
 
+        if (batch.isEmpty()) {
+            logger.warn("append with empty entries");
+            return;
+        }
+
+        if (firstIndexInStorage < 0) {
+            ObjectWithId first = batch.get(0);
+            firstIndexInStorage = first.getId();
+        }
+
+//        try {
+//            long lastIndex = -1;
+//            for (LogEntry e : entries) {
+//                checkArgument(e.getIndex() > lastIndex,
+//                        "log entries being appended is not monotone increasing: %s", entries);
+//                lastIndex = e.getIndex();
+//                if (makeRoomForEntry(false)) {
+//                    byte[] data = e.toByteArray();
+//                    logWriter.append(data);
+//                    mm.add(e.getIndex(), e);
+//                    lastIndexInStorage = e.getIndex();
+//                } else {
+//                    throw new StorageInternalError("make room on file based storage failed");
+//                }
+//            }
+//            return getLastIndex();
+//        } catch (IOException ex) {
+//            throw new StorageInternalError("append log on file based storage failed", ex);
+//        }
     }
 
     @Override
@@ -336,43 +369,6 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
 //        return ret;
 //    }
 
-//    @Override
-//    public synchronized long append(List<LogEntry> entries) {
-//        checkNotNull(entries);
-//        checkArgument(status == StorageStatus.OK,
-//                "FileBasedStorage's status is not normal, currently: %s", status);
-//
-//        if (entries.isEmpty()) {
-//            logger.warn("append with empty entries");
-//            return getLastIndex();
-//        }
-//
-//        if (firstIndexInStorage < 0) {
-//            LogEntry first = entries.get(0);
-//            firstIndexInStorage = first.getIndex();
-//        }
-//
-//        try {
-//            long lastIndex = -1;
-//            for (LogEntry e : entries) {
-//                checkArgument(e.getIndex() > lastIndex,
-//                        "log entries being appended is not monotone increasing: %s", entries);
-//                lastIndex = e.getIndex();
-//                if (makeRoomForEntry(false)) {
-//                    byte[] data = e.toByteArray();
-//                    logWriter.append(data);
-//                    mm.add(e.getIndex(), e);
-//                    lastIndexInStorage = e.getIndex();
-//                } else {
-//                    throw new StorageInternalError("make room on file based storage failed");
-//                }
-//            }
-//            return getLastIndex();
-//        } catch (IOException ex) {
-//            throw new StorageInternalError("append log on file based storage failed", ex);
-//        }
-//    }
-
     private boolean makeRoomForEntry(boolean force) {
         try {
             boolean forceRun = force;
@@ -499,7 +495,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         try (FileChannel ch = FileChannel.open(tableFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
             TableBuilder tableBuilder = new TableBuilder(ch);
 
-            Iterator<ObjectWithId> ssTableIterator = Collections.<ObjectWithId>emptyList().iterator();
+            Iterator<ObjectWithId> ssTableIterator = Collections.emptyIterator();
             if (sstable != null) {
                 ssTableIterator = tableCache.iterator(sstable.getFileNumber(), sstable.getFileSize());
             }

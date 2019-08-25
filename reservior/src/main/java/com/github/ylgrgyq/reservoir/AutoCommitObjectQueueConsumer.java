@@ -2,7 +2,7 @@ package com.github.ylgrgyq.reservoir;
 
 import javax.annotation.Nullable;
 import java.util.Base64;
-import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -99,7 +99,7 @@ final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
             }
 
             long lastId = lastCommittedId;
-            final Collection<? extends ObjectWithId> payloads;
+            final List<? extends ObjectWithId> payloads;
             if (timeout == 0) {
                 payloads = storage.fetch(lastId, batchSize);
             } else {

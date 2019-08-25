@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.reservoir;
 
-import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public interface ConsumerStorage extends AutoCloseable{
@@ -8,7 +8,7 @@ public interface ConsumerStorage extends AutoCloseable{
 
     long getLastCommittedId() throws StorageException;
 
-    Collection<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException;
+    List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException;
 
-    Collection<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException;
+    List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException;
 }
