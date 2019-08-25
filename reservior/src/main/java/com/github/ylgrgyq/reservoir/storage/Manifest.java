@@ -27,7 +27,6 @@ class Manifest {
 
     private final BlockingQueue<CompactTask<Long>> compactTaskQueue;
     private final String baseDir;
-    private final String storageName;
     private final List<SSTableFileMetaInfo> metas;
     private final ReentrantLock metasLock;
 
@@ -36,9 +35,8 @@ class Manifest {
     private LogWriter manifestRecordWriter;
     private int manifestFileNumber;
 
-    Manifest(String baseDir, String storageName) {
+    Manifest(String baseDir) {
         this.baseDir = baseDir;
-        this.storageName = storageName;
         this.metas = new CopyOnWriteArrayList<>();
         this.compactTaskQueue = new LinkedBlockingQueue<>();
         this.metasLock = new ReentrantLock();
@@ -64,7 +62,7 @@ class Manifest {
         String manifestFileName = null;
         if (manifestRecordWriter == null) {
             manifestFileNumber = getNextFileNumber();
-            manifestFileName = FileName.getManifestFileName(storageName, manifestFileNumber);
+            manifestFileName = FileName.getManifestFileName(manifestFileNumber);
             FileChannel manifestFile = FileChannel.open(Paths.get(baseDir, manifestFileName),
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE);
             manifestRecordWriter = new LogWriter(manifestFile);
@@ -79,7 +77,7 @@ class Manifest {
         logger.debug("written manifest record {} to manifest file number {}", record, manifestFileNumber);
 
         if (manifestFileName != null) {
-            FileName.setCurrentFile(baseDir, storageName, manifestFileNumber);
+            FileName.setCurrentFile(baseDir, manifestFileNumber);
         }
     }
 

@@ -19,40 +19,44 @@ import java.util.stream.Collectors;
 class FileName {
     private static final Logger logger = LoggerFactory.getLogger(FileName.class.getName());
 
-    static String getCurrentManifestFileName(String storageName) {
-        return storageName + "_CURRENT";
+    static String getCurrentManifestFileName() {
+        return "CURRENT";
     }
 
-    private static String generateFileName(String storageName, int fileNumber, String suffix) {
-        return String.format("%s-%07d.%s", storageName, fileNumber, suffix);
+    private static String generateFileName(String prefix, int fileNumber, String suffix) {
+        return String.format("%s-%07d.%s", prefix, fileNumber, suffix);
     }
 
-    static String getLockFileName(String storageName) {
-        return storageName + ".lock";
+    private static String generateFileName(int fileNumber, String suffix) {
+        return String.format("%07d.%s", fileNumber, suffix);
     }
 
-    static String getSSTableName(String storageName, int fileNumber) {
-        return generateFileName(storageName, fileNumber, "sst");
+    static String getLockFileName() {
+        return "LOCK";
     }
 
-    static String getLogFileName(String storageName, int fileNumber) {
-        return generateFileName(storageName, fileNumber, "log");
+    static String getSSTableName(int fileNumber) {
+        return generateFileName(fileNumber, "sst");
     }
 
-    static String getManifestFileName(String storageName, int fileNumber) {
-        return generateFileName(storageName, fileNumber, "mf");
+    static String getLogFileName(int fileNumber) {
+        return generateFileName("LOG", fileNumber, "log");
     }
 
-    static void setCurrentFile(String baseDir, String storageName, int manifestFileNumber) throws IOException {
-        Path tmpPath = Files.createTempFile(Paths.get(baseDir), storageName + "_", ".tmp_mf");
+    static String getManifestFileName(int fileNumber) {
+        return generateFileName("MANIFEST", fileNumber, "mf");
+    }
+
+    static void setCurrentFile(String baseDir, int manifestFileNumber) throws IOException {
+        Path tmpPath = Files.createTempFile(Paths.get(baseDir),  "CURRENT_TMP", ".tmp_mf");
         try {
-            String manifestFileName = getManifestFileName(storageName, manifestFileNumber);
+            String manifestFileName = getManifestFileName(manifestFileNumber);
 
             Files.write(tmpPath, manifestFileName.getBytes(StandardCharsets.UTF_8), StandardOpenOption.SYNC,
                     StandardOpenOption.CREATE,
                     StandardOpenOption.WRITE);
 
-            Files.move(tmpPath, Paths.get(baseDir, getCurrentManifestFileName(storageName)), StandardCopyOption.REPLACE_EXISTING);
+            Files.move(tmpPath, Paths.get(baseDir, getCurrentManifestFileName()), StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException ex) {
             Files.deleteIfExists(tmpPath);
             throw ex;

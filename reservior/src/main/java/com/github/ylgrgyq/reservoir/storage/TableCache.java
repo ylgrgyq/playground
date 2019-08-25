@@ -18,12 +18,10 @@ import java.util.Set;
  */
 class TableCache {
     private String baseDir;
-    private String storageName;
     private Cache<Integer, Table> cache;
 
-    TableCache(String baseDir, String storageName) {
+    TableCache(String baseDir) {
         this.baseDir = baseDir;
-        this.storageName = storageName;
         cache = Caffeine.newBuilder()
                 .maximumSize(1024)
                 .build();
@@ -38,7 +36,7 @@ class TableCache {
     }
 
     Table loadTable(int fileNumber, long fileSize) throws IOException {
-        String tableFileName = FileName.getSSTableName(storageName, fileNumber);
+        String tableFileName = FileName.getSSTableName(fileNumber);
         FileChannel ch = FileChannel.open(Paths.get(baseDir, tableFileName), StandardOpenOption.READ);
         Table t = Table.open(ch, fileSize);
         cache.put(fileNumber, t);

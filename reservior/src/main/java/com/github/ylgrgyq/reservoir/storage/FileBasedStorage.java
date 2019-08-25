@@ -22,7 +22,6 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     private final ExecutorService sstableWriterPool = Executors.newSingleThreadScheduledExecutor(
             new NamedThreadFactory("SSTable-Writer-"));
     private final String baseDir;
-    private final String storageName;
     private final TableCache tableCache;
     private final Manifest manifest;
 
@@ -38,27 +37,21 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     private boolean backgroundWriteSstableRunning;
     private volatile CountDownLatch shutdownLatch;
 
-    public FileBasedStorage(String storageBaseDir, String storageName) {
+    public FileBasedStorage(String storageBaseDir) {
         requireNonNull(storageBaseDir, "storageBaseDir");
-        requireNonNull(storageName, "storageName");
         Path baseDirPath = Paths.get(storageBaseDir);
 
         if (Files.exists(baseDirPath) && !Files.isDirectory(baseDirPath)) {
             throw new IllegalArgumentException("\"" + storageBaseDir + "\" must be a directory");
         }
 
-        if (!storageName.matches("[A-Za-z0-9_-]+")) {
-            throw new IllegalArgumentException("storageName: " + storageName + " (expect: [A-Za-z0-9_-]+ ");
-        }
-
         this.mm = new Memtable();
-        this.storageName = storageName;
-        this.baseDir = storageBaseDir + "/" + storageName;
+        this.baseDir = storageBaseDir;
         this.firstIndexInStorage = -1;
         this.lastIndexInStorage = -1;
         this.status = StorageStatus.NEED_INIT;
-        this.tableCache = new TableCache(baseDir, storageName);
-        this.manifest = new Manifest(baseDir, storageName);
+        this.tableCache = new TableCache(baseDir);
+        this.manifest = new Manifest(baseDir);
         this.backgroundWriteSstableRunning = false;
     }
 
@@ -106,23 +99,23 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         try {
             createStorageDir();
 
-            Path lockFilePath = Paths.get(baseDir, FileName.getLockFileName(storageName));
+            Path lockFilePath = Paths.get(baseDir, FileName.getLockFileName());
             storageLockChannel = FileChannel.open(lockFilePath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
             storageLock = storageLockChannel.tryLock();
             if (storageLock == null) {
                 throw new IllegalStateException("failed to lock file: " + baseDir);
             }
 
-            logger.debug("start init storage {} under {}", storageName, baseDir);
+            logger.debug("start init storage under {}", baseDir);
 
             ManifestRecord record = ManifestRecord.newPlainRecord();
-            if (Files.exists(Paths.get(baseDir, FileName.getCurrentManifestFileName(storageName)))) {
+            if (Files.exists(Paths.get(baseDir, FileName.getCurrentManifestFileName()))) {
                 recoverStorage(record);
             }
 
             if (logWriter == null) {
                 int nextLogFileNumber = manifest.getNextFileNumber();
-                String nextLogFile = FileName.getLogFileName(storageName, nextLogFileNumber);
+                String nextLogFile = FileName.getLogFileName(nextLogFileNumber);
                 FileChannel logFile = FileChannel.open(Paths.get(baseDir, nextLogFile),
                         StandardOpenOption.CREATE, StandardOpenOption.WRITE);
                 logWriter = new LogWriter(logFile);
@@ -172,7 +165,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     }
 
     private void recoverStorage(ManifestRecord record) throws IOException {
-        Path currentFilePath = Paths.get(baseDir, FileName.getCurrentManifestFileName(storageName));
+        Path currentFilePath = Paths.get(baseDir, FileName.getCurrentManifestFileName());
         assert Files.exists(currentFilePath);
         String currentManifestFileName = new String(Files.readAllBytes(currentFilePath), StandardCharsets.UTF_8);
         assert !currentManifestFileName.isEmpty();
@@ -199,7 +192,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     }
 
     private void recoverMmFromLogFiles(int fileNumber, ManifestRecord record, boolean lastLogFile) throws IOException {
-        Path logFilePath = Paths.get(baseDir, FileName.getLogFileName(storageName, fileNumber));
+        Path logFilePath = Paths.get(baseDir, FileName.getLogFileName(fileNumber));
         if (Files.exists(logFilePath)) {
             throw new IllegalArgumentException("log file " + logFilePath + " was deleted");
         }
@@ -406,7 +399,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
 
     private void makeRoomForEntry0() throws IOException {
         int nextLogFileNumber = manifest.getNextFileNumber();
-        String nextLogFile = FileName.getLogFileName(storageName, nextLogFileNumber);
+        String nextLogFile = FileName.getLogFileName(nextLogFileNumber);
         FileChannel logFile = FileChannel.open(Paths.get(baseDir, nextLogFile),
                 StandardOpenOption.CREATE, StandardOpenOption.WRITE);
         if (logWriter != null) {
@@ -501,7 +494,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         meta.setFirstKey(Math.min(mm.firstKey(), sstable != null ? sstable.getFirstKey() : Long.MAX_VALUE));
         meta.setLastKey(Math.max(mm.lastKey(), sstable != null ? sstable.getLastKey() : -1));
 
-        String tableFileName = FileName.getSSTableName(storageName, fileNumber);
+        String tableFileName = FileName.getSSTableName(fileNumber);
         Path tableFile = Paths.get(baseDir, tableFileName);
         try (FileChannel ch = FileChannel.open(tableFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
             TableBuilder tableBuilder = new TableBuilder(ch);

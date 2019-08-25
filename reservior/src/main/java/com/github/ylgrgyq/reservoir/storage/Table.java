@@ -146,8 +146,9 @@ class Table implements Iterable<ObjectWithId> {
                 Block block = getBlock(handle);
                 return block.iterator();
             } catch (IOException ex) {
-                throw getSneakyThrowable(new StorageException("create inner block iterator failed", ex));
+//                throw getSneakyThrowable(new StorageException("create inner block iterator failed", ex));
             }
+            return null;
         }
 
         @Override
