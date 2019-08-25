@@ -1,8 +1,6 @@
 package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.StorageException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -14,7 +12,6 @@ import java.util.List;
 import java.util.zip.CRC32;
 
 final class LogReader implements Closeable {
-    private static final Logger logger = LoggerFactory.getLogger(LogReader.class);
     private final FileChannel workingFileChannel;
     private final long initialOffset;
     private final boolean checkChecksum;
@@ -62,12 +59,9 @@ final class LogReader implements Closeable {
                     break;
                 case kLastType:
                     if (!isFragmented) {
-                        throw new StorageException("missing start for last fragmented record");
+                        throw new StorageException("missing start for the last fragmented record");
                     }
                     return outPut;
-                case kCorruptedRecord:
-                    buffer.clear();
-                    throw new BadRecordException(type);
                 case kEOF:
                     // we need to return kEOF consistently after encounter the kEOF for the first time.
                     // so we do not clear the buffer, otherwise the next read will try to read the last block
@@ -93,7 +87,7 @@ final class LogReader implements Closeable {
         // will write empty buffer to pad that space. so we should check if
         // offsetInBlock is within padding area and forward blockStartPosition
         // to the start position of the next real block
-        if (offsetInBlock > Constant.kBlockSize - Constant.kHeaderSize + 1) {
+        if (offsetInBlock >= Constant.kBlockSize - Constant.kHeaderSize) {
             blockStartPosition += Constant.kBlockSize;
         }
 
@@ -102,7 +96,7 @@ final class LogReader implements Closeable {
         }
     }
 
-    private RecordType readRecord(List<byte[]> out) throws IOException {
+    private RecordType readRecord(List<byte[]> out) throws IOException, StorageException {
         // we don't expect empty data in log, so when remaining buffer is <= kHeaderSize
         // which means all of the bytes left in buffer is padding
         outer:
@@ -133,17 +127,19 @@ final class LogReader implements Closeable {
         final short length = buffer.getShort();
         final byte typeCode = buffer.get();
 
-        if (length > buffer.remaining()) {
+        if (length <= 0 || length > buffer.remaining()) {
             // if eof, this means writer crashing at the middle of writing the payload
             // we consider this is OK and return kEOF
-            return eof ? RecordType.kEOF : RecordType.kCorruptedRecord;
+            if (eof) {
+                return RecordType.kEOF;
+            } else {
+                throw new BadRecordException("block buffer under flow. need: " + length + " remain: " + buffer.remaining());
+            }
         }
-
 
         final RecordType type = RecordType.getRecordTypeByCode(typeCode);
         if (type == null) {
-            logger.debug("Got corrupted record with unknown record type code: {}", typeCode);
-            return RecordType.kCorruptedRecord;
+            throw new BadRecordException("unknown record type code: " + typeCode);
         }
 
         final byte[] buf = new byte[length];
@@ -153,7 +149,7 @@ final class LogReader implements Closeable {
             actualChecksum.update(typeCode);
             actualChecksum.update(buf);
             if (actualChecksum.getValue() != expectChecksum) {
-                return RecordType.kCorruptedRecord;
+                throw new BadRecordException("checksum: " + actualChecksum.getValue() + " expect: " + expectChecksum);
             }
         }
 

@@ -9,15 +9,16 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Random;
+import java.util.zip.CRC32;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 
 public class LogTest {
     private String tempLogFile;
@@ -148,19 +149,143 @@ public class LogTest {
         assertThat(readLog()).isEqualTo("EOF");
     }
 
-//    @Test
-//    public void testReadFailed() throws Exception {
-//        writeLog("Hello");
-//
-//        readChannel.close();
-//
-//
-//
-//        assertThat(readLog()).isEqualTo("Hello");
-//
-//        assertThat(readLog()).isEqualTo("EOF");
-//    }
+    @Test
+    public void readLogFileFailed() throws Exception {
+        writeLog("Hello");
 
+        readChannel.close();
+
+        assertThatThrownBy(this::readLog).isInstanceOf(IOException.class);
+    }
+
+    @Test
+    public void unknownRecordType() throws Exception {
+        writeLog("Hello");
+        // checksum size + log length = 10 bytes
+        // 25 is an arbitrary value which is not a valid record type code
+        assert Constant.kHeaderSize == 11;
+        setByteInFile(10, (byte) 25);
+        assertThatThrownBy(this::readLog)
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining("unknown record type code: 25");
+    }
+
+    @Test
+    public void badLength() throws Exception {
+        writeLog(constructTestingLog("Hello", Constant.kBlockSize / 2));
+        long pos = writeChannel.position();
+        writeLog(constructTestingLog("World", Constant.kBlockSize));
+        assert Constant.kHeaderSize == 11;
+        // set length of the second log to 32767
+        setByteInFile(pos + 8, (byte) 127);
+        setByteInFile(pos + 9, (byte) 255);
+        assertThat(readLog()).isEqualTo(constructTestingLog("Hello", Constant.kBlockSize / 2));
+        assertThatThrownBy(this::readLog)
+                .isInstanceOf(StorageException.class)
+                .hasMessageContaining("block buffer under flow.");
+    }
+
+    @Test
+    public void checksumFailed() throws Exception {
+        writeLog("Hello");
+        setByteInFile(2, (byte) 127);
+        assertThatThrownBy(this::readLog)
+                .isInstanceOf(StorageException.class)
+                .hasMessageMatching("checksum: \\d+.*expect:.*");
+    }
+
+    @Test
+    public void readHeaderUnfinishedLog() throws Exception {
+        writeLog("Hello");
+        long pos = writeChannel.position();
+        writeLog("World");
+        assert Constant.kHeaderSize == 11;
+        truncateLogFile(pos + 5);
+        assertThat(readLog()).isEqualTo("Hello");
+        assertThat(readLog()).isEqualTo("EOF");
+    }
+
+    @Test
+    public void readDataUnfinishedLog() throws Exception {
+        writeLog("Hello");
+        long pos = writeChannel.position();
+        writeLog("World");
+        assert Constant.kHeaderSize == 11;
+        truncateLogFile(pos + 12);
+        assertThat(readLog()).isEqualTo("Hello");
+        assertThat(readLog()).isEqualTo("EOF");
+    }
+
+    @Test
+    public void missingStartForMiddleRecord() throws Exception {
+        writeLog("Hello");
+        setByteInFile(10, RecordType.kMiddleType.getCode());
+        fixChecksum(0);
+        assertThatThrownBy(this::readLog)
+                .isInstanceOf(StorageException.class)
+                .hasMessage("missing start of fragmented record");
+    }
+
+    @Test
+    public void missingStartForLastRecord() throws Exception {
+        writeLog("Hello");
+        setByteInFile(10, RecordType.kLastType.getCode());
+        fixChecksum(0);
+        assertThatThrownBy(this::readLog)
+                .isInstanceOf(StorageException.class)
+                .hasMessage("missing start for the last fragmented record");
+    }
+
+    @Test
+    public void unexpectedFullType() throws Exception {
+        writeLog("Hello");
+        writeLog("World");
+        setByteInFile(10, RecordType.kFirstType.getCode());
+        fixChecksum(0);
+        assertThatThrownBy(this::readLog)
+                .isInstanceOf(StorageException.class)
+                .hasMessage("partial record without end(1)");
+    }
+
+    @Test
+    public void unexpectedFirstType() throws Exception {
+        writeLog("Hello");
+        writeLog(constructTestingLog("World", Constant.kBlockSize));
+        setByteInFile(10, RecordType.kFirstType.getCode());
+        fixChecksum(0);
+        assertThatThrownBy(this::readLog)
+                .isInstanceOf(StorageException.class)
+                .hasMessage("partial record without end(2)");
+    }
+
+    @Test
+    public void missingLastRecordHeaderIsIgnored() throws Exception {
+        writeLog(constructTestingLog("Hello", Constant.kBlockSize));
+
+        // there's 2 * kHeaderSize bytes left in second block including header
+        // truncate all of them
+        truncateLogFile(writeChannel.size() - 2 * Constant.kHeaderSize);
+        assertThat(readLog()).isEqualTo("EOF");
+    }
+
+    @Test
+    public void missingLastRecordDataIsIgnored() throws Exception {
+        writeLog(constructTestingLog("Hello", Constant.kBlockSize));
+
+        // there's 2 * kHeaderSize bytes left in second block including header
+        // truncate some data and leaves header and some of the data block
+        truncateLogFile(writeChannel.size() - Constant.kHeaderSize / 2);
+        assertThat(readLog()).isEqualTo("EOF");
+    }
+
+    @Test
+    public void skipIntoPaddingArea() throws Exception {
+        writeLog(constructTestingLog("Hello", Constant.kBlockSize - Constant.kHeaderSize));
+        writeLog("World");
+        restartReadingAt(Constant.kBlockSize - Constant.kHeaderSize);
+        assertThat(readLog()).isEqualTo("World");
+        assertThat(readLog()).isEqualTo("EOF");
+    }
 
     private void writeLog(String log) throws IOException {
         logWriter.append(log.getBytes(StandardCharsets.UTF_8));
@@ -208,7 +333,60 @@ public class LogTest {
 
     private void reopenWriter() throws Exception {
         logWriter.close();
+        assert !writeChannel.isOpen();
         writeChannel = FileChannel.open(Paths.get(tempLogFile), StandardOpenOption.WRITE, StandardOpenOption.APPEND);
         logWriter = new LogWriter(writeChannel);
+    }
+
+    private void setByteInFile(long position, byte newValue) throws Exception {
+        final ByteBuffer valBuf = ByteBuffer.allocate(1);
+        valBuf.put(newValue);
+        valBuf.flip();
+
+        try (FileChannel channel = FileChannel.open(Paths.get(tempLogFile), StandardOpenOption.WRITE)) {
+            channel.write(valBuf, position);
+        }
+    }
+
+    private void truncateLogFile(long expectSize) throws Exception {
+        try (FileChannel channel = FileChannel.open(Paths.get(tempLogFile), StandardOpenOption.WRITE)) {
+            channel.truncate(expectSize);
+        }
+    }
+
+    private void fixChecksum(long headerOffset) throws Exception {
+        try (FileChannel channel = FileChannel.open(Paths.get(tempLogFile),
+                StandardOpenOption.READ, StandardOpenOption.WRITE)) {
+            channel.position(headerOffset);
+
+            ByteBuffer header = ByteBuffer.allocate(Constant.kHeaderSize);
+            channel.read(header);
+            header.flip();
+
+            header.getLong();
+            short len = header.getShort();
+            byte typeCode = header.get();
+
+            ByteBuffer data = ByteBuffer.allocate(len);
+            channel.position(headerOffset + Constant.kHeaderSize);
+            channel.read(data);
+            data.flip();
+
+            final CRC32 actualChecksum = new CRC32();
+            actualChecksum.update(typeCode);
+            actualChecksum.update(data.array());
+
+            ByteBuffer newChecksum = ByteBuffer.allocate(Long.BYTES);
+            newChecksum.putLong(actualChecksum.getValue());
+            newChecksum.flip();
+            channel.write(newChecksum, headerOffset);
+        }
+    }
+
+    private void restartReadingAt(long position) throws Exception {
+        logReader.close();
+        assert !readChannel.isOpen();
+        readChannel = FileChannel.open(Paths.get(tempLogFile), StandardOpenOption.READ);
+        logReader = new LogReader(readChannel, position, true);
     }
 }
