@@ -40,7 +40,7 @@ public class LogTest {
                 StandardOpenOption.READ);
 
         logWriter = new LogWriter(writeChannel);
-        logReader = new LogReader(readChannel, 0, true);
+        logReader = new LogReader(readChannel, true);
     }
 
     @After
@@ -286,15 +286,6 @@ public class LogTest {
         assertThat(readLog()).isEqualTo("EOF");
     }
 
-    @Test
-    public void skipIntoPaddingArea() throws Exception {
-        writeLog(constructTestingLog("Hello", Constant.kBlockSize - Constant.kHeaderSize));
-        writeLog("World");
-        restartReadingAt(Constant.kBlockSize - Constant.kHeaderSize);
-        assertThat(readLog()).isEqualTo("World");
-        assertThat(readLog()).isEqualTo("EOF");
-    }
-
     private void writeLog(String log) throws IOException {
         logWriter.append(log.getBytes(StandardCharsets.UTF_8));
         logWriter.flush();
@@ -389,12 +380,5 @@ public class LogTest {
             newChecksum.flip();
             channel.write(newChecksum, headerOffset);
         }
-    }
-
-    private void restartReadingAt(long position) throws Exception {
-        logReader.close();
-        assert !readChannel.isOpen();
-        readChannel = FileChannel.open(Paths.get(tempLogFile), StandardOpenOption.READ);
-        logReader = new LogReader(readChannel, position, true);
     }
 }

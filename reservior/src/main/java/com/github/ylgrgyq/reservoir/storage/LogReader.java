@@ -13,15 +13,12 @@ import java.util.zip.CRC32;
 
 final class LogReader implements Closeable {
     private final FileChannel workingFileChannel;
-    private final long initialOffset;
     private final boolean checkChecksum;
     private final ByteBuffer buffer;
-    private long bufferEndOffset;
     private boolean eof;
 
-    LogReader(FileChannel workingFileChannel, long initialOffset, boolean checkChecksum) {
+    LogReader(FileChannel workingFileChannel, boolean checkChecksum) {
         this.workingFileChannel = workingFileChannel;
-        this.initialOffset = initialOffset;
         // we don't make the buffer to lazy allocate buffer
         // because we think this way can save a check in read block, and we will always
         // read block immediately after construct a LogReader
@@ -33,10 +30,6 @@ final class LogReader implements Closeable {
     }
 
     List<byte[]> readLog() throws IOException, StorageException {
-        if (initialOffset > 0) {
-            skipToInitBlock();
-        }
-
         final ArrayList<byte[]> outPut = new ArrayList<>();
         boolean isFragmented = false;
         while (true) {
@@ -80,24 +73,6 @@ final class LogReader implements Closeable {
         buffer.clear();
     }
 
-    private void skipToInitBlock() throws IOException {
-        long offsetInBlock = initialOffset % Constant.kBlockSize;
-        long blockStartPosition = initialOffset - offsetInBlock;
-
-        // if remaining space in block can not write a whole header, log writer
-        // will write empty buffer to pad that space. so we should check if
-        // offsetInBlock is within padding area and forward blockStartPosition
-        // to the start position of the next real block
-        if (offsetInBlock >= Constant.kBlockSize - Constant.kHeaderSize) {
-            blockStartPosition += Constant.kBlockSize;
-        }
-
-        if (blockStartPosition > 0) {
-            workingFileChannel.position(blockStartPosition);
-            bufferEndOffset = blockStartPosition;
-        }
-    }
-
     private RecordType readRecord(List<byte[]> out) throws IOException, StorageException {
         // we don't expect empty data in log, so when remaining buffer is <= kHeaderSize
         // which means all of the bytes left in buffer is padding
@@ -110,7 +85,6 @@ final class LogReader implements Closeable {
             } else {
                 buffer.clear();
                 readBlockFromChannel(buffer);
-                bufferEndOffset += buffer.remaining();
             }
         }
 

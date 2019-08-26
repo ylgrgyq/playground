@@ -315,7 +315,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         boolean noNewSSTable = true;
         Memtable mm = null;
         FileChannel ch = FileChannel.open(logFilePath, StandardOpenOption.READ);
-        try (LogReader reader = new LogReader(ch, 0, true)) {
+        try (LogReader reader = new LogReader(ch, true)) {
             while (true) {
                 List<byte[]> logOpt = reader.readLog();
                 if (!logOpt.isEmpty()) {

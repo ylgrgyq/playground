@@ -130,7 +130,7 @@ class Manifest {
     synchronized void recover(String manifestFileName) throws IOException, StorageException {
         Path manifestFilePath = Paths.get(baseDir, manifestFileName);
         FileChannel manifestFile = FileChannel.open(manifestFilePath, StandardOpenOption.READ);
-        try (LogReader reader = new LogReader(manifestFile, 0, true)) {
+        try (LogReader reader = new LogReader(manifestFile, true)) {
             List<SSTableFileMetaInfo> ms = new ArrayList<>();
             while (true) {
                 List<byte[]> logOpt = reader.readLog();
