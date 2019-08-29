@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
@@ -25,19 +26,19 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     private final TableCache tableCache;
     private final Manifest manifest;
 
-    private FileChannel storageLockChannel;
     private FileLock storageLock;
-    private LogWriter logWriter;
+    private LogWriter consumerCommitLogWriter;
+    private LogWriter dataLogWriter;
     private volatile int logFileNumber;
-    private long firstIndexInStorage;
-    private long lastIndexInStorage;
+    private long firstIdInStorage;
+    private long lastIdInStorage;
     private Memtable mm;
     private volatile Memtable imm;
     private volatile StorageStatus status;
     private boolean backgroundWriteSstableRunning;
     private volatile CountDownLatch shutdownLatch;
 
-    public FileBasedStorage(String storageBaseDir) {
+    public FileBasedStorage(String storageBaseDir) throws StorageException{
         requireNonNull(storageBaseDir, "storageBaseDir");
         Path baseDirPath = Paths.get(storageBaseDir);
 
@@ -47,12 +48,57 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
 
         this.mm = new Memtable();
         this.baseDir = storageBaseDir;
-        this.firstIndexInStorage = -1;
-        this.lastIndexInStorage = -1;
+        this.firstIdInStorage = -1;
+        this.lastIdInStorage = -1;
         this.status = StorageStatus.NEED_INIT;
         this.tableCache = new TableCache(baseDir);
         this.manifest = new Manifest(baseDir);
         this.backgroundWriteSstableRunning = false;
+
+        try {
+            createStorageDir();
+
+            this.storageLock = lockStorage(storageBaseDir);
+
+            logger.debug("Start init storage under {}", storageBaseDir);
+
+            final ManifestRecord record = ManifestRecord.newPlainRecord();
+            final Path currentFilePath = Paths.get(storageBaseDir, FileName.getCurrentFileName());
+            if (Files.exists(currentFilePath)) {
+                recoverStorage(currentFilePath, record);
+            }
+
+            if (this.dataLogWriter == null) {
+                this.dataLogWriter = createNewDataLogWriter();
+            }
+
+            record.setLogNumber(this.logFileNumber);
+            this.manifest.logRecord(record);
+
+            firstIdInStorage = manifest.getFirstId();
+            if (firstIdInStorage < 0) {
+                firstIdInStorage = mm.firstKey();
+            }
+
+            lastIdInStorage = mm.lastKey();
+            if (lastIdInStorage < 0) {
+                lastIdInStorage = manifest.getLastId();
+            }
+            status = StorageStatus.OK;
+        } catch (IOException | StorageException t) {
+            throw new IllegalStateException("init storage failed", t);
+        } catch (Exception ex) {
+            throw new StorageException(ex);
+        } finally {
+            if (status != StorageStatus.OK) {
+                status = StorageStatus.ERROR;
+                try {
+                    releaseStorageLock();
+                } catch (IOException ex) {
+                    logger.error("Release storage lock failed", ex);
+                }
+            }
+        }
     }
 
     @Override
@@ -116,9 +162,9 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
             throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
         }
 
-        assert mm.isEmpty() || mm.lastKey() == lastIndexInStorage :
-                String.format("actual lastIndex:%s lastIndexInMm:%s", lastIndexInStorage, mm.lastKey());
-        return lastIndexInStorage;
+        assert mm.isEmpty() || mm.lastKey() == lastIdInStorage :
+                String.format("actual lastIndex:%s lastIndexInMm:%s", lastIdInStorage, mm.lastKey());
+        return lastIdInStorage;
     }
 
     @Override
@@ -133,9 +179,9 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
             return;
         }
 
-        if (firstIndexInStorage < 0) {
+        if (firstIdInStorage < 0) {
             ObjectWithId first = batch.get(0);
-            firstIndexInStorage = first.getId();
+            firstIdInStorage = first.getId();
         }
 
         try {
@@ -148,9 +194,9 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
                 lastIndex = e.getId();
                 if (makeRoomForEntry(false)) {
                     byte[] data = e.getObjectInBytes();
-                    logWriter.append(data);
+                    dataLogWriter.append(data);
                     mm.add(e.getId(), e);
-                    lastIndexInStorage = e.getId();
+                    lastIdInStorage = e.getId();
                 } else {
                     throw new StorageException("make room on file based storage failed");
                 }
@@ -176,21 +222,15 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
                         logger.debug("shutting file based storage down");
                         sstableWriterPool.shutdownNow();
 
-                        if (logWriter != null) {
-                            logWriter.close();
+                        if (dataLogWriter != null) {
+                            dataLogWriter.close();
                         }
 
                         manifest.close();
 
                         tableCache.evictAll();
 
-                        if (storageLock != null && storageLock.isValid()) {
-                            storageLock.release();
-                        }
-
-                        if (storageLockChannel != null && storageLockChannel.isOpen()) {
-                            storageLockChannel.close();
-                        }
+                        releaseStorageLock();
                         logger.debug("file based storage shutdown successfully");
                     } catch (Exception ex) {
                         logger.error("shutdown failed", ex);
@@ -204,71 +244,6 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         }
     }
 
-    //    @Override
-    public synchronized void init() {
-        if (status != StorageStatus.NEED_INIT) {
-            throw new IllegalArgumentException("status: " + status + " (expect: " + StorageStatus.NEED_INIT + " )");
-        }
-
-        try {
-            createStorageDir();
-
-            Path lockFilePath = Paths.get(baseDir, FileName.getLockFileName());
-            storageLockChannel = FileChannel.open(lockFilePath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-            storageLock = storageLockChannel.tryLock();
-            if (storageLock == null) {
-                throw new IllegalStateException("failed to lock file: " + baseDir);
-            }
-
-            logger.debug("start init storage under {}", baseDir);
-
-            ManifestRecord record = ManifestRecord.newPlainRecord();
-            if (Files.exists(Paths.get(baseDir, FileName.getCurrentManifestFileName()))) {
-                recoverStorage(record);
-            }
-
-            if (logWriter == null) {
-                int nextLogFileNumber = manifest.getNextFileNumber();
-                String nextLogFile = FileName.getLogFileName(nextLogFileNumber);
-                FileChannel logFile = FileChannel.open(Paths.get(baseDir, nextLogFile),
-                        StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-                logWriter = new LogWriter(logFile);
-                logFileNumber = nextLogFileNumber;
-            }
-
-            record.setLogNumber(logFileNumber);
-            manifest.logRecord(record);
-
-            firstIndexInStorage = manifest.getFirstIndex();
-            if (firstIndexInStorage < 0) {
-                firstIndexInStorage = mm.firstKey();
-            }
-
-            lastIndexInStorage = mm.lastKey();
-            if (lastIndexInStorage < 0) {
-                lastIndexInStorage = manifest.getLastIndex();
-            }
-            status = StorageStatus.OK;
-        } catch (IOException | StorageException t) {
-            throw new IllegalStateException("init storage failed", t);
-        } finally {
-            if (status != StorageStatus.OK) {
-                status = StorageStatus.ERROR;
-                if (storageLockChannel != null) {
-                    try {
-                        if (storageLock != null) {
-                            storageLock.release();
-                        }
-                        storageLockChannel.close();
-                    } catch (IOException ex) {
-                        logger.error("storage release lock failed", ex);
-                    }
-                }
-            }
-        }
-
-    }
-
     private void createStorageDir() throws IOException {
         Path storageDirPath = Paths.get(baseDir);
         try {
@@ -278,52 +253,84 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         }
     }
 
-    private void recoverStorage(ManifestRecord record) throws IOException, StorageException {
-        Path currentFilePath = Paths.get(baseDir, FileName.getCurrentManifestFileName());
+    private FileLock lockStorage(String baseDir) throws IOException {
+        final Path lockFilePath = Paths.get(baseDir, FileName.getLockFileName());
+        final FileChannel lockChannel = FileChannel.open(lockFilePath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        final FileLock lock;
+        try {
+            lock = lockChannel.tryLock();
+            if (lock == null) {
+                throw new IllegalStateException("failed to lock directory: " + baseDir);
+            }
+        } catch (IOException ex) {
+            lockChannel.close();
+            throw ex;
+        }
+
+        return lock;
+    }
+
+    private void releaseStorageLock() throws IOException {
+        if (storageLock != null) {
+            final Channel channel = storageLock.acquiredBy();
+            try {
+                storageLock.release();
+            } finally {
+                if (channel.isOpen()) {
+                    channel.close();
+                }
+            }
+        }
+    }
+
+    private void recoverStorage(Path currentFilePath, ManifestRecord record) throws IOException, StorageException {
         assert Files.exists(currentFilePath);
-        String currentManifestFileName = new String(Files.readAllBytes(currentFilePath), StandardCharsets.UTF_8);
-        assert !currentManifestFileName.isEmpty();
+        final String currentManifestFileName = new String(Files.readAllBytes(currentFilePath), StandardCharsets.UTF_8);
+        if (currentManifestFileName.isEmpty()) {
+            throw new StorageException("empty CURRENT file in storage dir: " + baseDir);
+        }
 
         manifest.recover(currentManifestFileName);
 
-        int logFileNumber = manifest.getLogFileNumber();
-        File baseDirFile = new File(baseDir);
-        File[] files = baseDirFile.listFiles();
+        final int logFileNumber = manifest.getLogFileNumber();
+        final File baseDirFile = new File(baseDir);
+        final File[] files = baseDirFile.listFiles();
         List<FileName.FileNameMeta> logsFileMetas = Collections.emptyList();
         if (files != null) {
             logsFileMetas = Arrays.stream(files)
                     .filter(File::isFile)
                     .map(File::getName)
                     .map(FileName::parseFileName)
-                    .filter(meta -> meta.getType() == FileName.FileType.Log && meta.getFileNumber() >= logFileNumber)
+                    .filter(fileMeta -> fileMeta.getType() == FileName.FileType.Log && fileMeta.getFileNumber() >= logFileNumber)
                     .collect(Collectors.toList());
         }
 
         for (int i = 0; i < logsFileMetas.size(); ++i) {
-            FileName.FileNameMeta fileMeta = logsFileMetas.get(i);
-            recoverMmFromLogFiles(fileMeta.getFileNumber(), record, i == logsFileMetas.size() - 1);
+            final FileName.FileNameMeta fileMeta = logsFileMetas.get(i);
+            recoverMemtableFromLogFiles(fileMeta.getFileNumber(), record, i == logsFileMetas.size() - 1);
         }
     }
 
-    private void recoverMmFromLogFiles(int fileNumber, ManifestRecord record, boolean lastLogFile) throws IOException, StorageException {
-        Path logFilePath = Paths.get(baseDir, FileName.getLogFileName(fileNumber));
+    private void recoverMemtableFromLogFiles(int fileNumber, ManifestRecord record, boolean lastLogFile) throws IOException, StorageException {
+        final Path logFilePath = Paths.get(baseDir, FileName.getLogFileName(fileNumber));
         if (Files.exists(logFilePath)) {
-            throw new IllegalArgumentException("log file " + logFilePath + " was deleted");
+            logger.warn("Log file {} was deleted. We can't recover memtable from it.", logFilePath);
+            return;
         }
 
+        final FileChannel ch = FileChannel.open(logFilePath, StandardOpenOption.READ);
         long readEndPosition;
         boolean noNewSSTable = true;
         Memtable mm = null;
-        FileChannel ch = FileChannel.open(logFilePath, StandardOpenOption.READ);
         try (LogReader reader = new LogReader(ch, true)) {
             while (true) {
                 List<byte[]> logOpt = reader.readLog();
                 if (!logOpt.isEmpty()) {
-//                    LogEntry e = LogEntry.parseFrom(logOpt.get());
+                    ObjectWithId e = new ObjectWithId(logOpt);
                     if (mm == null) {
                         mm = new Memtable();
                     }
-//                    mm.add(e.getIndex(), e);
+                    mm.add(e.getId(), e);
                     if (mm.getMemoryUsedInBytes() > Constant.kMaxMemtableSize) {
                         SSTableFileMetaInfo meta = writeMemTableToSSTable(mm);
                         record.addMeta(meta);
@@ -338,10 +345,10 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
             readEndPosition = ch.position();
 
             if (lastLogFile && noNewSSTable) {
-                FileChannel logFile = FileChannel.open(logFilePath, StandardOpenOption.WRITE);
-                assert logWriter == null;
+                final FileChannel logFile = FileChannel.open(logFilePath, StandardOpenOption.WRITE);
+                assert dataLogWriter == null;
                 assert logFileNumber == 0;
-                logWriter = new LogWriter(logFile, readEndPosition);
+                dataLogWriter = new LogWriter(logFile, readEndPosition);
                 logFileNumber = fileNumber;
                 if (mm != null) {
                     this.mm = mm;
@@ -353,16 +360,13 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         }
 
         if (mm != null) {
-            SSTableFileMetaInfo meta = writeMemTableToSSTable(mm);
+            final SSTableFileMetaInfo meta = writeMemTableToSSTable(mm);
             record.addMeta(meta);
         }
     }
 
-    //    @Override
-    public synchronized long getFirstIndex() {
-//        checkArgument(status == StorageStatus.OK,
-//                "FileBasedStorage's status is not normal, currently: %s", status);
-        return firstIndexInStorage;
+    private synchronized long getFirstIndex() {
+        return firstIdInStorage;
     }
 
     private boolean makeRoomForEntry(boolean force) {
@@ -390,20 +394,26 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     }
 
     private void makeRoomForEntry0() throws IOException {
-        int nextLogFileNumber = manifest.getNextFileNumber();
-        String nextLogFile = FileName.getLogFileName(nextLogFileNumber);
-        FileChannel logFile = FileChannel.open(Paths.get(baseDir, nextLogFile),
-                StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-        if (logWriter != null) {
-            logWriter.close();
+        final LogWriter logWriter = createNewDataLogWriter();
+        if (dataLogWriter != null) {
+            dataLogWriter.close();
         }
-        logWriter = new LogWriter(logFile);
-        logFileNumber = nextLogFileNumber;
+        dataLogWriter = logWriter;
         imm = mm;
         mm = new Memtable();
         backgroundWriteSstableRunning = true;
-        logger.debug("trigger compaction, new log file number={}", logFileNumber);
+        logger.debug("Trigger compaction, new log file number={}", logFileNumber);
         sstableWriterPool.submit(this::writeMemTable);
+    }
+
+    private LogWriter createNewDataLogWriter() throws IOException {
+        final int nextLogFileNumber = manifest.getNextFileNumber();
+        final String nextLogFile = FileName.getLogFileName(nextLogFileNumber);
+        final FileChannel logFile = FileChannel.open(Paths.get(baseDir, nextLogFile),
+                StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        final LogWriter writer = new LogWriter(logFile);
+        logFileNumber = nextLogFileNumber;
+        return writer;
     }
 
     private void writeMemTable() {
@@ -412,16 +422,16 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         try {
             ManifestRecord record = null;
             if (!imm.isEmpty()) {
-                if (imm.firstKey() > manifest.getLastIndex()) {
-                    SSTableFileMetaInfo meta = writeMemTableToSSTable(imm);
+                if (imm.firstKey() > manifest.getLastId()) {
+                    final SSTableFileMetaInfo meta = writeMemTableToSSTable(imm);
                     record = ManifestRecord.newPlainRecord();
                     record.addMeta(meta);
                     record.setLogNumber(logFileNumber);
                 } else {
-                    List<SSTableFileMetaInfo> remainMetas = new ArrayList<>();
+                    final List<SSTableFileMetaInfo> remainMetas = new ArrayList<>();
 
-                    long firstKeyInImm = imm.firstKey();
-                    List<SSTableFileMetaInfo> allMetas = manifest.searchMetas(Long.MIN_VALUE, Long.MAX_VALUE);
+                    final long firstKeyInImm = imm.firstKey();
+                    final List<SSTableFileMetaInfo> allMetas = manifest.searchMetas(Long.MIN_VALUE, Long.MAX_VALUE);
                     for (SSTableFileMetaInfo meta : allMetas) {
                         if (firstKeyInImm < meta.getLastKey()) {
                             remainMetas.add(mergeMemTableAndSStable(meta, imm));
@@ -440,10 +450,10 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
             }
 
             if (manifest.processCompactTask()) {
-                firstIndexInStorage = manifest.getFirstIndex();
+                firstIdInStorage = manifest.getFirstId();
             }
 
-            Set<Integer> remainMetasFileNumberSet = manifest.searchMetas(Long.MIN_VALUE, Long.MAX_VALUE)
+            final Set<Integer> remainMetasFileNumberSet = manifest.searchMetas(Long.MIN_VALUE, Long.MAX_VALUE)
                     .stream()
                     .map(SSTableFileMetaInfo::getFileNumber)
                     .collect(Collectors.toSet());

@@ -1,5 +1,6 @@
 package com.github.ylgrgyq.reservoir.storage;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,6 +9,8 @@ import java.util.List;
  * Date: 18/6/10
  */
 class ManifestRecord {
+    private static int SSTABLE_META_INFO_ENCODE_SIZE = Integer.BYTES + Long.BYTES * 3;
+
     private int nextFileNumber;
     private int logNumber;
     private Type type;
@@ -18,7 +21,7 @@ class ManifestRecord {
         this.type = type;
     }
 
-    static ManifestRecord newPlainRecord(){
+    static ManifestRecord newPlainRecord() {
         return new ManifestRecord(Type.PLAIN);
     }
 
@@ -65,44 +68,52 @@ class ManifestRecord {
     }
 
     void addMetas(List<SSTableFileMetaInfo> ms) {
-        assert ms != null && ! ms.isEmpty();
+        assert ms != null && !ms.isEmpty();
         metas.addAll(ms);
     }
 
-    byte[] encode(){
-//        ByteArrayDataOutput out = ByteStreams.newDataOutput();
-//        out.writeInt(nextFileNumber);
-//        out.writeInt(logNumber);
-//
-//        out.writeInt(metas.size());
-//        for (SSTableFileMetaInfo meta : metas) {
-//            out.writeLong(meta.getFileSize());
-//            out.writeInt(meta.getFileNumber());
-//            out.writeLong(meta.getFirstKey());
-//            out.writeLong(meta.getLastKey());
-//        }
+    byte[] encode() {
+        final ByteBuffer buffer = ByteBuffer.allocate(metas.size() * SSTABLE_META_INFO_ENCODE_SIZE + Integer.BYTES * 3);
+        buffer.putInt(nextFileNumber);
+        buffer.putInt(logNumber);
+        buffer.putInt(metas.size());
 
-        return null;
-//        return out.toByteArray();
+        for (SSTableFileMetaInfo meta : metas) {
+            buffer.putLong(meta.getFileSize());
+            buffer.putInt(meta.getFileNumber());
+            buffer.putLong(meta.getFirstKey());
+            buffer.putLong(meta.getLastKey());
+        }
+
+        return buffer.array();
+    }
+
+    private static byte[] compact(List<byte[]> output) {
+        final int size = output.stream().mapToInt(b -> b.length).sum();
+        final ByteBuffer buffer = ByteBuffer.allocate(size);
+        for (byte[] bytes : output) {
+            buffer.put(bytes);
+        }
+        return buffer.array();
     }
 
     static ManifestRecord decode(List<byte[]> bytes) {
-        ManifestRecord record = new ManifestRecord(Type.PLAIN);
+        final ManifestRecord record = new ManifestRecord(Type.PLAIN);
 
-//        ByteArrayDataInput in = ByteStreams.newDataInput(bytes);
-//        record.setNextFileNumber(in.readInt());
-//        record.setLogNumber(in.readInt());
-//
-//        int metasSize = in.readInt();
-//        for (int i = 0; i < metasSize; i++) {
-//            SSTableFileMetaInfo meta = new SSTableFileMetaInfo();
-//            meta.setFileSize(in.readLong());
-//            meta.setFileNumber(in.readInt());
-//            meta.setFirstKey(in.readLong());
-//            meta.setLastKey(in.readLong());
-//
-//            record.addMeta(meta);
-//        }
+        final ByteBuffer buffer = ByteBuffer.wrap(compact(bytes));
+        record.setNextFileNumber(buffer.getInt());
+        record.setLogNumber(buffer.getInt());
+
+        final int metasSize = buffer.getInt();
+        for (int i = 0; i < metasSize; i++) {
+            SSTableFileMetaInfo meta = new SSTableFileMetaInfo();
+            meta.setFileSize(buffer.getLong());
+            meta.setFileNumber(buffer.getInt());
+            meta.setFirstKey(buffer.getLong());
+            meta.setLastKey(buffer.getLong());
+
+            record.addMeta(meta);
+        }
 
         return record;
     }

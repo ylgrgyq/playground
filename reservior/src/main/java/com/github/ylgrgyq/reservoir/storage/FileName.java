@@ -18,9 +18,11 @@ import java.util.stream.Collectors;
  */
 class FileName {
     private static final Logger logger = LoggerFactory.getLogger(FileName.class.getName());
+    private static final String CURRENT_FILE_PREFIX = "CURRENT";
+    private static final String LOCK_FILE_PREFIX = "LOCK";
 
-    static String getCurrentManifestFileName() {
-        return "CURRENT";
+    static String getCurrentFileName() {
+        return CURRENT_FILE_PREFIX;
     }
 
     private static String generateFileName(String prefix, int fileNumber, String suffix) {
@@ -32,7 +34,7 @@ class FileName {
     }
 
     static String getLockFileName() {
-        return "LOCK";
+        return LOCK_FILE_PREFIX;
     }
 
     static String getSSTableName(int fileNumber) {
@@ -56,7 +58,7 @@ class FileName {
                     StandardOpenOption.CREATE,
                     StandardOpenOption.WRITE);
 
-            Files.move(tmpPath, Paths.get(baseDir, getCurrentManifestFileName()), StandardCopyOption.REPLACE_EXISTING);
+            Files.move(tmpPath, Paths.get(baseDir, getCurrentFileName()), StandardCopyOption.REPLACE_EXISTING);
         } catch (IOException ex) {
             Files.deleteIfExists(tmpPath);
             throw ex;
@@ -73,20 +75,15 @@ class FileName {
 
         FileType type = FileType.Unknown;
         int fileNumber = 0;
-        String storageName = "";
-        if (fileName.endsWith("_CURRENT")) {
-            storageName = fileName.substring(0, fileName.length() - "_CURRENT".length());
+        if (fileName.endsWith(CURRENT_FILE_PREFIX)) {
             type = FileType.Current;
         } else if (fileName.endsWith(".lock")) {
-            storageName = fileName.substring(0, fileName.length() - ".lock".length());
             type = FileType.Lock;
         } else if (fileName.endsWith(".tmp_mf")) {
-            storageName = fileName.substring(0, fileName.length() - ".tmp_mf".length());
             type = FileType.TempManifest;
         } else {
             String[] strs = fileName.split("[\\-.]", 3);
             if (strs.length == 3) {
-                storageName = strs[0];
                 fileNumber = Integer.parseInt(strs[1]);
                 switch (strs[2]) {
                     case "sst":
@@ -103,7 +100,7 @@ class FileName {
                 }
             }
         }
-        return new FileNameMeta(fileName, storageName, fileNumber, type);
+        return new FileNameMeta(fileName, fileNumber, type);
     }
 
     private static List<Path> getOutdatedFiles(String baseDir, int logFileNumber, TableCache tableCache) {
@@ -157,23 +154,17 @@ class FileName {
 
     static class FileNameMeta {
         private final String fileName;
-        private final String storageName;
         private final int fileNumber;
         private final FileType type;
 
-        FileNameMeta(String fileName, String storageName, int fileNumber, FileType type) {
+        FileNameMeta(String fileName, int fileNumber, FileType type) {
             this.fileName = fileName;
-            this.storageName = storageName;
             this.fileNumber = fileNumber;
             this.type = type;
         }
 
         String getFileName() {
             return fileName;
-        }
-
-        String getStorageName() {
-            return storageName;
         }
 
         int getFileNumber() {

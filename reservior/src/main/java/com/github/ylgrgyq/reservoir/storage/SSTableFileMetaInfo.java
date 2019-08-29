@@ -2,10 +2,6 @@ package com.github.ylgrgyq.reservoir.storage;
 
 import java.util.Objects;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/10
- */
 class SSTableFileMetaInfo {
     private int fileNumber;
     private long firstKey;

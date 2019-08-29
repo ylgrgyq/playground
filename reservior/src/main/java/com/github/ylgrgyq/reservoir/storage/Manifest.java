@@ -4,14 +4,15 @@ import com.github.ylgrgyq.reservoir.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -111,7 +112,7 @@ class Manifest {
                 }
 
                 // TODO complete compact task with requesting toIndex in CompactTask
-                final Long firstIndex = getFirstIndex();
+                final Long firstIndex = getFirstId();
                 tasks.forEach(t -> t.getFuture().complete(firstIndex));
                 return true;
             }
@@ -127,21 +128,32 @@ class Manifest {
         return future;
     }
 
-    synchronized void recover(String manifestFileName) throws IOException, StorageException {
-        Path manifestFilePath = Paths.get(baseDir, manifestFileName);
-        FileChannel manifestFile = FileChannel.open(manifestFilePath, StandardOpenOption.READ);
-        try (LogReader reader = new LogReader(manifestFile, true)) {
+    private void recover(String manifestFileName) throws IOException, StorageException {
+        final Path manifestFilePath = Paths.get(baseDir, manifestFileName);
+        if (!Files.exists(manifestFilePath)) {
+            throw new StorageException("CURRENT file points to an non-exists manifest file: " +
+                    baseDir + File.separator + manifestFileName);
+        }
+
+        final FileChannel manifestFile = FileChannel.open(manifestFilePath, StandardOpenOption.READ);
+        try (final LogReader reader = new LogReader(manifestFile, true)) {
             List<SSTableFileMetaInfo> ms = new ArrayList<>();
             while (true) {
-                List<byte[]> logOpt = reader.readLog();
+                final List<byte[]> logOpt = reader.readLog();
                 if (!logOpt.isEmpty()) {
-                    ManifestRecord record = ManifestRecord.decode(logOpt);
-                    if (record.getType() == ManifestRecord.Type.PLAIN) {
-                        nextFileNumber = record.getNextFileNumber();
-                        logNumber = record.getLogNumber();
-                        ms.addAll(record.getMetas());
-                    } else {
-                        ms = new ArrayList<>(record.getMetas());
+                    final ManifestRecord record = ManifestRecord.decode(logOpt);
+                    switch (record.getType()) {
+                        case PLAIN:
+                            nextFileNumber = record.getNextFileNumber();
+                            logNumber = record.getLogNumber();
+                            ms.addAll(record.getMetas());
+                            break;
+                        case REPLACE_METAS:
+                            // replace all previous metas with the metas in this manifest record
+                            ms = new ArrayList<>(record.getMetas());
+                            break;
+                        default:
+                            throw new StorageException("unknown manifest record type: " + record.getType());
                     }
                 } else {
                     break;
@@ -157,13 +169,13 @@ class Manifest {
                 metasLock.unlock();
             }
         } catch (BadRecordException ex) {
-            String msg = String.format("Recover manifest from file:\"%s\" failed due to \"%s\" log record",
+            String msg = String.format("recover manifest from file:\"%s\" failed due to \"%s\" log record",
                     manifestFileName, manifestFilePath);
-            throw new RuntimeException(msg);
+            throw new StorageException(msg);
         }
     }
 
-    long getFirstIndex() {
+    long getFirstId() {
         metasLock.lock();
         try {
             if (!metas.isEmpty()) {
@@ -176,7 +188,7 @@ class Manifest {
         }
     }
 
-    long getLastIndex() {
+    long getLastId() {
         metasLock.lock();
         try {
             if (!metas.isEmpty()) {
