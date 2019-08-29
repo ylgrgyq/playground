@@ -4,8 +4,10 @@ import com.github.ylgrgyq.reservoir.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -25,20 +27,23 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     private final String baseDir;
     private final TableCache tableCache;
     private final Manifest manifest;
+    private final long readRetryIntervalMillis;
 
     private FileLock storageLock;
     private LogWriter consumerCommitLogWriter;
+    @Nullable
     private LogWriter dataLogWriter;
     private volatile int logFileNumber;
     private long firstIdInStorage;
     private long lastIdInStorage;
     private Memtable mm;
+    @Nullable
     private volatile Memtable imm;
     private volatile StorageStatus status;
     private boolean backgroundWriteSstableRunning;
     private volatile CountDownLatch shutdownLatch;
 
-    public FileBasedStorage(String storageBaseDir) throws StorageException{
+    public FileBasedStorage(String storageBaseDir, long readRetryIntervalMillis) throws StorageException{
         requireNonNull(storageBaseDir, "storageBaseDir");
         Path baseDirPath = Paths.get(storageBaseDir);
 
@@ -46,6 +51,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
             throw new IllegalArgumentException("\"" + storageBaseDir + "\" must be a directory");
         }
 
+        this.readRetryIntervalMillis = readRetryIntervalMillis;
         this.mm = new Memtable();
         this.baseDir = storageBaseDir;
         this.firstIdInStorage = -1;
@@ -112,7 +118,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     }
 
     @Override
-    public List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
+    public synchronized List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
         if (status != StorageStatus.OK) {
             throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
         }
@@ -125,39 +131,45 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
             return mm.getEntries(fromId, limit);
         }
 
-        Itr itr;
-        if (imm != null && fromId >= imm.firstKey()) {
-            List<SeekableIterator<Long, ObjectWithId>> itrs = Arrays.asList(imm.iterator(), mm.iterator());
-            for (SeekableIterator<Long, ObjectWithId> it : itrs) {
-                it.seek(fromId);
-            }
+        List<ObjectWithId> entries;
+        while (true) {
+            entries = doFetch(fromId, limit);
 
-            itr = new Itr(itrs);
-        } else {
-            itr = internalIterator(fromId, limit);
-        }
-
-        List<ObjectWithId> ret = new ArrayList<>();
-        while (itr.hasNext()) {
-            ObjectWithId e = itr.next();
-            if (ret.size() >= limit) {
+            if (!entries.isEmpty()) {
                 break;
             }
 
-            ret.add(e);
+            Thread.sleep(readRetryIntervalMillis);
         }
 
-        return ret;
+        return Collections.unmodifiableList(entries);
     }
 
     @Override
-    public List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
+    public synchronized List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
 
-        return null;
+        final long end = System.nanoTime() + unit.toNanos(timeout);
+        List<ObjectWithId> entries;
+        while (true) {
+            entries = doFetch(fromId, limit);
+
+            if (!entries.isEmpty()) {
+                break;
+            }
+
+            final long remain = TimeUnit.NANOSECONDS.toMillis(end - System.nanoTime());
+            if (remain <= 0) {
+                break;
+            }
+
+            Thread.sleep(Math.min(remain, readRetryIntervalMillis));
+        }
+
+        return Collections.unmodifiableList(entries);
     }
 
     @Override
-    public long getLastProducedId() throws StorageException {
+    public synchronized long getLastProducedId() throws StorageException {
         if (status != StorageStatus.OK) {
             throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
         }
@@ -168,7 +180,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     }
 
     @Override
-    public void store(List<ObjectWithId> batch) throws StorageException {
+    public synchronized void store(List<ObjectWithId> batch) throws StorageException {
         requireNonNull(batch, "batch");
         if (status != StorageStatus.OK) {
             throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
@@ -180,7 +192,7 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         }
 
         if (firstIdInStorage < 0) {
-            ObjectWithId first = batch.get(0);
+            final ObjectWithId first = batch.get(0);
             firstIdInStorage = first.getId();
         }
 
@@ -193,12 +205,12 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
 
                 lastIndex = e.getId();
                 if (makeRoomForEntry(false)) {
-                    byte[] data = e.getObjectInBytes();
-                    dataLogWriter.append(data);
+                    assert dataLogWriter != null;
+                    dataLogWriter.append(encodeObjectWithId(e));
                     mm.add(e.getId(), e);
                     lastIdInStorage = e.getId();
                 } else {
-                    throw new StorageException("make room on file based storage failed");
+                    throw new StorageException("no more room to storage data");
                 }
             }
         } catch (IOException ex) {
@@ -321,21 +333,21 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         final FileChannel ch = FileChannel.open(logFilePath, StandardOpenOption.READ);
         long readEndPosition;
         boolean noNewSSTable = true;
-        Memtable mm = null;
+        Memtable recoveredMm = null;
         try (LogReader reader = new LogReader(ch, true)) {
             while (true) {
                 List<byte[]> logOpt = reader.readLog();
                 if (!logOpt.isEmpty()) {
-                    ObjectWithId e = new ObjectWithId(logOpt);
-                    if (mm == null) {
-                        mm = new Memtable();
+                    final ObjectWithId e = decodeObjectWithId(logOpt);
+                    if (recoveredMm == null) {
+                        recoveredMm = new Memtable();
                     }
-                    mm.add(e.getId(), e);
-                    if (mm.getMemoryUsedInBytes() > Constant.kMaxMemtableSize) {
-                        SSTableFileMetaInfo meta = writeMemTableToSSTable(mm);
+                    recoveredMm.add(e.getId(), e);
+                    if (recoveredMm.getMemoryUsedInBytes() > Constant.kMaxMemtableSize) {
+                        final SSTableFileMetaInfo meta = writeMemTableToSSTable(recoveredMm);
                         record.addMeta(meta);
                         noNewSSTable = false;
-                        mm = null;
+                        recoveredMm = null;
                     }
                 } else {
                     break;
@@ -350,26 +362,80 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
                 assert logFileNumber == 0;
                 dataLogWriter = new LogWriter(logFile, readEndPosition);
                 logFileNumber = fileNumber;
-                if (mm != null) {
-                    this.mm = mm;
-                    mm = null;
+                if (recoveredMm != null) {
+                    mm = recoveredMm;
+                    recoveredMm = null;
                 }
             }
         } catch (BadRecordException ex) {
             logger.warn("got \"{}\" record in log file:\"{}\". ", ex.getType(), logFilePath);
         }
 
-        if (mm != null) {
-            final SSTableFileMetaInfo meta = writeMemTableToSSTable(mm);
+        if (recoveredMm != null) {
+            final SSTableFileMetaInfo meta = writeMemTableToSSTable(recoveredMm);
             record.addMeta(meta);
         }
+    }
+
+    private byte[] encodeObjectWithId(ObjectWithId obj) {
+        final ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES  + Integer.BYTES + obj.getObjectInBytes().length);
+        buffer.putLong(obj.getId());
+        buffer.putInt(obj.getObjectInBytes().length);
+        buffer.put(obj.getObjectInBytes());
+
+        return buffer.array();
+    }
+
+    private ObjectWithId decodeObjectWithId (List<byte[]> bytes) {
+        final ByteBuffer buffer = ByteBuffer.wrap(compact(bytes));
+        final long id = buffer.getLong();
+        final int length = buffer.getInt();
+        final byte[] bs = new byte[length];
+        buffer.get(bs);
+
+        return new ObjectWithId(id, bs);
+    }
+
+    private byte[] compact(List<byte[]> output) {
+        final int size = output.stream().mapToInt(b -> b.length).sum();
+        final ByteBuffer buffer = ByteBuffer.allocate(size);
+        for (byte[] bytes : output) {
+            buffer.put(bytes);
+        }
+        return buffer.array();
+    }
+
+    private List<ObjectWithId> doFetch(long fromId, int limit) throws StorageException{
+        Itr itr;
+        if (imm != null && fromId >= imm.firstKey()) {
+            List<SeekableIterator<Long, ObjectWithId>> itrs = Arrays.asList(imm.iterator(), mm.iterator());
+            for (SeekableIterator<Long, ObjectWithId> it : itrs) {
+                it.seek(fromId);
+            }
+
+            itr = new Itr(itrs);
+        } else {
+            itr = internalIterator(fromId, limit);
+        }
+
+        List<ObjectWithId> ret = new ArrayList<>();
+        while (itr.hasNext()) {
+            ObjectWithId e = itr.next();
+            if (ret.size() >= limit) {
+                break;
+            }
+
+            ret.add(e);
+        }
+
+        return ret;
     }
 
     private synchronized long getFirstIndex() {
         return firstIdInStorage;
     }
 
-    private boolean makeRoomForEntry(boolean force) {
+    private synchronized boolean makeRoomForEntry(boolean force) {
         try {
             boolean forceRun = force;
             while (true) {
@@ -420,37 +486,15 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         logger.debug("start write mem table in background");
         StorageStatus status = StorageStatus.OK;
         try {
+            assert imm != null;
             ManifestRecord record = null;
             if (!imm.isEmpty()) {
-                if (imm.firstKey() > manifest.getLastId()) {
-                    final SSTableFileMetaInfo meta = writeMemTableToSSTable(imm);
-                    record = ManifestRecord.newPlainRecord();
-                    record.addMeta(meta);
-                    record.setLogNumber(logFileNumber);
-                } else {
-                    final List<SSTableFileMetaInfo> remainMetas = new ArrayList<>();
-
-                    final long firstKeyInImm = imm.firstKey();
-                    final List<SSTableFileMetaInfo> allMetas = manifest.searchMetas(Long.MIN_VALUE, Long.MAX_VALUE);
-                    for (SSTableFileMetaInfo meta : allMetas) {
-                        if (firstKeyInImm < meta.getLastKey()) {
-                            remainMetas.add(mergeMemTableAndSStable(meta, imm));
-                            break;
-                        } else {
-                            remainMetas.add(meta);
-                        }
-                    }
-
-                    assert !remainMetas.isEmpty();
-                    record = ManifestRecord.newReplaceAllExistedMetasRecord();
-                    record.addMetas(remainMetas);
-                    record.setLogNumber(logFileNumber);
-                }
+                assert imm.firstKey() > manifest.getLastId();
+                final SSTableFileMetaInfo meta = writeMemTableToSSTable(imm);
+                record = ManifestRecord.newPlainRecord();
+                record.addMeta(meta);
+                record.setLogNumber(logFileNumber);
                 manifest.logRecord(record);
-            }
-
-            if (manifest.processCompactTask()) {
-                firstIdInStorage = manifest.getFirstId();
             }
 
             final Set<Integer> remainMetasFileNumberSet = manifest.searchMetas(Long.MIN_VALUE, Long.MAX_VALUE)
@@ -483,42 +527,26 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
     }
 
     private SSTableFileMetaInfo writeMemTableToSSTable(Memtable mm) throws IOException {
-        return mergeMemTableAndSStable(null, mm);
+        return mergeMemTableAndSStable(mm);
     }
 
-    private SSTableFileMetaInfo mergeMemTableAndSStable(SSTableFileMetaInfo sstable, Memtable mm) throws IOException {
+    private SSTableFileMetaInfo mergeMemTableAndSStable(Memtable mm) throws IOException {
         assert mm != null;
 
-        SSTableFileMetaInfo meta = new SSTableFileMetaInfo();
+        final SSTableFileMetaInfo meta = new SSTableFileMetaInfo();
 
-        int fileNumber = manifest.getNextFileNumber();
+        final int fileNumber = manifest.getNextFileNumber();
         meta.setFileNumber(fileNumber);
-        meta.setFirstKey(Math.min(mm.firstKey(), sstable != null ? sstable.getFirstKey() : Long.MAX_VALUE));
-        meta.setLastKey(Math.max(mm.lastKey(), sstable != null ? sstable.getLastKey() : -1));
+        meta.setFirstKey(mm.firstKey());
+        meta.setLastKey(mm.lastKey());
 
-        String tableFileName = FileName.getSSTableName(fileNumber);
-        Path tableFile = Paths.get(baseDir, tableFileName);
+        final String tableFileName = FileName.getSSTableName(fileNumber);
+        final Path tableFile = Paths.get(baseDir, tableFileName);
         try (FileChannel ch = FileChannel.open(tableFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
-            TableBuilder tableBuilder = new TableBuilder(ch);
-
-            Iterator<ObjectWithId> ssTableIterator = Collections.emptyIterator();
-            if (sstable != null) {
-                ssTableIterator = tableCache.iterator(sstable.getFileNumber(), sstable.getFileSize());
-            }
-
-            long boundary = mm.firstKey();
-            while (ssTableIterator.hasNext()) {
-                ObjectWithId entry = ssTableIterator.next();
-                if (entry.getId() < boundary) {
-                    byte[] data = entry.getObjectInBytes();
-                    tableBuilder.add(entry.getId(), data);
-                } else {
-                    break;
-                }
-            }
+            final TableBuilder tableBuilder = new TableBuilder(ch);
 
             for (ObjectWithId entry : mm) {
-                byte[] data = entry.getObjectInBytes();
+                final byte[] data = entry.getObjectInBytes();
                 tableBuilder.add(entry.getId(), data);
             }
 
@@ -538,22 +566,6 @@ public class FileBasedStorage implements ProducerStorage, ConsumerStorage {
         }
 
         return meta;
-    }
-
-    public Future<Long> compact(long toIndex) {
-//        checkArgument(toIndex > 0);
-
-        return manifest.compact(toIndex);
-    }
-
-    synchronized void forceFlushMemtable() {
-        makeRoomForEntry(true);
-    }
-
-    synchronized void waitWriteSstableFinish() throws InterruptedException {
-        if (backgroundWriteSstableRunning) {
-            this.wait();
-        }
     }
 
     private Itr internalIterator(long start, long end) throws StorageException {

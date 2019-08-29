@@ -83,52 +83,7 @@ class Manifest {
         }
     }
 
-    boolean processCompactTask() throws IOException {
-        long greatestToKey = -1L;
-        List<CompactTask<Long>> tasks = new ArrayList<>();
-        CompactTask<Long> task;
-        while ((task = compactTaskQueue.poll()) != null) {
-            tasks.add(task);
-            if (task.getToKey() > greatestToKey) {
-                greatestToKey = task.getToKey();
-            }
-        }
-
-        if (greatestToKey > 0) {
-            List<SSTableFileMetaInfo> remainMetas = searchMetas(greatestToKey, Integer.MAX_VALUE);
-            if (remainMetas.size() == 0) {
-                // we don't have enough meta tables to fulfill this compact.
-                // so we add compact tasks back to queue and wait for next flush SSTable time
-                compactTaskQueue.addAll(tasks);
-            } else {
-                if (remainMetas.size() < metas.size()) {
-                    ManifestRecord record = ManifestRecord.newReplaceAllExistedMetasRecord();
-                    record.addMetas(remainMetas);
-                    logRecord(record);
-
-                    registerMetas(record);
-                } else {
-                    assert remainMetas.size() == metas.size();
-                }
-
-                // TODO complete compact task with requesting toIndex in CompactTask
-                final Long firstIndex = getFirstId();
-                tasks.forEach(t -> t.getFuture().complete(firstIndex));
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    CompletableFuture<Long> compact(long toKey) {
-        CompletableFuture<Long> future = new CompletableFuture<>();
-        CompactTask<Long> task = new CompactTask<>(future, toKey);
-        compactTaskQueue.add(task);
-        return future;
-    }
-
-    private void recover(String manifestFileName) throws IOException, StorageException {
+    synchronized void recover(String manifestFileName) throws IOException, StorageException {
         final Path manifestFilePath = Paths.get(baseDir, manifestFileName);
         if (!Files.exists(manifestFilePath)) {
             throw new StorageException("CURRENT file points to an non-exists manifest file: " +
@@ -196,18 +151,6 @@ class Manifest {
             } else {
                 return -1L;
             }
-        } finally {
-            metasLock.unlock();
-        }
-    }
-
-    int getLowestSSTableFileNumber() {
-        metasLock.lock();
-        try {
-            return metas.stream()
-                    .mapToInt(SSTableFileMetaInfo::getFileNumber)
-                    .min()
-                    .orElse(-1);
         } finally {
             metasLock.unlock();
         }

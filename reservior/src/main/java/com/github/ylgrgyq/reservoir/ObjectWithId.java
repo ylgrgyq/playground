@@ -9,6 +9,8 @@ public final class ObjectWithId {
     private final byte[] objectInBytes;
 
     public ObjectWithId(long id, byte[] objectInBytes) {
+        Objects.requireNonNull(objectInBytes, "objectInBytes");
+
         this.id = id;
         this.objectInBytes = objectInBytes;
     }
