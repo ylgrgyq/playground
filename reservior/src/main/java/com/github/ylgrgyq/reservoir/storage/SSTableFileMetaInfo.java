@@ -56,4 +56,14 @@ class SSTableFileMetaInfo {
 
         return Objects.hash(getFileNumber(), getFirstId(), getLastId(), getFileSize());
     }
+
+    @Override
+    public String toString() {
+        return "SSTableFileMetaInfo{" +
+                "fileNumber=" + fileNumber +
+                ", firstKey=" + firstKey +
+                ", lastKey=" + lastKey +
+                ", fileSize=" + fileSize +
+                '}';
+    }
 }

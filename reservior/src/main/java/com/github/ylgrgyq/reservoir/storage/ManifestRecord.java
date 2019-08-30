@@ -3,11 +3,12 @@ package com.github.ylgrgyq.reservoir.storage;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 final class ManifestRecord {
+    private final List<SSTableFileMetaInfo> metas;
     private int nextFileNumber;
     private int dataLogFileNumber;
-    private final List<SSTableFileMetaInfo> metas;
 
     ManifestRecord() {
         this.metas = new ArrayList<>();
@@ -86,6 +87,21 @@ final class ManifestRecord {
         }
 
         return record;
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        final ManifestRecord that = (ManifestRecord) o;
+        return getNextFileNumber() == that.getNextFileNumber() &&
+                getDataLogFileNumber() == that.getDataLogFileNumber() &&
+                getMetas().equals(that.getMetas());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getNextFileNumber(), getDataLogFileNumber(), getMetas());
     }
 
     @Override
