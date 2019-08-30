@@ -3,5 +3,5 @@ package com.github.ylgrgyq.reservoir.storage;
 import java.util.Iterator;
 
 interface SeekableIterator<K, E> extends Iterator<E>{
-    void seek(K key);
+    SeekableIterator<K, E> seek(K key);
 }

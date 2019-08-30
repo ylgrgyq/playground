@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.zip.CRC32;
 
+import static com.github.ylgrgyq.reservoir.TestingUtils.nextPositiveInt;
 import static org.assertj.core.api.Assertions.*;
 
 public class LogTest {
@@ -298,15 +299,6 @@ public class LogTest {
         } else {
             return new String(concatByteArray(logs), StandardCharsets.UTF_8);
         }
-    }
-
-    @SuppressWarnings("StatementWithEmptyBody")
-    private int nextPositiveInt(Random random, int bound) {
-        int nextInt;
-        while ((nextInt = random.nextInt(bound)) <= 0) {
-            // loop
-        }
-        return nextInt;
     }
 
     private byte[] concatByteArray(List<byte[]> out) {

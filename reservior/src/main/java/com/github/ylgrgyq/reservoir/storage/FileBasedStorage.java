@@ -207,7 +207,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 if (makeRoomForEntry(false)) {
                     assert dataLogWriter != null;
                     dataLogWriter.append(encodeObjectWithId(e));
-                    mm.add(e.getId(), e);
+                    mm.add(e);
                     lastIdInStorage = e.getId();
                 } else {
                     throw new StorageException("no more room to storage data");
@@ -342,7 +342,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                     if (recoveredMm == null) {
                         recoveredMm = new Memtable();
                     }
-                    recoveredMm.add(e.getId(), e);
+                    recoveredMm.add(e);
                     if (recoveredMm.getMemoryUsedInBytes() > Constant.kMaxMemtableSize) {
                         final SSTableFileMetaInfo meta = writeMemTableToSSTable(recoveredMm);
                         record.addMeta(meta);

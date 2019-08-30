@@ -103,7 +103,7 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
         }
 
         @Override
-        public void seek(Long key) {
+        public SeekableIterator<Long, KeyValueEntry<Long, byte[]>> seek(Long key) {
             int checkpoint = findStartCheckpoint(key);
             offset = checkpoints.get(checkpoint);
             assert offset < content.limit();
@@ -118,6 +118,7 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
                     break;
                 }
             }
+            return this;
         }
 
         @Override

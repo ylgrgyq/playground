@@ -114,7 +114,7 @@ final class Table implements Iterable<ObjectWithId> {
         }
 
         @Override
-        public void seek(Long key) {
+        public Itr seek(Long key) {
             indexBlockIter.seek(key);
             if (indexBlockIter.hasNext()) {
                 innerBlockIter = createInnerBlockIter();
@@ -122,6 +122,7 @@ final class Table implements Iterable<ObjectWithId> {
             } else {
                 innerBlockIter = null;
             }
+            return this;
         }
 
         @Override
