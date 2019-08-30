@@ -1,10 +1,6 @@
 package com.github.ylgrgyq.reservoir.storage;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/29
- */
-class KeyValueEntry<K, V> {
+final class KeyValueEntry<K, V> {
     private final K key;
     private final V val;
 

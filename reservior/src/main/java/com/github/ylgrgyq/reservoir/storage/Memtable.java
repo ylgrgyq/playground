@@ -2,6 +2,7 @@ package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.ObjectWithId;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -9,11 +10,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/11
- */
-class Memtable implements Iterable<ObjectWithId> {
+final class Memtable implements Iterable<ObjectWithId> {
     private ConcurrentSkipListMap<Long, ObjectWithId> table;
     private int memSize;
 
@@ -22,25 +19,13 @@ class Memtable implements Iterable<ObjectWithId> {
     }
 
     void add(long k, ObjectWithId v) {
-//        assert k > 0;
-
-        if (! table.isEmpty() && k <= table.lastKey()){
-            long removeStartKeyNotInclusive = table.ceilingKey(k);
-            table = new ConcurrentSkipListMap<>(table.subMap(-1L, removeStartKeyNotInclusive));
-
-            memSize = recalculateCurrentMemoryUsedInBytes();
-        }
+        assert k > 0;
 
         table.put(k, v);
         memSize += Long.BYTES + v.getObjectInBytes().length;
     }
 
-    private int recalculateCurrentMemoryUsedInBytes() {
-        int entrySize = table.values().stream().mapToInt(o -> o.getObjectInBytes().length).sum();
-        return table.size() * Long.BYTES + entrySize;
-    }
-
-    Long firstKey() {
+    long firstId() {
         if (table.isEmpty()) {
             return -1L;
         } else {
@@ -48,7 +33,7 @@ class Memtable implements Iterable<ObjectWithId> {
         }
     }
 
-    Long lastKey() {
+    long lastId() {
         if (table.isEmpty()) {
             return -1L;
         } else {
@@ -65,16 +50,16 @@ class Memtable implements Iterable<ObjectWithId> {
     }
 
     List<ObjectWithId> getEntries(long start, long end) {
-        if (end < firstKey() || start > lastKey()) {
+        if (end < firstId() || start > lastId()) {
             return Collections.emptyList();
         }
 
-        SeekableIterator<Long, ObjectWithId> iter = iterator();
+        final SeekableIterator<Long, ObjectWithId> iter = iterator();
         iter.seek(start);
 
-        List<ObjectWithId> ret = new ArrayList<>();
+        final List<ObjectWithId> ret = new ArrayList<>();
         while (iter.hasNext()) {
-            ObjectWithId v = iter.next();
+            final ObjectWithId v = iter.next();
             if (v.getId() >= start && v.getId() < end) {
                 ret.add(v);
             } else {
@@ -95,7 +80,8 @@ class Memtable implements Iterable<ObjectWithId> {
     }
 
     private static class Itr implements SeekableIterator<Long, ObjectWithId> {
-        private ConcurrentNavigableMap<Long, ObjectWithId> innerMap;
+        private final ConcurrentNavigableMap<Long, ObjectWithId> innerMap;
+        @Nullable
         private Map.Entry<Long, ObjectWithId> offset;
 
         Itr(ConcurrentNavigableMap<Long, ObjectWithId> innerMap) {
@@ -105,7 +91,7 @@ class Memtable implements Iterable<ObjectWithId> {
 
         @Override
         public void seek(Long key) {
-            offset = innerMap.ceilingEntry(key);
+            offset = innerMap.higherEntry(key);
         }
 
         @Override
@@ -115,6 +101,7 @@ class Memtable implements Iterable<ObjectWithId> {
 
         @Override
         public ObjectWithId next() {
+            assert offset != null;
             ObjectWithId v = offset.getValue();
             offset = innerMap.higherEntry(v.getId());
             return v;

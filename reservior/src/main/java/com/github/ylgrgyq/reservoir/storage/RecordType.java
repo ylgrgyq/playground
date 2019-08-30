@@ -2,12 +2,8 @@ package com.github.ylgrgyq.reservoir.storage;
 
 import javax.annotation.Nullable;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/10
- */
-public enum RecordType {
-    // Zero is reserved for preallocated files
+enum RecordType {
+    // Zero is reserved for pre-allocated files
     kZeroType((byte)0),
 
     kFullType((byte)1),

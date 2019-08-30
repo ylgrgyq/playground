@@ -43,7 +43,7 @@ public final class ObjectQueueBuilder<E> {
         return codec;
     }
 
-    public ObjectQueueBuilder<E> setCodec(@Nullable Codec<E> codec) {
+    public ObjectQueueBuilder<E> setCodec(Codec<E> codec) {
         requireNonNull(codec, "codec");
         this.codec = codec;
         return this;

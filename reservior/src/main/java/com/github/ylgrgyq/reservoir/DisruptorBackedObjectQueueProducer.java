@@ -111,7 +111,7 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
         public void translateTo(ProducerEvent event, long sequence, byte[] payload, CompletableFuture<Void> future, Boolean flush) {
             event.reset();
             event.future = future;
-            if (flush == Boolean.TRUE) {
+            if (Boolean.TRUE.equals(flush)) {
                 event.flush = true;
             }
 

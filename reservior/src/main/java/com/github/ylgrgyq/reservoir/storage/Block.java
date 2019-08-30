@@ -4,11 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/24
- */
-class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
+final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
     private final ByteBuffer content;
     private final List<Integer> checkpoints;
 

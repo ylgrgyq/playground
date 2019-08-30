@@ -4,7 +4,7 @@ import com.github.ylgrgyq.reservoir.StorageException;
 
 import javax.annotation.Nullable;
 
-public class BadRecordException extends StorageException {
+public final class BadRecordException extends StorageException {
     private static final long serialVersionUID = -2307908210663868336L;
     @Nullable
     private final RecordType type;

@@ -12,11 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/24
- */
-class TableCache {
+final class TableCache {
     private String baseDir;
     private Cache<Integer, Table> cache;
 

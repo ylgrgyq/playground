@@ -2,11 +2,7 @@ package com.github.ylgrgyq.reservoir.storage;
 
 import java.nio.ByteBuffer;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/24
- */
-class Footer {
+final class Footer {
     static int tableFooterSize = BlockHandle.blockHandleSize + Long.BYTES;
 
     private BlockHandle indexBlockHandle;

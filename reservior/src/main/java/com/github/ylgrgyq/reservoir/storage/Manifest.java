@@ -4,6 +4,7 @@ import com.github.ylgrgyq.reservoir.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -13,71 +14,60 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/10
- */
-class Manifest {
+final class Manifest {
     private static final Logger logger = LoggerFactory.getLogger(Manifest.class.getName());
 
-    private final BlockingQueue<CompactTask<Long>> compactTaskQueue;
     private final String baseDir;
     private final List<SSTableFileMetaInfo> metas;
     private final ReentrantLock metasLock;
 
-    private int nextFileNumber = 1;
-    private int logNumber;
+    @Nullable
     private LogWriter manifestRecordWriter;
+    private int nextFileNumber = 1;
+    private int dataLogFileNumber;
     private int manifestFileNumber;
 
     Manifest(String baseDir) {
         this.baseDir = baseDir;
         this.metas = new CopyOnWriteArrayList<>();
-        this.compactTaskQueue = new LinkedBlockingQueue<>();
         this.metasLock = new ReentrantLock();
     }
 
     private void registerMetas(ManifestRecord record) {
         metasLock.lock();
         try {
-            if (record.getType() == ManifestRecord.Type.REPLACE_METAS) {
-                this.metas.clear();
-            }
-            this.metas.addAll(record.getMetas());
+            metas.addAll(record.getMetas());
         } finally {
             metasLock.unlock();
         }
     }
 
     synchronized void logRecord(ManifestRecord record) throws IOException {
-        assert record.getType() != ManifestRecord.Type.PLAIN || record.getLogNumber() >= logNumber;
+        assert record.getDataLogFileNumber() >= dataLogFileNumber;
 
         registerMetas(record);
 
         String manifestFileName = null;
         if (manifestRecordWriter == null) {
-            manifestFileNumber = getNextFileNumber();
-            manifestFileName = FileName.getManifestFileName(manifestFileNumber);
-            FileChannel manifestFile = FileChannel.open(Paths.get(baseDir, manifestFileName),
+            final int fileNumber = getNextFileNumber();
+            manifestFileNumber = fileNumber;
+            manifestFileName = FileName.getManifestFileName(fileNumber);
+            final FileChannel manifestFile = FileChannel.open(Paths.get(baseDir, manifestFileName),
                     StandardOpenOption.CREATE, StandardOpenOption.WRITE);
             manifestRecordWriter = new LogWriter(manifestFile);
         }
 
-        if (record.getType() == ManifestRecord.Type.PLAIN) {
-            record.setNextFileNumber(nextFileNumber);
-        }
+        record.setNextFileNumber(nextFileNumber);
         manifestRecordWriter.append(record.encode());
         manifestRecordWriter.flush();
 
         logger.debug("written manifest record {} to manifest file number {}", record, manifestFileNumber);
 
+        // only set CURRENT to the new manifest file after a new record has safely written to it
         if (manifestFileName != null) {
             FileName.setCurrentFile(baseDir, manifestFileNumber);
         }
@@ -97,19 +87,9 @@ class Manifest {
                 final List<byte[]> logOpt = reader.readLog();
                 if (!logOpt.isEmpty()) {
                     final ManifestRecord record = ManifestRecord.decode(logOpt);
-                    switch (record.getType()) {
-                        case PLAIN:
-                            nextFileNumber = record.getNextFileNumber();
-                            logNumber = record.getLogNumber();
-                            ms.addAll(record.getMetas());
-                            break;
-                        case REPLACE_METAS:
-                            // replace all previous metas with the metas in this manifest record
-                            ms = new ArrayList<>(record.getMetas());
-                            break;
-                        default:
-                            throw new StorageException("unknown manifest record type: " + record.getType());
-                    }
+                    nextFileNumber = record.getNextFileNumber();
+                    dataLogFileNumber = record.getDataLogFileNumber();
+                    ms.addAll(record.getMetas());
                 } else {
                     break;
                 }
@@ -134,7 +114,7 @@ class Manifest {
         metasLock.lock();
         try {
             if (!metas.isEmpty()) {
-                return metas.get(0).getFirstKey();
+                return metas.get(0).getFirstId();
             } else {
                 return -1L;
             }
@@ -147,7 +127,7 @@ class Manifest {
         metasLock.lock();
         try {
             if (!metas.isEmpty()) {
-                return metas.get(metas.size() - 1).getLastKey();
+                return metas.get(metas.size() - 1).getLastId();
             } else {
                 return -1L;
             }
@@ -166,8 +146,8 @@ class Manifest {
         return nextFileNumber++;
     }
 
-    synchronized int getLogFileNumber() {
-        return logNumber;
+    synchronized int getDataLogFileNumber() {
+        return dataLogFileNumber;
     }
 
     /**
@@ -189,7 +169,7 @@ class Manifest {
 
             return metas.subList(startMetaIndex, metas.size())
                     .stream()
-                    .filter(meta -> meta.getFirstKey() < endKey)
+                    .filter(meta -> meta.getFirstId() < endKey)
                     .collect(Collectors.toList());
         } finally {
             metasLock.unlock();
@@ -200,9 +180,9 @@ class Manifest {
         int i = 0;
         while (i < metas.size()) {
             SSTableFileMetaInfo meta = metas.get(i);
-            if (index <= meta.getFirstKey()) {
+            if (index <= meta.getFirstId()) {
                 break;
-            } else if (index <= meta.getLastKey()) {
+            } else if (index <= meta.getLastId()) {
                 break;
             }
             ++i;
@@ -218,9 +198,9 @@ class Manifest {
         while (start < end) {
             int mid = (start + end) / 2;
             SSTableFileMetaInfo meta = metas.get(mid);
-            if (index >= meta.getFirstKey() && index <= meta.getLastKey()) {
+            if (index >= meta.getFirstId() && index <= meta.getLastId()) {
                 return mid;
-            } else if (index < meta.getFirstKey()) {
+            } else if (index < meta.getFirstId()) {
                 end = mid;
             } else {
                 start = mid + 1;
@@ -228,23 +208,5 @@ class Manifest {
         }
 
         return start;
-    }
-
-    private static class CompactTask<T> {
-        private final CompletableFuture<T> future;
-        private final long toKey;
-
-        CompactTask(CompletableFuture<T> future, long toKey) {
-            this.future = future;
-            this.toKey = toKey;
-        }
-
-        CompletableFuture<T> getFuture() {
-            return future;
-        }
-
-        long getToKey() {
-            return toKey;
-        }
     }
 }

@@ -39,6 +39,7 @@ final class LogReader implements Closeable {
                     if (isFragmented) {
                         throw new StorageException("partial record without end(1)");
                     }
+                    assert !outPut.isEmpty();
                     return outPut;
                 case kFirstType:
                     if (isFragmented) {
@@ -55,6 +56,7 @@ final class LogReader implements Closeable {
                     if (!isFragmented) {
                         throw new StorageException("missing start for the last fragmented record");
                     }
+                    assert !outPut.isEmpty();
                     return outPut;
                 case kEOF:
                     // we need to return kEOF consistently after encounter the kEOF for the first time.

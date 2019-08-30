@@ -86,7 +86,7 @@ public final class RocksDbStorage implements ObjectQueueStorage {
             final List<ColumnFamilyDescriptor> columnFamilyDescriptors = new ArrayList<>();
             columnFamilyDescriptors.add(new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, columnFamilyOptions));
             ColumnFamilyOptions options = createDefaultColumnFamilyOptions();
-            columnFamilyDescriptors.add(new ColumnFamilyDescriptor(DEFAULT_QUEUE_NAME.getBytes(), options));
+            columnFamilyDescriptors.add(new ColumnFamilyDescriptor(DEFAULT_QUEUE_NAME.getBytes(StandardCharsets.UTF_8), options));
 
             this.columnFamilyHandles = new ArrayList<>();
             this.db = RocksDB.open(dbOptions, path, columnFamilyDescriptors, columnFamilyHandles);
@@ -149,6 +149,9 @@ public final class RocksDbStorage implements ObjectQueueStorage {
             try (RocksIterator it = db.newIterator(columnFamilyHandle, readOptions)) {
                 for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
                     final long id = Bits.getLong(it.key(), 0);
+                    if (id == fromId) {
+                        continue;
+                    }
                     final ObjectWithId entry = new ObjectWithId(id, it.value());
                     entries.add(entry);
                 }
@@ -177,6 +180,9 @@ public final class RocksDbStorage implements ObjectQueueStorage {
             try (RocksIterator it = db.newIterator(columnFamilyHandle, readOptions)) {
                 for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
                     final long id = Bits.getLong(it.key(), 0);
+                    if (id == fromId) {
+                        continue;
+                    }
                     final ObjectWithId entry = new ObjectWithId(id, it.value());
                     entries.add(entry);
                 }

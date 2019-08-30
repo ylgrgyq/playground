@@ -2,11 +2,7 @@ package com.github.ylgrgyq.reservoir.storage;
 
 import java.nio.ByteBuffer;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/24
- */
-class BlockHandle {
+final class BlockHandle {
     static int blockHandleSize = Long.BYTES + Integer.BYTES;
 
     private long offset;

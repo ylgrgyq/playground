@@ -120,7 +120,7 @@ public class TestingStorage extends AbstractTestingStorage{
         return closed;
     }
 
-    void clear() {
+    synchronized void clear() {
         producedPayloads.clear();
         lastProducedId = 0;
         lastCommittedId = -1;

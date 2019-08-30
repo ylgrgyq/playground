@@ -7,11 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.CRC32;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/24
- */
-class BlockBuilder {
+final class BlockBuilder {
     private final List<ByteBuffer> buffers;
     private final List<Integer> checkPoints;
     private int blockSize;

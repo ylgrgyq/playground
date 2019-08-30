@@ -28,11 +28,11 @@ class SSTableFileMetaInfo {
         return fileNumber;
     }
 
-    long getFirstKey() {
+    long getFirstId() {
         return firstKey;
     }
 
-    long getLastKey() {
+    long getLastId() {
         return lastKey;
     }
 
@@ -46,14 +46,14 @@ class SSTableFileMetaInfo {
         if (!(o instanceof SSTableFileMetaInfo)) return false;
         SSTableFileMetaInfo that = (SSTableFileMetaInfo) o;
         return getFileNumber() == that.getFileNumber() &&
-                getFirstKey() == that.getFirstKey() &&
-                getLastKey() == that.getLastKey() &&
+                getFirstId() == that.getFirstId() &&
+                getLastId() == that.getLastId() &&
                 getFileSize() == that.getFileSize();
     }
 
     @Override
     public int hashCode() {
 
-        return Objects.hash(getFileNumber(), getFirstKey(), getLastKey(), getFileSize());
+        return Objects.hash(getFileNumber(), getFirstId(), getLastId(), getFileSize());
     }
 }

@@ -12,11 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/24
- */
-class FileName {
+final class FileName {
     private static final Logger logger = LoggerFactory.getLogger(FileName.class.getName());
     private static final String CURRENT_FILE_PREFIX = "CURRENT";
     private static final String LOCK_FILE_PREFIX = "LOCK";

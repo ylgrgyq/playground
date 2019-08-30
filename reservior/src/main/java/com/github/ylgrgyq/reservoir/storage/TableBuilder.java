@@ -4,11 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/24
- */
-class TableBuilder {
+final class TableBuilder {
     private FileChannel fileChannel;
     private BlockBuilder dataBlock;
     private BlockBuilder indexBlock;

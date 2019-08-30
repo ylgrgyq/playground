@@ -12,11 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.CRC32;
 
-/**
- * Author: ylgrgyq
- * Date: 18/6/10
- */
-class Table implements Iterable<ObjectWithId> {
+final class Table implements Iterable<ObjectWithId> {
     private final Cache<Long, Block> dataBlockCache = Caffeine.newBuilder()
             .initialCapacity(1024)
             .maximumSize(2048)
