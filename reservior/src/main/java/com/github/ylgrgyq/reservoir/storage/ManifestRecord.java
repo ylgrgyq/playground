@@ -7,7 +7,7 @@ import java.util.Objects;
 
 final class ManifestRecord {
     private final List<SSTableFileMetaInfo> metas;
-    private Type type;
+    private final Type type;
     private int nextFileNumber;
     private int dataLogFileNumber;
 
@@ -46,7 +46,7 @@ final class ManifestRecord {
     }
 
     void setDataLogFileNumber(int number) {
-        assert number > 1;
+        assert type != Type.PLAIN || number > 1;
         this.dataLogFileNumber = number;
     }
 
@@ -157,7 +157,7 @@ final class ManifestRecord {
 
         private byte code;
 
-        private Type(byte code) {
+        Type(byte code) {
             this.code = code;
         }
 

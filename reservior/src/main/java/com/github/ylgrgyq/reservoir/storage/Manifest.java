@@ -1,6 +1,7 @@
 package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.StorageException;
+import com.github.ylgrgyq.reservoir.storage.ManifestRecord.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +17,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 
 final class Manifest {
     private static final Logger logger = LoggerFactory.getLogger(Manifest.class.getName());
@@ -52,7 +52,7 @@ final class Manifest {
             manifestRecordWriter = new LogWriter(manifestFile);
         }
 
-        if (record.getType() == ManifestRecord.Type.PLAIN) {
+        if (record.getType() == Type.PLAIN) {
             record.setNextFileNumber(nextFileNumber);
         }
         manifestRecordWriter.append(record.encode());
@@ -65,7 +65,10 @@ final class Manifest {
             assert manifestFileNumber != 0;
             FileName.setCurrentFile(baseDir, manifestFileNumber);
         }
-        dataLogFileNumber = record.getDataLogFileNumber();
+
+        if (record.getType() == Type.PLAIN) {
+            dataLogFileNumber = record.getDataLogFileNumber();
+        }
     }
 
     synchronized void recover(String manifestFileName) throws IOException, StorageException {
@@ -76,7 +79,7 @@ final class Manifest {
         }
 
         final FileChannel manifestFile = FileChannel.open(manifestFilePath, StandardOpenOption.READ);
-        List<SSTableFileMetaInfo> ms = new ArrayList<>();
+        final List<SSTableFileMetaInfo> ms = new ArrayList<>();
         try (LogReader reader = new LogReader(manifestFile, true)) {
             while (true) {
                 final List<byte[]> logOpt = reader.readLog();
@@ -86,14 +89,14 @@ final class Manifest {
                         case PLAIN:
                             nextFileNumber = record.getNextFileNumber();
                             dataLogFileNumber = record.getDataLogFileNumber();
-                            ms.addAll(record.getMetas());
                             break;
                         case REPLACE_METAS:
-                            ms = new ArrayList<>(record.getMetas());
+                            ms.clear();
                             break;
                         default:
                             throw new StorageException("unknown manifest record type:" + record.getType());
                     }
+                    ms.addAll(record.getMetas());
                 } else {
                     break;
                 }
@@ -140,7 +143,7 @@ final class Manifest {
         }
     }
 
-    boolean truncateToId(long toId) throws IOException {
+    void truncateToId(long toId) throws IOException {
         if (toId > 0) {
             List<SSTableFileMetaInfo> remainMetas = searchMetas(toId);
             if (remainMetas.size() < metas.size()) {
@@ -149,13 +152,10 @@ final class Manifest {
                 logRecord(record);
 
                 registerMetas(record);
-                return true;
             } else {
                 assert remainMetas.size() == metas.size();
             }
         }
-
-        return false;
     }
 
     synchronized void close() throws IOException {
@@ -175,17 +175,17 @@ final class Manifest {
     /**
      * find all the SSTableFileMetaInfo who's index range intersect with startIndex and endIndex
      *
-     * @param startKey target start key (inclusive)
+     * @param startId target start id (inclusive)
      * @return iterator for found SSTableFileMetaInfo
      */
-    List<SSTableFileMetaInfo> searchMetas(long startKey) {
+    List<SSTableFileMetaInfo> searchMetas(long startId) {
         metasLock.lock();
         try {
             int startMetaIndex;
             if (metas.size() > 32) {
-                startMetaIndex = binarySearchStartMeta(startKey);
+                startMetaIndex = binarySearchStartMeta(startId);
             } else {
-                startMetaIndex = traverseSearchStartMeta(startKey);
+                startMetaIndex = traverseSearchStartMeta(startId);
             }
 
             return metas.subList(startMetaIndex, metas.size());
