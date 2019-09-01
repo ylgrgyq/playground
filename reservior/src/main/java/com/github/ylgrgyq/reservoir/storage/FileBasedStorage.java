@@ -1,6 +1,7 @@
 package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.*;
+import com.github.ylgrgyq.reservoir.storage.FileName.FileType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,27 +29,30 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     private final TableCache tableCache;
     private final Manifest manifest;
     private final long readRetryIntervalMillis;
+    private final FileLock storageLock;
 
-    private FileLock storageLock;
-    private LogWriter consumerCommitLogWriter;
     @Nullable
     private LogWriter dataLogWriter;
-    private volatile int logFileNumber;
+    private volatile int dataLogFileNumber;
+    @Nullable
+    private LogWriter consumerCommitLogWriter;
+    private volatile int consumerCommitLogFileNumber;
     private long firstIdInStorage;
     private long lastIdInStorage;
-    private long lastCommitedId;
+    private long lastCommittedId;
     private Memtable mm;
     @Nullable
     private volatile Memtable imm;
     private volatile StorageStatus status;
     private boolean backgroundWriteSstableRunning;
+    @Nullable
     private volatile CountDownLatch shutdownLatch;
 
     public FileBasedStorage(String path) throws StorageException {
         this(path, 500);
     }
 
-    public FileBasedStorage(String storageBaseDir, long readRetryIntervalMillis) throws StorageException{
+    public FileBasedStorage(String storageBaseDir, long readRetryIntervalMillis) throws StorageException {
         requireNonNull(storageBaseDir, "storageBaseDir");
         Path baseDirPath = Paths.get(storageBaseDir);
 
@@ -61,7 +65,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         this.baseDir = storageBaseDir;
         this.firstIdInStorage = -1;
         this.lastIdInStorage = -1;
-        this.lastCommitedId = Long.MIN_VALUE;
+        this.lastCommittedId = Long.MIN_VALUE;
         this.status = StorageStatus.INIT;
         this.tableCache = new TableCache(baseDir);
         this.manifest = new Manifest(baseDir);
@@ -84,7 +88,12 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 this.dataLogWriter = createNewDataLogWriter();
             }
 
-            record.setDataLogFileNumber(this.logFileNumber);
+            if (this.consumerCommitLogWriter == null) {
+                this.consumerCommitLogWriter = createConsumerCommitLogWriter();
+            }
+
+            record.setDataLogFileNumber(this.dataLogFileNumber);
+            record.setConsumerCommitLogFileNumber(this.consumerCommitLogFileNumber);
             this.manifest.logRecord(record);
 
             firstIdInStorage = manifest.getFirstId();
@@ -114,23 +123,29 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     }
 
     @Override
-    public void commitId(long id) throws StorageException {
-
+    public synchronized void commitId(long id) throws StorageException {
+        try {
+            if (id > lastCommittedId) {
+                assert consumerCommitLogWriter != null;
+                final byte[] bs = new byte[8];
+                Bits.putLong(bs, 0, id);
+                consumerCommitLogWriter.append(bs);
+                lastCommittedId = id;
+            }
+        } catch (IOException ex) {
+            throw new StorageException(ex);
+        }
     }
 
     @Override
-    public long getLastCommittedId() throws StorageException {
-        return lastCommitedId;
+    public synchronized long getLastCommittedId() throws StorageException {
+        return lastCommittedId;
     }
 
     @Override
     public List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
         if (status != StorageStatus.OK) {
             throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
-        }
-
-        if (!mm.isEmpty() && fromId >= mm.firstId()) {
-            return mm.getEntries(fromId, limit);
         }
 
         List<ObjectWithId> entries;
@@ -240,6 +255,10 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                             dataLogWriter.close();
                         }
 
+                        if (consumerCommitLogWriter != null) {
+                            consumerCommitLogWriter.close();
+                        }
+
                         manifest.close();
 
                         tableCache.evictAll();
@@ -297,7 +316,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         }
     }
 
-    private void recoverStorage(Path currentFilePath, ManifestRecord record) throws IOException, StorageException {
+    private synchronized void recoverStorage(Path currentFilePath, ManifestRecord record) throws IOException, StorageException {
         assert Files.exists(currentFilePath);
         final String currentManifestFileName = new String(Files.readAllBytes(currentFilePath), StandardCharsets.UTF_8);
         if (currentManifestFileName.isEmpty()) {
@@ -306,6 +325,11 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
         manifest.recover(currentManifestFileName);
 
+        recoverFromDataLogFiles(record);
+        recoverLastConsumerCommittedId();
+    }
+
+    private void recoverFromDataLogFiles(ManifestRecord record) throws IOException, StorageException {
         final int dataLogFileNumber = manifest.getDataLogFileNumber();
         final File baseDirFile = new File(baseDir);
         final File[] files = baseDirFile.listFiles();
@@ -325,7 +349,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         }
     }
 
-    private synchronized void recoverMemtableFromDataLogFiles(int fileNumber, ManifestRecord record, boolean lastLogFile) throws IOException, StorageException {
+    private void recoverMemtableFromDataLogFiles(int fileNumber, ManifestRecord record, boolean lastLogFile) throws IOException, StorageException {
         final Path logFilePath = Paths.get(baseDir, FileName.getLogFileName(fileNumber));
         if (Files.exists(logFilePath)) {
             logger.warn("Log file {} was deleted. We can't recover memtable from it.", logFilePath);
@@ -361,9 +385,9 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             if (lastLogFile && noNewSSTable) {
                 final FileChannel logFile = FileChannel.open(logFilePath, StandardOpenOption.WRITE);
                 assert dataLogWriter == null;
-                assert logFileNumber == 0;
+                assert dataLogFileNumber == 0;
                 dataLogWriter = new LogWriter(logFile, readEndPosition);
-                logFileNumber = fileNumber;
+                dataLogFileNumber = fileNumber;
                 if (recoveredMm != null) {
                     mm = recoveredMm;
                     recoveredMm = null;
@@ -379,8 +403,67 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         }
     }
 
+    private synchronized void recoverLastConsumerCommittedId() throws IOException, StorageException {
+        final int fileNumber = manifest.getConsumerCommittedIdLogFileNumber();
+        final File baseDirFile = new File(baseDir);
+        final File[] files = baseDirFile.listFiles();
+        List<FileName.FileNameMeta> consumerLogFileMetas = Collections.emptyList();
+        if (files != null) {
+            consumerLogFileMetas = Arrays.stream(files)
+                    .filter(File::isFile)
+                    .map(File::getName)
+                    .map(FileName::parseFileName)
+                    .filter(fileMeta -> fileMeta.getType() == FileType.ConsumerCommit
+                            && fileMeta.getFileNumber() >= fileNumber)
+                    .collect(Collectors.toList());
+        }
+
+        for (int i = consumerLogFileMetas.size() - 1; i >= 0; --i) {
+            final FileName.FileNameMeta fileMeta = consumerLogFileMetas.get(i);
+            if (recoverLastConsumerCommittedIdFromLogFile(fileMeta.getFileNumber())) {
+                break;
+            }
+        }
+    }
+
+    private synchronized boolean recoverLastConsumerCommittedIdFromLogFile(int fileNumber) throws IOException, StorageException {
+        final Path logFilePath = Paths.get(baseDir, FileName.getConsumerCommittedIdFileName(fileNumber));
+        if (Files.exists(logFilePath)) {
+            logger.warn("Log file {} was deleted. We can't recover consumer committed id from it.", logFilePath);
+            return false;
+        }
+
+        final FileChannel ch = FileChannel.open(logFilePath, StandardOpenOption.READ);
+        long readEndPosition;
+        try (LogReader reader = new LogReader(ch, true)) {
+            long id = lastCommittedId;
+            while (true) {
+                List<byte[]> logOpt = reader.readLog();
+                if (!logOpt.isEmpty()) {
+                    id = Bits.getLong(compact(logOpt), 0);
+                } else {
+                    break;
+                }
+            }
+
+            readEndPosition = ch.position();
+
+            if (id > lastCommittedId) {
+                final FileChannel logFile = FileChannel.open(logFilePath, StandardOpenOption.WRITE);
+                assert consumerCommitLogWriter == null;
+                assert fileNumber == 0;
+                consumerCommitLogWriter = new LogWriter(logFile, readEndPosition);
+                consumerCommitLogFileNumber = fileNumber;
+                return true;
+            }
+        } catch (BadRecordException ex) {
+            logger.warn("got \"{}\" record in log file:\"{}\". ", ex.getType(), logFilePath);
+        }
+        return false;
+    }
+
     private byte[] encodeObjectWithId(ObjectWithId obj) {
-        final ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES  + Integer.BYTES + obj.getObjectInBytes().length);
+        final ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + Integer.BYTES + obj.getObjectInBytes().length);
         buffer.putLong(obj.getId());
         buffer.putInt(obj.getObjectInBytes().length);
         buffer.put(obj.getObjectInBytes());
@@ -388,7 +471,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         return buffer.array();
     }
 
-    private ObjectWithId decodeObjectWithId (List<byte[]> bytes) {
+    private ObjectWithId decodeObjectWithId(List<byte[]> bytes) {
         final ByteBuffer buffer = ByteBuffer.wrap(compact(bytes));
         final long id = buffer.getLong();
         final int length = buffer.getInt();
@@ -407,8 +490,13 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         return buffer.array();
     }
 
-    private synchronized List<ObjectWithId> doFetch(long fromId, int limit) throws StorageException{
+    private synchronized List<ObjectWithId> doFetch(long fromId, int limit) throws StorageException {
         Itr itr;
+
+        if (!mm.isEmpty() && fromId >= mm.firstId()) {
+            return mm.getEntries(fromId, limit);
+        }
+
         try {
             if (imm != null && fromId >= imm.firstId()) {
                 List<SeekableIterator<Long, ObjectWithId>> itrs = Arrays.asList(imm.iterator(), mm.iterator());
@@ -474,7 +562,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         imm = mm;
         mm = new Memtable();
         backgroundWriteSstableRunning = true;
-        logger.debug("Trigger compaction, new log file number={}", logFileNumber);
+        logger.debug("Trigger compaction, new log file number={}", dataLogFileNumber);
         sstableWriterPool.submit(this::writeMemTable);
     }
 
@@ -484,7 +572,17 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         final FileChannel logFile = FileChannel.open(Paths.get(baseDir, nextLogFile),
                 StandardOpenOption.CREATE, StandardOpenOption.WRITE);
         final LogWriter writer = new LogWriter(logFile);
-        logFileNumber = nextLogFileNumber;
+        dataLogFileNumber = nextLogFileNumber;
+        return writer;
+    }
+
+    private LogWriter createConsumerCommitLogWriter() throws IOException {
+        final int nextLogFileNumber = manifest.getNextFileNumber();
+        final String nextLogFile = FileName.getConsumerCommittedIdFileName(nextLogFileNumber);
+        final FileChannel logFile = FileChannel.open(Paths.get(baseDir, nextLogFile),
+                StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        final LogWriter writer = new LogWriter(logFile);
+        consumerCommitLogFileNumber = nextLogFileNumber;
         return writer;
     }
 
@@ -499,7 +597,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 final SSTableFileMetaInfo meta = writeMemTableToSSTable(imm);
                 record = ManifestRecord.newPlainRecord();
                 record.addMeta(meta);
-                record.setDataLogFileNumber(logFileNumber);
+                record.setDataLogFileNumber(dataLogFileNumber);
                 manifest.logRecord(record);
             }
 
@@ -513,7 +611,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 }
             }
 
-            FileName.deleteOutdatedFiles(baseDir, logFileNumber, tableCache);
+            FileName.deleteOutdatedFiles(baseDir, dataLogFileNumber, tableCache);
 
             logger.debug("write mem table in background done with manifest record {}", record);
         } catch (Throwable t) {

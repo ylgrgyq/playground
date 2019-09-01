@@ -12,6 +12,7 @@ public class ManifestRecordTest {
         final ManifestRecord record = ManifestRecord.newPlainRecord();
         record.setDataLogFileNumber(101);
         record.setNextFileNumber(102);
+        record.setConsumerCommitLogFileNumber(103);
 
         assertThat(ManifestRecord.decode(Lists.list(record.encode()))).isEqualTo(record);
     }
@@ -21,6 +22,7 @@ public class ManifestRecordTest {
         final ManifestRecord record = ManifestRecord.newPlainRecord();
         record.setDataLogFileNumber(101);
         record.setNextFileNumber(102);
+        record.setConsumerCommitLogFileNumber(103);
 
         for (int i = 0; i < 1000; i++) {
             final SSTableFileMetaInfo meta = new SSTableFileMetaInfo();

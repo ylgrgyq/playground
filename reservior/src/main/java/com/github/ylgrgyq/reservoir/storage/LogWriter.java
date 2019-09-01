@@ -16,8 +16,6 @@ final class LogWriter implements Closeable {
     }
 
     LogWriter(FileChannel workingFileChannel, long writePosotion) throws IOException {
-        assert workingFileChannel != null;
-
         workingFileChannel.position(writePosotion);
         this.workingFileChannel = workingFileChannel;
         this.headerBuffer = ByteBuffer.allocate(Constant.kLogHeaderSize);
@@ -34,7 +32,6 @@ final class LogWriter implements Closeable {
     }
 
     void append(byte[] data) throws IOException {
-        assert data != null;
         assert data.length > 0;
 
         final ByteBuffer writeBuffer = ByteBuffer.wrap(data);

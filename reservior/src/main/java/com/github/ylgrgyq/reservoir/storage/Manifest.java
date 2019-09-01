@@ -32,6 +32,7 @@ final class Manifest {
     private LogWriter manifestRecordWriter;
     private int nextFileNumber = 1;
     private int dataLogFileNumber;
+    private int consumerCommittedIdLogFileNumber;
 
     Manifest(String baseDir) {
         this.baseDir = baseDir;
@@ -73,6 +74,7 @@ final class Manifest {
 
         if (record.getType() == Type.PLAIN) {
             dataLogFileNumber = record.getDataLogFileNumber();
+            consumerCommittedIdLogFileNumber = record.getConsumerCommitLogFileNumber();
         }
     }
 
@@ -94,6 +96,7 @@ final class Manifest {
                         case PLAIN:
                             nextFileNumber = record.getNextFileNumber();
                             dataLogFileNumber = record.getDataLogFileNumber();
+                            consumerCommittedIdLogFileNumber = record.getConsumerCommitLogFileNumber();
                             break;
                         case REPLACE_METAS:
                             ms.clear();
@@ -182,6 +185,10 @@ final class Manifest {
         return dataLogFileNumber;
     }
 
+    synchronized int getConsumerCommittedIdLogFileNumber() {
+        return consumerCommittedIdLogFileNumber;
+    }
+
     /**
      * Find all the SSTableFileMetaInfo who's id range covers startId.
      *
@@ -211,13 +218,15 @@ final class Manifest {
         final Manifest manifest = (Manifest) o;
         return getNextFileNumber() == manifest.getNextFileNumber() &&
                 getDataLogFileNumber() == manifest.getDataLogFileNumber() &&
+                getConsumerCommittedIdLogFileNumber() == manifest.getConsumerCommittedIdLogFileNumber() &&
                 baseDir.equals(manifest.baseDir) &&
                 metas.equals(manifest.metas);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(baseDir, metas, getNextFileNumber(), getDataLogFileNumber());
+        return Objects.hash(baseDir, metas, getNextFileNumber(),
+                getDataLogFileNumber(), getConsumerCommittedIdLogFileNumber());
     }
 
     private int traverseSearchStartMeta(long index) {

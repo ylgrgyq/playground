@@ -10,6 +10,7 @@ final class ManifestRecord {
     private final Type type;
     private int nextFileNumber;
     private int dataLogFileNumber;
+    private int consumerCommitLogFileNumber;
 
     private ManifestRecord(Type type) {
         this.metas = new ArrayList<>();
@@ -45,9 +46,22 @@ final class ManifestRecord {
         }
     }
 
+    int getConsumerCommitLogFileNumber() {
+        if (type == Type.PLAIN) {
+            return consumerCommitLogFileNumber;
+        } else {
+            return -1;
+        }
+    }
+
     void setDataLogFileNumber(int number) {
         assert type != Type.PLAIN || number > 0;
         this.dataLogFileNumber = number;
+    }
+
+    void setConsumerCommitLogFileNumber(int number) {
+        assert type != Type.PLAIN || number > 0;
+        this.consumerCommitLogFileNumber = number;
     }
 
     Type getType() {
@@ -68,10 +82,11 @@ final class ManifestRecord {
 
     byte[] encode() {
         final int sstableMetaInfoEncodeSize = Integer.BYTES + Long.BYTES * 3;
-        final ByteBuffer buffer = ByteBuffer.allocate(1 + metas.size() * sstableMetaInfoEncodeSize + Integer.BYTES * 3);
+        final ByteBuffer buffer = ByteBuffer.allocate(1 + metas.size() * sstableMetaInfoEncodeSize + Integer.BYTES * 4);
         buffer.put(type.getCode());
         buffer.putInt(nextFileNumber);
         buffer.putInt(dataLogFileNumber);
+        buffer.putInt(consumerCommitLogFileNumber);
         buffer.putInt(metas.size());
 
         for (SSTableFileMetaInfo meta : metas) {
@@ -99,6 +114,7 @@ final class ManifestRecord {
 
         record.setNextFileNumber(buffer.getInt());
         record.setDataLogFileNumber(buffer.getInt());
+        record.setConsumerCommitLogFileNumber(buffer.getInt());
 
         final int metasSize = buffer.getInt();
         for (int i = 0; i < metasSize; i++) {
@@ -121,13 +137,15 @@ final class ManifestRecord {
         final ManifestRecord that = (ManifestRecord) o;
         return getNextFileNumber() == that.getNextFileNumber() &&
                 getDataLogFileNumber() == that.getDataLogFileNumber() &&
+                getConsumerCommitLogFileNumber() == that.getConsumerCommitLogFileNumber() &&
                 getMetas().equals(that.getMetas()) &&
                 getType() == that.getType();
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getMetas(), getType(), getNextFileNumber(), getDataLogFileNumber());
+        return Objects.hash(getMetas(), getType(), getNextFileNumber(),
+                getDataLogFileNumber(), getConsumerCommitLogFileNumber());
     }
 
     @Override
@@ -135,6 +153,7 @@ final class ManifestRecord {
         StringBuilder builder = new StringBuilder("ManifestRecord{" +
                 "type=" + type +
                 ", nextFileNumber=" + nextFileNumber +
+                ", consumerCommitLogFileNumber=" + consumerCommitLogFileNumber +
                 ", dataLogFileNumber=" + dataLogFileNumber);
 
         if (!metas.isEmpty()) {

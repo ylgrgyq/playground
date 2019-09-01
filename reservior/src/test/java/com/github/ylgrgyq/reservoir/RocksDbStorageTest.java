@@ -90,7 +90,7 @@ public class RocksDbStorageTest {
         final int expectSize = 2000;
         List<ObjectWithId> objs = new ArrayList<>();
         for (int i = 1; i < expectSize + 1; i++) {
-            ObjectWithId obj = new ObjectWithId(i, ("" + i).getBytes(StandardCharsets.UTF_8));
+            ObjectWithId obj = new ObjectWithId(i, TestingUtils.numberStringBytes(i));
             objs.add(obj);
         }
         storage.store(objs);

@@ -16,6 +16,9 @@ final class FileName {
     private static final Logger logger = LoggerFactory.getLogger(FileName.class.getName());
     private static final String CURRENT_FILE_PREFIX = "CURRENT";
     private static final String LOCK_FILE_PREFIX = "LOCK";
+    private static final String LOG_FILE_PREFIX = "LOG";
+    private static final String MANIFEST_FILE_PREFIX = "MANIFEST";
+    private static final String CONSUMER_COMMITTED_ID_FILE_PREFIX = "CONSUMER";
 
     static String getCurrentFileName() {
         return CURRENT_FILE_PREFIX;
@@ -38,15 +41,19 @@ final class FileName {
     }
 
     static String getLogFileName(int fileNumber) {
-        return generateFileName("LOG", fileNumber, "log");
+        return generateFileName(LOG_FILE_PREFIX, fileNumber, "log");
+    }
+
+    static String getConsumerCommittedIdFileName(int fileNumber) {
+        return generateFileName(CONSUMER_COMMITTED_ID_FILE_PREFIX, fileNumber, "commit");
     }
 
     static String getManifestFileName(int fileNumber) {
-        return generateFileName("MANIFEST", fileNumber, "mf");
+        return generateFileName(MANIFEST_FILE_PREFIX, fileNumber, "mf");
     }
 
     static void setCurrentFile(String baseDir, int manifestFileNumber) throws IOException {
-        Path tmpPath = Files.createTempFile(Paths.get(baseDir),  "CURRENT_TMP", ".tmp_mf");
+        Path tmpPath = Files.createTempFile(Paths.get(baseDir), "CURRENT_TMP", ".tmp_mf");
         try {
             String manifestFileName = getManifestFileName(manifestFileNumber);
 
@@ -62,7 +69,6 @@ final class FileName {
     }
 
     static FileNameMeta parseFileName(String fileName) {
-        assert fileName != null;
         if (fileName.startsWith("/") || fileName.startsWith("./")) {
             String[] strs = fileName.split("/");
             assert strs.length > 0;
@@ -90,6 +96,9 @@ final class FileName {
                         break;
                     case "mf":
                         type = FileType.Manifest;
+                        break;
+                    case "commit":
+                        type = FileType.ConsumerCommit;
                         break;
                     default:
                         break;
@@ -121,7 +130,7 @@ final class FileName {
                                 case Log:
                                     return meta.getFileNumber() < logFileNumber;
                                 case SSTable:
-                                    return ! tableCache.hasTable(meta.getFileNumber());
+                                    return !tableCache.hasTable(meta.getFileNumber());
                                 default:
                                     return false;
                             }
@@ -178,6 +187,7 @@ final class FileName {
         Current,
         Log,
         Manifest,
+        ConsumerCommit,
         TempManifest,
         Lock
     }

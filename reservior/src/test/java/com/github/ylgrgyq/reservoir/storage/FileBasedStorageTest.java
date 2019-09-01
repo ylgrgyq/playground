@@ -27,7 +27,6 @@ public class FileBasedStorageTest {
         FileUtils.forceMkdir(tempFile);
     }
 
-    @Ignore
     @Test
     public void commitId() throws Exception {
         FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
@@ -88,7 +87,6 @@ public class FileBasedStorageTest {
         storage.close();
     }
 
-    @Ignore
     @Test
     public void truncate() throws Exception {
         FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());

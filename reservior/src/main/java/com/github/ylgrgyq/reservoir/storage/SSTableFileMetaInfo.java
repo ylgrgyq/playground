@@ -9,17 +9,17 @@ final class SSTableFileMetaInfo {
     private long fileSize;
 
     void setFileNumber(int fileNumber) {
-        assert fileNumber > 0;
+        assert fileNumber >= 0;
         this.fileNumber = fileNumber;
     }
 
     void setFirstId(long firstIndex) {
-        assert firstIndex > 0;
+        assert firstIndex >= 0;
         this.firstId = firstIndex;
     }
 
     void setLastId(long lastIndex) {
-        assert lastIndex > 0;
+        assert lastIndex >= 0;
         this.lastId = lastIndex;
     }
 
