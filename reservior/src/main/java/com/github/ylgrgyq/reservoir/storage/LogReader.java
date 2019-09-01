@@ -76,9 +76,9 @@ final class LogReader implements Closeable {
     }
 
     private RecordType readRecord(List<byte[]> out) throws IOException, StorageException {
-        // we don't expect empty data in log, so when remaining buffer is <= kHeaderSize
+        // we don't expect empty data in log, so when remaining buffer is <= kLogHeaderSize
         // which means all of the bytes left in buffer is padding
-        while (buffer.remaining() <= Constant.kHeaderSize) {
+        while (buffer.remaining() <= Constant.kLogHeaderSize) {
             if (eof) {
                 // encounter a truncated header at the end of the file. This can be caused
                 // by writer crashing in the middle of writing the header. We consider

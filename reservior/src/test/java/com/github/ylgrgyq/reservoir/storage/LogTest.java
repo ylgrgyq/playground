@@ -111,12 +111,12 @@ public class LogTest {
     @Test
     public void readWriteTrailer() throws Exception {
         // write a log which only leave a header size space in a block
-        writeLog(constructTestingLog("Hello", Constant.kBlockSize - 2 * Constant.kHeaderSize));
-        assertThat(writeChannel.size()).isEqualTo(Constant.kBlockSize - Constant.kHeaderSize);
+        writeLog(constructTestingLog("Hello", Constant.kBlockSize - 2 * Constant.kLogHeaderSize));
+        assertThat(writeChannel.size()).isEqualTo(Constant.kBlockSize - Constant.kLogHeaderSize);
         // write a new log which will be write to a new block
         writeLog("World");
 
-        assertThat(readLog()).isEqualTo(constructTestingLog("Hello", Constant.kBlockSize - 2 * Constant.kHeaderSize));
+        assertThat(readLog()).isEqualTo(constructTestingLog("Hello", Constant.kBlockSize - 2 * Constant.kLogHeaderSize));
         assertThat(readLog()).isEqualTo("World");
 
         assertThat(readLog()).isEqualTo("EOF");
@@ -125,12 +125,12 @@ public class LogTest {
     @Test
     public void paddingBlock() throws Exception {
         // write a log which leaves space in block shorter than the header size
-        writeLog(constructTestingLog("Hello", Constant.kBlockSize - 2 * Constant.kHeaderSize + 6));
-        assertThat(writeChannel.size()).isEqualTo(Constant.kBlockSize - Constant.kHeaderSize + 6);
+        writeLog(constructTestingLog("Hello", Constant.kBlockSize - 2 * Constant.kLogHeaderSize + 6));
+        assertThat(writeChannel.size()).isEqualTo(Constant.kBlockSize - Constant.kLogHeaderSize + 6);
         // write a new log which will be write to a new block
         writeLog("World");
 
-        assertThat(readLog()).isEqualTo(constructTestingLog("Hello", Constant.kBlockSize - 2 * Constant.kHeaderSize + 6));
+        assertThat(readLog()).isEqualTo(constructTestingLog("Hello", Constant.kBlockSize - 2 * Constant.kLogHeaderSize + 6));
         assertThat(readLog()).isEqualTo("World");
 
         assertThat(readLog()).isEqualTo("EOF");
@@ -172,7 +172,7 @@ public class LogTest {
         writeLog("Hello");
         // checksum size + log length = 10 bytes
         // 25 is an arbitrary value which is not a valid record type code
-        assert Constant.kHeaderSize == 11;
+        assert Constant.kLogHeaderSize == 11;
         setByteInFile(10, (byte) 25);
         assertThatThrownBy(this::readLog)
                 .isInstanceOf(StorageException.class)
@@ -184,7 +184,7 @@ public class LogTest {
         writeLog(constructTestingLog("Hello", Constant.kBlockSize / 2));
         long pos = writeChannel.position();
         writeLog(constructTestingLog("World", Constant.kBlockSize));
-        assert Constant.kHeaderSize == 11;
+        assert Constant.kLogHeaderSize == 11;
         // set length of the second log to 32767
         setByteInFile(pos + 8, (byte) 127);
         setByteInFile(pos + 9, (byte) 255);
@@ -208,7 +208,7 @@ public class LogTest {
         writeLog("Hello");
         long pos = writeChannel.position();
         writeLog("World");
-        assert Constant.kHeaderSize == 11;
+        assert Constant.kLogHeaderSize == 11;
         truncateLogFile(pos + 5);
         assertThat(readLog()).isEqualTo("Hello");
         assertThat(readLog()).isEqualTo("EOF");
@@ -219,7 +219,7 @@ public class LogTest {
         writeLog("Hello");
         long pos = writeChannel.position();
         writeLog("World");
-        assert Constant.kHeaderSize == 11;
+        assert Constant.kLogHeaderSize == 11;
         truncateLogFile(pos + 12);
         assertThat(readLog()).isEqualTo("Hello");
         assertThat(readLog()).isEqualTo("EOF");
@@ -271,9 +271,9 @@ public class LogTest {
     public void missingLastRecordHeaderIsIgnored() throws Exception {
         writeLog(constructTestingLog("Hello", Constant.kBlockSize));
 
-        // there's 2 * kHeaderSize bytes left in second block including header
+        // there's 2 * kLogHeaderSize bytes left in second block including header
         // truncate all of them
-        truncateLogFile(writeChannel.size() - 2 * Constant.kHeaderSize);
+        truncateLogFile(writeChannel.size() - 2 * Constant.kLogHeaderSize);
         assertThat(readLog()).isEqualTo("EOF");
     }
 
@@ -281,9 +281,9 @@ public class LogTest {
     public void missingLastRecordDataIsIgnored() throws Exception {
         writeLog(constructTestingLog("Hello", Constant.kBlockSize));
 
-        // there's 2 * kHeaderSize bytes left in second block including header
+        // there's 2 * kLogHeaderSize bytes left in second block including header
         // truncate some data and leaves header and some of the data block
-        truncateLogFile(writeChannel.size() - Constant.kHeaderSize / 2);
+        truncateLogFile(writeChannel.size() - Constant.kLogHeaderSize / 2);
         assertThat(readLog()).isEqualTo("EOF");
     }
 
@@ -350,7 +350,7 @@ public class LogTest {
                 StandardOpenOption.READ, StandardOpenOption.WRITE)) {
             channel.position(headerOffset);
 
-            ByteBuffer header = ByteBuffer.allocate(Constant.kHeaderSize);
+            ByteBuffer header = ByteBuffer.allocate(Constant.kLogHeaderSize);
             channel.read(header);
             header.flip();
 
@@ -359,7 +359,7 @@ public class LogTest {
             byte typeCode = header.get();
 
             ByteBuffer data = ByteBuffer.allocate(len);
-            channel.position(headerOffset + Constant.kHeaderSize);
+            channel.position(headerOffset + Constant.kLogHeaderSize);
             channel.read(data);
             data.flip();
 

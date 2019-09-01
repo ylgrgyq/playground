@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.ylgrgyq.reservoir.ObjectWithId;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -95,17 +96,9 @@ final class Table implements Iterable<ObjectWithId> {
         return new Itr(indexBlock);
     }
 
-    /**
-     * Use this to throw checked exceptions from iterator methods that do not declare that they throw
-     * checked exceptions.
-     */
-    @SuppressWarnings({"unchecked", "TypeParameterUnusedInFormals"})
-    static <T extends Throwable> T getSneakyThrowable(Throwable t) throws T {
-        throw (T) t;
-    }
-
     private class Itr implements SeekableIterator<Long, ObjectWithId> {
         private final SeekableIterator<Long, KeyValueEntry<Long, byte[]>> indexBlockIter;
+        @Nullable
         private SeekableIterator<Long, KeyValueEntry<Long, byte[]>> innerBlockIter;
 
         Itr(Block indexBlock) {
@@ -142,9 +135,8 @@ final class Table implements Iterable<ObjectWithId> {
                 Block block = getBlock(handle);
                 return block.iterator();
             } catch (IOException ex) {
-//                throw getSneakyThrowable(new StorageException("create inner block iterator failed", ex));
+                throw new StorageRuntimeException("create inner block iterator failed", ex);
             }
-            return null;
         }
 
         @Override

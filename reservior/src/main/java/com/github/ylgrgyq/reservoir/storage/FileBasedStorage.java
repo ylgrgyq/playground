@@ -407,28 +407,32 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     private List<ObjectWithId> doFetch(long fromId, int limit) throws StorageException{
         Itr itr;
-        if (imm != null && fromId >= imm.firstId()) {
-            List<SeekableIterator<Long, ObjectWithId>> itrs = Arrays.asList(imm.iterator(), mm.iterator());
-            for (SeekableIterator<Long, ObjectWithId> it : itrs) {
-                it.seek(fromId);
+        try {
+            if (imm != null && fromId >= imm.firstId()) {
+                List<SeekableIterator<Long, ObjectWithId>> itrs = Arrays.asList(imm.iterator(), mm.iterator());
+                for (SeekableIterator<Long, ObjectWithId> it : itrs) {
+                    it.seek(fromId);
+                }
+
+                itr = new Itr(itrs);
+            } else {
+                itr = internalIterator(fromId);
             }
 
-            itr = new Itr(itrs);
-        } else {
-            itr = internalIterator(fromId);
-        }
+            List<ObjectWithId> ret = new ArrayList<>();
+            while (itr.hasNext()) {
+                ObjectWithId e = itr.next();
+                if (ret.size() >= limit) {
+                    break;
+                }
 
-        List<ObjectWithId> ret = new ArrayList<>();
-        while (itr.hasNext()) {
-            ObjectWithId e = itr.next();
-            if (ret.size() >= limit) {
-                break;
+                ret.add(e);
             }
 
-            ret.add(e);
+            return ret;
+        } catch (StorageRuntimeException ex) {
+            throw new StorageException(ex.getMessage(), ex.getCause());
         }
-
-        return ret;
     }
 
     private synchronized long getFirstIndex() {

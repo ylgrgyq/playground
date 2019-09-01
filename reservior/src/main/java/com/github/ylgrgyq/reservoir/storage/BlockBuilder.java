@@ -22,13 +22,13 @@ final class BlockBuilder {
     long add(long k, byte[] v) {
         assert !isBuilt;
         assert v.length > 0 : String.format("actual:%s", v.length);
-        assert entryCounter >= 0 && entryCounter < Integer.MAX_VALUE;
+        assert entryCounter >= 0;
 
         if ((entryCounter++ & (Constant.kBlockCheckpointInterval - 1)) == 0) {
             checkPoints.add(blockSize);
         }
 
-        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + Integer.BYTES + v.length);
+        final ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + Integer.BYTES + v.length);
         buffer.putLong(k);
         buffer.putInt(v.length);
         buffer.put(v);
@@ -50,14 +50,13 @@ final class BlockBuilder {
 
     long writeBlock(FileChannel fileChannel) throws IOException {
         assert !isBuilt;
-        assert fileChannel != null;
         assert !buffers.isEmpty();
         assert !checkPoints.isEmpty();
 
         isBuilt = true;
 
         // append checkpoints
-        ByteBuffer checkpointsBuffer = ByteBuffer.allocate(Integer.BYTES * checkPoints.size() + Integer.BYTES);
+        final ByteBuffer checkpointsBuffer = ByteBuffer.allocate(Integer.BYTES * checkPoints.size() + Integer.BYTES);
         for (Integer checkpoint : checkPoints) {
             checkpointsBuffer.putInt(checkpoint);
         }
@@ -67,11 +66,11 @@ final class BlockBuilder {
         blockSize += checkpointsBuffer.limit();
 
         // write whole block include block and checkpoints
-        CRC32 checksum = new CRC32();
+        final CRC32 checksum = new CRC32();
         for (ByteBuffer buffer : buffers) {
             checksum.update(buffer.array());
         }
-        ByteBuffer[] bufferArray = new ByteBuffer[buffers.size()];
+        final ByteBuffer[] bufferArray = new ByteBuffer[buffers.size()];
         buffers.toArray(bufferArray);
 
         // maybe we have a lot of buffers which may not be written to channel at once, so we need loop and

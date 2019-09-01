@@ -4,9 +4,9 @@ final class Constant {
     static final int kBlockSize = 32768;
 
     // Header is checksum (Long) + length (Short) + record type (Byte).
-    static final int kHeaderSize = Long.BYTES + Short.BYTES + Byte.BYTES;
+    static final int kLogHeaderSize = Long.BYTES + Short.BYTES + Byte.BYTES;
 
-    static final int kMaxBlockSize = 4096;
+    static final int kLogMaxBlockSize = 4096;
 
     // Block Trailer is checksum(Long)
     static final int kBlockTrailerSize = Long.BYTES;
@@ -15,5 +15,6 @@ final class Constant {
 
     static final int kMaxMemtableSize = 8388608;
 
+    // Add a checkpoint every this many key values in a block
     static final int kBlockCheckpointInterval = 64;
 }

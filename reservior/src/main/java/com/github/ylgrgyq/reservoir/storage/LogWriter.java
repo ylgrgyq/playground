@@ -20,7 +20,7 @@ final class LogWriter implements Closeable {
 
         workingFileChannel.position(writePosotion);
         this.workingFileChannel = workingFileChannel;
-        this.headerBuffer = ByteBuffer.allocate(Constant.kHeaderSize);
+        this.headerBuffer = ByteBuffer.allocate(Constant.kLogHeaderSize);
         this.blockOffset = 0;
     }
 
@@ -45,18 +45,18 @@ final class LogWriter implements Closeable {
             final int blockLeft = Constant.kBlockSize - blockOffset;
             assert blockLeft >= 0;
 
-            // we don't expect data.length == 0, so if blockLeft == kHeaderSize
+            // we don't expect data.length == 0, so if blockLeft == kLogHeaderSize
             // we need to allocate another block also
-            if (blockLeft <= Constant.kHeaderSize) {
+            if (blockLeft <= Constant.kLogHeaderSize) {
                 paddingBlock(blockLeft);
                 blockOffset = 0;
             }
 
-            // Invariant: never leave < kHeaderSize bytes in a block
-            assert Constant.kBlockSize - blockOffset - Constant.kHeaderSize >= 0;
+            // Invariant: never leave < kLogHeaderSize bytes in a block
+            assert Constant.kBlockSize - blockOffset - Constant.kLogHeaderSize >= 0;
 
             final RecordType type;
-            final int blockForDataAvailable = Constant.kBlockSize - blockOffset - Constant.kHeaderSize;
+            final int blockForDataAvailable = Constant.kBlockSize - blockOffset - Constant.kLogHeaderSize;
             final int fragmentSize = Math.min(blockForDataAvailable, dataSizeRemain);
             final boolean end = fragmentSize == dataSizeRemain;
             if (begin && end) {
@@ -89,7 +89,7 @@ final class LogWriter implements Closeable {
     }
 
     private void writeRecord(RecordType type, byte[] blockPayload) throws IOException {
-        assert blockOffset + Constant.kHeaderSize + blockPayload.length <= Constant.kBlockSize;
+        assert blockOffset + Constant.kLogHeaderSize + blockPayload.length <= Constant.kBlockSize;
 
         // format header
         headerBuffer.clear();
@@ -105,6 +105,6 @@ final class LogWriter implements Closeable {
         // write hader and payload
         workingFileChannel.write(headerBuffer);
         workingFileChannel.write(ByteBuffer.wrap(blockPayload));
-        blockOffset += blockPayload.length + Constant.kHeaderSize;
+        blockOffset += blockPayload.length + Constant.kLogHeaderSize;
     }
 }

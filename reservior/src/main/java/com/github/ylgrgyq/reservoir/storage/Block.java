@@ -11,11 +11,11 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
     Block(ByteBuffer content) {
         this.content = content;
         content.position(content.limit() - Integer.BYTES);
-        int checkpointSize = content.getInt();
+        final int checkpointSize = content.getInt();
         assert checkpointSize > 0;
 
-        checkpoints = new ArrayList<>(checkpointSize);
-        int checkpointStart = content.limit() - Integer.BYTES - checkpointSize * Integer.BYTES;
+        this.checkpoints = new ArrayList<>(checkpointSize);
+        final int checkpointStart = content.limit() - Integer.BYTES - checkpointSize * Integer.BYTES;
         content.position(checkpointStart);
         int lastCheckpoint = -1;
         for (int i = 0; i < checkpointSize; i++) {
@@ -25,30 +25,15 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
             lastCheckpoint = checkpoint;
             assert checkpoint < checkpointStart :
                     String.format("checkpoint:%s, checkpointStart:%s", checkpoint, checkpointStart);
-            checkpoints.add(checkpoint);
+            this.checkpoints.add(checkpoint);
         }
         content.rewind();
         content.limit(checkpointStart);
     }
 
-    List<byte[]> getValuesByKeyRange(long startKey, long endKey) {
-        assert startKey < endKey;
-
-        List<byte[]> ret = new ArrayList<>();
-
-        SeekableIterator<Long, KeyValueEntry<Long, byte[]>> iter = iterator();
-        iter.seek(startKey);
-
-        while (iter.hasNext()) {
-            KeyValueEntry<Long, byte[]> entry = iter.next();
-            if (entry.getKey() < endKey) {
-                ret.add(entry.getVal());
-            } else {
-                break;
-            }
-        }
-
-        return ret;
+    @Override
+    public SeekableIterator<Long, KeyValueEntry<Long, byte[]>> iterator() {
+        return new Itr(content);
     }
 
     private int findStartCheckpoint(long key) {
@@ -89,11 +74,6 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
         return buffer;
     }
 
-    @Override
-    public SeekableIterator<Long, KeyValueEntry<Long, byte[]>> iterator() {
-        return new Itr(content);
-    }
-
     private class Itr implements SeekableIterator<Long, KeyValueEntry<Long, byte[]>> {
         private final ByteBuffer content;
         private int offset;
@@ -104,13 +84,13 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
 
         @Override
         public SeekableIterator<Long, KeyValueEntry<Long, byte[]>> seek(Long key) {
-            int checkpoint = findStartCheckpoint(key);
+            final int checkpoint = findStartCheckpoint(key);
             offset = checkpoints.get(checkpoint);
             assert offset < content.limit();
             while (offset < content.limit()) {
                 content.position(offset);
-                long k = content.getLong();
-                int len = content.getInt();
+                final long k = content.getLong();
+                final int len = content.getInt();
                 assert len > 0;
                 if (k < key) {
                     offset += len + Long.BYTES + Integer.BYTES;
@@ -131,10 +111,10 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
             assert offset < content.limit();
 
             content.position(offset);
-            long k = content.getLong();
-            int len = content.getInt();
+            final long k = content.getLong();
+            final int len = content.getInt();
             assert len > 0;
-            byte[] val = readVal(content, len);
+            final byte[] val = readVal(content, len);
 
             offset += len + Long.BYTES + Integer.BYTES;
 
