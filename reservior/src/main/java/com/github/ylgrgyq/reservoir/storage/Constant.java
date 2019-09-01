@@ -1,12 +1,11 @@
 package com.github.ylgrgyq.reservoir.storage;
 
 final class Constant {
-    static final int kBlockSize = 32768;
-
     // Header is checksum (Long) + length (Short) + record type (Byte).
     static final int kLogHeaderSize = Long.BYTES + Short.BYTES + Byte.BYTES;
+    static final int kLogBlockSize = 32768;
 
-    static final int kLogMaxBlockSize = 4096;
+    static final int kMaxDataBlockCountInSStable = 4096;
 
     // Block Trailer is checksum(Long)
     static final int kBlockTrailerSize = Long.BYTES;

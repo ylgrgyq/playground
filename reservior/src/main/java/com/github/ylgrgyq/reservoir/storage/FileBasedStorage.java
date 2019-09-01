@@ -22,7 +22,9 @@ import static java.util.Objects.requireNonNull;
 
 public final class FileBasedStorage implements ObjectQueueStorage {
     private static final Logger logger = LoggerFactory.getLogger(FileBasedStorage.class.getName());
+    private static final ThreadFactory threadFactory = new NamedThreadFactory("storage-background-truncate-handler-");
 
+    private final Thread backgroundTruncateHandler;
     private final ExecutorService sstableWriterPool = Executors.newSingleThreadScheduledExecutor(
             new NamedThreadFactory("SSTable-Writer-"));
     private final String baseDir;
@@ -44,15 +46,16 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     @Nullable
     private volatile Memtable imm;
     private volatile StorageStatus status;
-    private boolean backgroundWriteSstableRunning;
-    @Nullable
-    private volatile CountDownLatch shutdownLatch;
 
     public FileBasedStorage(String path) throws StorageException {
         this(path, 500);
     }
 
-    public FileBasedStorage(String storageBaseDir, long readRetryIntervalMillis) throws StorageException {
+    public FileBasedStorage(String path, long readRetryIntervalMillis) throws StorageException {
+        this(path, readRetryIntervalMillis, TimeUnit.MINUTES.toMillis(1));
+    }
+
+    public FileBasedStorage(String storageBaseDir, long readRetryIntervalMillis, long detectTruncateIntervalMillis) throws StorageException {
         requireNonNull(storageBaseDir, "storageBaseDir");
         Path baseDirPath = Paths.get(storageBaseDir);
 
@@ -69,7 +72,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         this.status = StorageStatus.INIT;
         this.tableCache = new TableCache(baseDir);
         this.manifest = new Manifest(baseDir);
-        this.backgroundWriteSstableRunning = false;
 
         try {
             createStorageDir();
@@ -96,16 +98,19 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             record.setConsumerCommitLogFileNumber(this.consumerCommitLogFileNumber);
             this.manifest.logRecord(record);
 
-            firstIdInStorage = manifest.getFirstId();
-            if (firstIdInStorage < 0) {
-                firstIdInStorage = mm.firstId();
+            this.firstIdInStorage = this.manifest.getFirstId();
+            if (this.firstIdInStorage < 0) {
+                this.firstIdInStorage = this.mm.firstId();
             }
 
-            lastIdInStorage = mm.lastId();
-            if (lastIdInStorage < 0) {
-                lastIdInStorage = manifest.getLastId();
+            this.lastIdInStorage = this.mm.lastId();
+            if (this.lastIdInStorage < 0) {
+                this.lastIdInStorage = this.manifest.getLastId();
             }
-            status = StorageStatus.OK;
+
+            this.backgroundTruncateHandler = threadFactory.newThread(new BackgroundTruncateHandler(detectTruncateIntervalMillis));
+            this.backgroundTruncateHandler.start();
+            this.status = StorageStatus.OK;
         } catch (IOException | StorageException t) {
             throw new IllegalStateException("init storage failed", t);
         } catch (Exception ex) {
@@ -243,35 +248,32 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
         try {
             status = StorageStatus.SHUTTING_DOWN;
-            shutdownLatch = new CountDownLatch(1);
+            sstableWriterPool.shutdown();
 
-            sstableWriterPool.submit(() -> {
-                synchronized (FileBasedStorage.this) {
-                    try {
-                        logger.debug("shutting file based storage down");
-                        sstableWriterPool.shutdownNow();
+            if (backgroundTruncateHandler != null) {
+                backgroundTruncateHandler.interrupt();
+                backgroundTruncateHandler.join();
+            }
 
-                        if (dataLogWriter != null) {
-                            dataLogWriter.close();
-                        }
+            logger.debug("shutting file based storage down");
+            sstableWriterPool.shutdownNow();
 
-                        if (consumerCommitLogWriter != null) {
-                            consumerCommitLogWriter.close();
-                        }
+            if (dataLogWriter != null) {
+                dataLogWriter.close();
+            }
 
-                        manifest.close();
+            if (consumerCommitLogWriter != null) {
+                consumerCommitLogWriter.close();
+            }
 
-                        tableCache.evictAll();
+            manifest.close();
 
-                        releaseStorageLock();
-                        logger.debug("file based storage shutdown successfully");
-                    } catch (Exception ex) {
-                        logger.error("shutdown failed", ex);
-                    } finally {
-                        shutdownLatch.countDown();
-                    }
-                }
-            });
+            tableCache.evictAll();
+
+            releaseStorageLock();
+            logger.debug("file based storage shutdown successfully");
+
+
         } catch (RejectedExecutionException ex) {
             throw new StorageException(ex);
         }
@@ -525,10 +527,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         }
     }
 
-    private synchronized long getFirstIndex() {
-        return firstIdInStorage;
-    }
-
     private synchronized boolean makeRoomForEntry(boolean force) {
         try {
             boolean forceRun = force;
@@ -561,7 +559,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         dataLogWriter = logWriter;
         imm = mm;
         mm = new Memtable();
-        backgroundWriteSstableRunning = true;
         logger.debug("Trigger compaction, new log file number={}", dataLogFileNumber);
         sstableWriterPool.submit(this::writeMemTable);
     }
@@ -619,7 +616,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             status = StorageStatus.ERROR;
         } finally {
             synchronized (this) {
-                backgroundWriteSstableRunning = false;
                 if (status == StorageStatus.OK) {
                     imm = null;
                 } else {
@@ -635,8 +631,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     }
 
     private SSTableFileMetaInfo mergeMemTableAndSStable(Memtable mm) throws IOException {
-        assert mm != null;
-
         final SSTableFileMetaInfo meta = new SSTableFileMetaInfo();
 
         final int fileNumber = manifest.getNextFileNumber();
@@ -728,6 +722,32 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         public ObjectWithId next() {
             assert lastItrIndex >= 0 && lastItrIndex < iterators.size();
             return iterators.get(lastItrIndex).next();
+        }
+    }
+
+    private class BackgroundTruncateHandler implements Runnable {
+        private final long detectTruncateIntervalMillis;
+
+        BackgroundTruncateHandler(long detectTruncateIntervalMillis) {
+            this.detectTruncateIntervalMillis = detectTruncateIntervalMillis;
+        }
+
+        @Override
+        public void run() {
+            while (status != StorageStatus.SHUTTING_DOWN) {
+                try {
+                    long lastCommittedId = getLastCommittedId();
+                    long truncateId = Math.max(0, lastCommittedId - 1000);
+                    manifest.truncateToId(truncateId);
+
+                    Thread.sleep(detectTruncateIntervalMillis);
+                } catch (InterruptedException ex) {
+                    // continue
+                } catch (Exception ex) {
+                    logger.error("Truncate handler failed for entry", ex);
+                    break;
+                }
+            }
         }
     }
 }

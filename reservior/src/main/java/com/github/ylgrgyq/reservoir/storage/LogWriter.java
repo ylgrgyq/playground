@@ -39,7 +39,7 @@ final class LogWriter implements Closeable {
         boolean begin = true;
 
         while (dataSizeRemain > 0) {
-            final int blockLeft = Constant.kBlockSize - blockOffset;
+            final int blockLeft = Constant.kLogBlockSize - blockOffset;
             assert blockLeft >= 0;
 
             // we don't expect data.length == 0, so if blockLeft == kLogHeaderSize
@@ -50,10 +50,10 @@ final class LogWriter implements Closeable {
             }
 
             // Invariant: never leave < kLogHeaderSize bytes in a block
-            assert Constant.kBlockSize - blockOffset - Constant.kLogHeaderSize >= 0;
+            assert Constant.kLogBlockSize - blockOffset - Constant.kLogHeaderSize >= 0;
 
             final RecordType type;
-            final int blockForDataAvailable = Constant.kBlockSize - blockOffset - Constant.kLogHeaderSize;
+            final int blockForDataAvailable = Constant.kLogBlockSize - blockOffset - Constant.kLogHeaderSize;
             final int fragmentSize = Math.min(blockForDataAvailable, dataSizeRemain);
             final boolean end = fragmentSize == dataSizeRemain;
             if (begin && end) {
@@ -86,7 +86,7 @@ final class LogWriter implements Closeable {
     }
 
     private void writeRecord(RecordType type, byte[] blockPayload) throws IOException {
-        assert blockOffset + Constant.kLogHeaderSize + blockPayload.length <= Constant.kBlockSize;
+        assert blockOffset + Constant.kLogHeaderSize + blockPayload.length <= Constant.kLogBlockSize;
 
         // format header
         headerBuffer.clear();

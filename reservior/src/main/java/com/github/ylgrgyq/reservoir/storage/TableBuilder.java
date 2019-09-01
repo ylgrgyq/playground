@@ -34,7 +34,7 @@ final class TableBuilder {
 
         dataBlock.add(k, v);
 
-        if (dataBlock.getCurrentEstimateBlockSize() >= Constant.kLogMaxBlockSize) {
+        if (dataBlock.getCurrentEstimateBlockSize() >= Constant.kMaxDataBlockCountInSStable) {
             flushDataBlock();
         }
 

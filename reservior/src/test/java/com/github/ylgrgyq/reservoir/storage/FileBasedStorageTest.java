@@ -2,7 +2,6 @@ package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.*;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -93,7 +92,7 @@ public class FileBasedStorageTest {
         final int expectSize = 2000;
         List<ObjectWithId> objs = new ArrayList<>();
         for (int i = 1; i < expectSize + 1; i++) {
-            ObjectWithId obj = new ObjectWithId(i, ("" + i).getBytes(StandardCharsets.UTF_8));
+            ObjectWithId obj = new ObjectWithId(i, new byte[Constant.kLogBlockSize]);
             objs.add(obj);
         }
         storage.store(objs);

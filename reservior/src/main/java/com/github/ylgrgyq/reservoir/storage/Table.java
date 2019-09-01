@@ -57,28 +57,10 @@ final class Table implements Iterable<ObjectWithId> {
         actualChecksum.update(content.array());
         if (expectChecksum != actualChecksum.getValue()) {
             throw new IllegalArgumentException("actualChecksum: " + actualChecksum.getValue()
-                    + " (expect: = )" + expectChecksum);
+                    + " (expect: = " + expectChecksum + ")");
         }
 
         return new Block(content);
-    }
-
-    List<ObjectWithId> getEntries(long start, long end) {
-        SeekableIterator<Long, ObjectWithId> itr = iterator();
-        itr.seek(start);
-
-        List<ObjectWithId> ret = new ArrayList<>();
-        while (itr.hasNext()) {
-            ObjectWithId v = itr.next();
-            long k = v.getId();
-            if (k >= start && k < end) {
-                ret.add(v);
-            } else {
-                break;
-            }
-        }
-
-        return ret;
     }
 
     private Block getBlock(IndexBlockHandle handle) throws IOException {

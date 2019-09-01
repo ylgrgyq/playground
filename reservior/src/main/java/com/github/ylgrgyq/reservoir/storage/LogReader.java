@@ -22,7 +22,7 @@ final class LogReader implements Closeable {
         // we don't make the buffer to lazy allocate buffer
         // because we think this way can save a check in read block, and we will always
         // read block immediately after construct a LogReader
-        this.buffer = ByteBuffer.allocate(Constant.kBlockSize);
+        this.buffer = ByteBuffer.allocate(Constant.kLogBlockSize);
         // flip to set the remaining bytes in buffer to zero. so next read will try to read
         // the log file to file this buffer
         this.buffer.flip();
