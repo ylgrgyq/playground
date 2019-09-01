@@ -3,7 +3,6 @@ package com.github.ylgrgyq.reservoir.storage;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.ylgrgyq.reservoir.ObjectWithId;
-import com.github.ylgrgyq.reservoir.StorageException;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -33,7 +32,7 @@ final class Table implements Iterable<ObjectWithId> {
         footerBuffer.flip();
         Footer footer = Footer.decode(footerBuffer.array());
 
-        BlockHandle indexBlockHandle = footer.getIndexBlockHandle();
+        IndexBlockHandle indexBlockHandle = footer.getIndexBlockHandle();
         Block indexBlock = readBlock(fileChannel, indexBlockHandle);
 
         return new Table(fileChannel, indexBlock);
@@ -44,7 +43,7 @@ final class Table implements Iterable<ObjectWithId> {
         dataBlockCache.invalidateAll();
     }
 
-    private static Block readBlock(FileChannel fileChannel, BlockHandle handle) throws IOException {
+    private static Block readBlock(FileChannel fileChannel, IndexBlockHandle handle) throws IOException {
         ByteBuffer content = ByteBuffer.allocate(handle.getSize());
         fileChannel.read(content, handle.getOffset());
 
@@ -81,7 +80,7 @@ final class Table implements Iterable<ObjectWithId> {
         return ret;
     }
 
-    private Block getBlock(BlockHandle handle) throws IOException {
+    private Block getBlock(IndexBlockHandle handle) throws IOException {
         Block block = dataBlockCache.getIfPresent(handle.getOffset());
         if (block == null) {
             block = readBlock(fileChannel, handle);
@@ -139,7 +138,7 @@ final class Table implements Iterable<ObjectWithId> {
         private SeekableIterator<Long, KeyValueEntry<Long, byte[]>> createInnerBlockIter() {
             try {
                 KeyValueEntry<Long, byte[]> kv = indexBlockIter.next();
-                BlockHandle handle = BlockHandle.decode(kv.getVal());
+                IndexBlockHandle handle = IndexBlockHandle.decode(kv.getVal());
                 Block block = getBlock(handle);
                 return block.iterator();
             } catch (IOException ex) {

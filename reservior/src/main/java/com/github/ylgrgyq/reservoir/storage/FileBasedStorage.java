@@ -323,7 +323,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         }
     }
 
-    private void recoverMemtableFromDataLogFiles(int fileNumber, ManifestRecord record, boolean lastLogFile) throws IOException, StorageException {
+    private synchronized void recoverMemtableFromDataLogFiles(int fileNumber, ManifestRecord record, boolean lastLogFile) throws IOException, StorageException {
         final Path logFilePath = Paths.get(baseDir, FileName.getLogFileName(fileNumber));
         if (Files.exists(logFilePath)) {
             logger.warn("Log file {} was deleted. We can't recover memtable from it.", logFilePath);

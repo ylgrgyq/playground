@@ -16,14 +16,17 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
 final class Manifest {
     private static final Logger logger = LoggerFactory.getLogger(Manifest.class.getName());
 
     private final String baseDir;
     private final List<SSTableFileMetaInfo> metas;
-    private final ReentrantLock metasLock;
+    private final ReadLock readMetasLock;
+    private final WriteLock writeMetasLock;
 
     @Nullable
     private LogWriter manifestRecordWriter;
@@ -33,7 +36,9 @@ final class Manifest {
     Manifest(String baseDir) {
         this.baseDir = baseDir;
         this.metas = new ArrayList<>();
-        this.metasLock = new ReentrantLock();
+        ReentrantReadWriteLock metasLock = new ReentrantReadWriteLock();
+        this.readMetasLock = metasLock.readLock();
+        this.writeMetasLock = metasLock.writeLock();
     }
 
     synchronized void logRecord(ManifestRecord record) throws IOException {
@@ -102,13 +107,13 @@ final class Manifest {
                 }
             }
 
-            metasLock.lock();
+            writeMetasLock.lock();
             try {
                 // we must make sure that searchMetas will only be called after recovery
                 assert metas.isEmpty();
                 metas.addAll(ms);
             } finally {
-                metasLock.unlock();
+                writeMetasLock.unlock();
             }
         } catch (BadRecordException ex) {
             String msg = String.format("recover manifest from file:\"%s\" failed due to \"%s\" log record",
@@ -118,7 +123,7 @@ final class Manifest {
     }
 
     long getFirstId() {
-        metasLock.lock();
+        readMetasLock.lock();
         try {
             if (!metas.isEmpty()) {
                 return metas.get(0).getFirstId();
@@ -126,12 +131,12 @@ final class Manifest {
                 return -1L;
             }
         } finally {
-            metasLock.unlock();
+            readMetasLock.unlock();
         }
     }
 
     long getLastId() {
-        metasLock.lock();
+        readMetasLock.lock();
         try {
             if (!metas.isEmpty()) {
                 return metas.get(metas.size() - 1).getLastId();
@@ -139,22 +144,27 @@ final class Manifest {
                 return -1L;
             }
         } finally {
-            metasLock.unlock();
+            readMetasLock.unlock();
         }
     }
 
     void truncateToId(long toId) throws IOException {
-        if (toId > 0) {
-            List<SSTableFileMetaInfo> remainMetas = searchMetas(toId);
-            if (remainMetas.size() < metas.size()) {
-                ManifestRecord record = ManifestRecord.newReplaceAllExistedMetasRecord();
-                record.addMetas(remainMetas);
-                logRecord(record);
+        writeMetasLock.lock();
+        try {
+            if (toId > 0) {
+                List<SSTableFileMetaInfo> remainMetas = searchMetas(toId);
+                if (remainMetas.size() < metas.size()) {
+                    ManifestRecord record = ManifestRecord.newReplaceAllExistedMetasRecord();
+                    record.addMetas(remainMetas);
+                    logRecord(record);
 
-                registerMetas(record);
-            } else {
-                assert remainMetas.size() == metas.size();
+                    registerMetas(record);
+                } else {
+                    assert remainMetas.size() == metas.size();
+                }
             }
+        } finally {
+            writeMetasLock.unlock();
         }
     }
 
@@ -173,13 +183,13 @@ final class Manifest {
     }
 
     /**
-     * find all the SSTableFileMetaInfo who's index range intersect with startIndex and endIndex
+     * Find all the SSTableFileMetaInfo who's id range covers startId.
      *
      * @param startId target start id (inclusive)
      * @return iterator for found SSTableFileMetaInfo
      */
     List<SSTableFileMetaInfo> searchMetas(long startId) {
-        metasLock.lock();
+        readMetasLock.lock();
         try {
             int startMetaIndex;
             if (metas.size() > 32) {
@@ -190,7 +200,7 @@ final class Manifest {
 
             return metas.subList(startMetaIndex, metas.size());
         } finally {
-            metasLock.unlock();
+            readMetasLock.unlock();
         }
     }
 
@@ -245,14 +255,14 @@ final class Manifest {
     }
 
     private void registerMetas(ManifestRecord record) {
-        metasLock.lock();
+        writeMetasLock.lock();
         try {
             if (record.getType() == ManifestRecord.Type.REPLACE_METAS) {
                 this.metas.clear();
             }
             this.metas.addAll(record.getMetas());
         } finally {
-            metasLock.unlock();
+            writeMetasLock.unlock();
         }
     }
 }

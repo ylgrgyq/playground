@@ -3,15 +3,15 @@ package com.github.ylgrgyq.reservoir.storage;
 import java.nio.ByteBuffer;
 
 final class Footer {
-    static int tableFooterSize = BlockHandle.blockHandleSize + Long.BYTES;
+    static int tableFooterSize = IndexBlockHandle.blockHandleSize + Long.BYTES;
 
-    private BlockHandle indexBlockHandle;
+    private final IndexBlockHandle indexBlockHandle;
 
-    Footer(BlockHandle indexBlockHandle) {
+    Footer(IndexBlockHandle indexBlockHandle) {
         this.indexBlockHandle = indexBlockHandle;
     }
 
-    BlockHandle getIndexBlockHandle() {
+    IndexBlockHandle getIndexBlockHandle() {
         return indexBlockHandle;
     }
 
@@ -26,7 +26,7 @@ final class Footer {
 
     static Footer decode(byte[] bytes) {
         ByteBuffer buffer = ByteBuffer.wrap(bytes);
-        byte[] indexBlockHandleBytes = new byte[BlockHandle.blockHandleSize];
+        byte[] indexBlockHandleBytes = new byte[IndexBlockHandle.blockHandleSize];
         buffer.get(indexBlockHandleBytes);
 
         long magic = buffer.getLong();
@@ -34,7 +34,7 @@ final class Footer {
             throw new IllegalStateException("found invalid sstable during checking magic number");
         }
 
-        BlockHandle indexBlockHandle = BlockHandle.decode(indexBlockHandleBytes);
+        IndexBlockHandle indexBlockHandle = IndexBlockHandle.decode(indexBlockHandleBytes);
         return new Footer(indexBlockHandle);
     }
 }
