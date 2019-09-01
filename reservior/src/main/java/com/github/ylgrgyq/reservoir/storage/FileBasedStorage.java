@@ -36,6 +36,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     private volatile int logFileNumber;
     private long firstIdInStorage;
     private long lastIdInStorage;
+    private long lastCommitedId;
     private Memtable mm;
     @Nullable
     private volatile Memtable imm;
@@ -60,6 +61,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         this.baseDir = storageBaseDir;
         this.firstIdInStorage = -1;
         this.lastIdInStorage = -1;
+        this.lastCommitedId = Long.MIN_VALUE;
         this.status = StorageStatus.INIT;
         this.tableCache = new TableCache(baseDir);
         this.manifest = new Manifest(baseDir);
@@ -118,11 +120,11 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     @Override
     public long getLastCommittedId() throws StorageException {
-        return 0;
+        return lastCommitedId;
     }
 
     @Override
-    public synchronized List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
+    public List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
         if (status != StorageStatus.OK) {
             throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
         }
@@ -146,7 +148,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     }
 
     @Override
-    public synchronized List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
+    public List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
 
         final long end = System.nanoTime() + unit.toNanos(timeout);
         List<ObjectWithId> entries;
@@ -405,7 +407,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         return buffer.array();
     }
 
-    private List<ObjectWithId> doFetch(long fromId, int limit) throws StorageException{
+    private synchronized List<ObjectWithId> doFetch(long fromId, int limit) throws StorageException{
         Itr itr;
         try {
             if (imm != null && fromId >= imm.firstId()) {

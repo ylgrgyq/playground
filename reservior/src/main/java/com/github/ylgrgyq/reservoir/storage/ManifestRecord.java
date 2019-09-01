@@ -46,7 +46,7 @@ final class ManifestRecord {
     }
 
     void setDataLogFileNumber(int number) {
-        assert type != Type.PLAIN || number > 1;
+        assert type != Type.PLAIN || number > 0;
         this.dataLogFileNumber = number;
     }
 

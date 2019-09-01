@@ -20,7 +20,6 @@ final class Memtable implements Iterable<ObjectWithId> {
 
     void add(ObjectWithId val) {
         long k = val.getId();
-        assert k > 0;
         byte[] v = val.getObjectInBytes();
 
         table.put(k, v);

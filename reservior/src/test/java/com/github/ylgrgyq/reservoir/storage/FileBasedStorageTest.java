@@ -2,6 +2,7 @@ package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.*;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -14,7 +15,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.junit.Assert.*;
 
 public class FileBasedStorageTest {
     private File tempFile;
@@ -27,6 +27,7 @@ public class FileBasedStorageTest {
         FileUtils.forceMkdir(tempFile);
     }
 
+    @Ignore
     @Test
     public void commitId() throws Exception {
         FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
@@ -87,6 +88,7 @@ public class FileBasedStorageTest {
         storage.close();
     }
 
+    @Ignore
     @Test
     public void truncate() throws Exception {
         FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
