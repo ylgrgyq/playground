@@ -7,27 +7,51 @@ import java.util.Objects;
 
 final class ManifestRecord {
     private final List<SSTableFileMetaInfo> metas;
+    private Type type;
     private int nextFileNumber;
     private int dataLogFileNumber;
 
-    ManifestRecord() {
+    private ManifestRecord(Type type) {
         this.metas = new ArrayList<>();
+        this.type = type;
+    }
+
+    static ManifestRecord newPlainRecord() {
+        return new ManifestRecord(Type.PLAIN);
+    }
+
+    static ManifestRecord newReplaceAllExistedMetasRecord() {
+        return new ManifestRecord(Type.REPLACE_METAS);
     }
 
     int getNextFileNumber() {
-        return nextFileNumber;
+        if (type == Type.PLAIN) {
+            return nextFileNumber;
+        } else {
+            return -1;
+        }
     }
 
     void setNextFileNumber(int nextFileNumber) {
+        assert type != Type.PLAIN || nextFileNumber > 1;
         this.nextFileNumber = nextFileNumber;
     }
 
     int getDataLogFileNumber() {
-        return dataLogFileNumber;
+        if (type == Type.PLAIN) {
+            return dataLogFileNumber;
+        } else {
+            return -1;
+        }
     }
 
     void setDataLogFileNumber(int number) {
+        assert number > 1;
         this.dataLogFileNumber = number;
+    }
+
+    Type getType() {
+        return type;
     }
 
     List<SSTableFileMetaInfo> getMetas() {
@@ -44,7 +68,8 @@ final class ManifestRecord {
 
     byte[] encode() {
         final int sstableMetaInfoEncodeSize = Integer.BYTES + Long.BYTES * 3;
-        final ByteBuffer buffer = ByteBuffer.allocate(metas.size() * sstableMetaInfoEncodeSize + Integer.BYTES * 3);
+        final ByteBuffer buffer = ByteBuffer.allocate(1 + metas.size() * sstableMetaInfoEncodeSize + Integer.BYTES * 3);
+        buffer.put(type.getCode());
         buffer.putInt(nextFileNumber);
         buffer.putInt(dataLogFileNumber);
         buffer.putInt(metas.size());
@@ -69,9 +94,9 @@ final class ManifestRecord {
     }
 
     static ManifestRecord decode(List<byte[]> bytes) {
-        final ManifestRecord record = new ManifestRecord();
-
         final ByteBuffer buffer = ByteBuffer.wrap(compact(bytes));
+        final ManifestRecord record = Type.newManifestRecord(buffer.get());
+
         record.setNextFileNumber(buffer.getInt());
         record.setDataLogFileNumber(buffer.getInt());
 
@@ -80,8 +105,8 @@ final class ManifestRecord {
             SSTableFileMetaInfo meta = new SSTableFileMetaInfo();
             meta.setFileSize(buffer.getLong());
             meta.setFileNumber(buffer.getInt());
-            meta.setFirstKey(buffer.getLong());
-            meta.setLastKey(buffer.getLong());
+            meta.setFirstId(buffer.getLong());
+            meta.setLastId(buffer.getLong());
 
             record.addMeta(meta);
         }
@@ -96,17 +121,19 @@ final class ManifestRecord {
         final ManifestRecord that = (ManifestRecord) o;
         return getNextFileNumber() == that.getNextFileNumber() &&
                 getDataLogFileNumber() == that.getDataLogFileNumber() &&
-                getMetas().equals(that.getMetas());
+                getMetas().equals(that.getMetas()) &&
+                getType() == that.getType();
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getNextFileNumber(), getDataLogFileNumber(), getMetas());
+        return Objects.hash(getMetas(), getType(), getNextFileNumber(), getDataLogFileNumber());
     }
 
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder("ManifestRecord{" +
+                "type=" + type +
                 ", nextFileNumber=" + nextFileNumber +
                 ", dataLogFileNumber=" + dataLogFileNumber);
 
@@ -122,5 +149,31 @@ final class ManifestRecord {
         builder.append("}");
 
         return builder.toString();
+    }
+
+    enum Type {
+        PLAIN((byte) 0),
+        REPLACE_METAS((byte) 1);
+
+        private byte code;
+
+        private Type(byte code) {
+            this.code = code;
+        }
+
+        public byte getCode() {
+            return code;
+        }
+
+        public static ManifestRecord newManifestRecord(byte typeCode) {
+            switch (typeCode) {
+                case 0:
+                    return newPlainRecord();
+                case 1:
+                    return newReplaceAllExistedMetasRecord();
+            }
+
+            throw new IllegalArgumentException("unknown manifest record type code: " + typeCode);
+        }
     }
 }

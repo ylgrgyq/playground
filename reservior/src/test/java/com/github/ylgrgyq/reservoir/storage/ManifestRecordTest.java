@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class ManifestRecordTest {
     @Test
     public void testEncodeEmptyMetas() {
-        final ManifestRecord record = new ManifestRecord();
+        final ManifestRecord record = ManifestRecord.newPlainRecord();
         record.setDataLogFileNumber(101);
         record.setNextFileNumber(102);
 
@@ -18,7 +18,7 @@ public class ManifestRecordTest {
 
     @Test
     public void testEncodeSomeMetas() {
-        final ManifestRecord record = new ManifestRecord();
+        final ManifestRecord record = ManifestRecord.newPlainRecord();
         record.setDataLogFileNumber(101);
         record.setNextFileNumber(102);
 
@@ -26,8 +26,8 @@ public class ManifestRecordTest {
             final SSTableFileMetaInfo meta = new SSTableFileMetaInfo();
             meta.setFileNumber(i);
             meta.setFileSize(i);
-            meta.setFirstKey(i);
-            meta.setLastKey(i);
+            meta.setFirstId(i);
+            meta.setLastId(i);
             record.addMeta(meta);
         }
 

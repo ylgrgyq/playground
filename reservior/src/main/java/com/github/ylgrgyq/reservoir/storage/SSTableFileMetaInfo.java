@@ -2,25 +2,29 @@ package com.github.ylgrgyq.reservoir.storage;
 
 import java.util.Objects;
 
-class SSTableFileMetaInfo {
+final class SSTableFileMetaInfo {
     private int fileNumber;
-    private long firstKey;
-    private long lastKey;
+    private long firstId;
+    private long lastId;
     private long fileSize;
 
     void setFileNumber(int fileNumber) {
+        assert fileNumber > 0;
         this.fileNumber = fileNumber;
     }
 
-    void setFirstKey(long firstIndex) {
-        this.firstKey = firstIndex;
+    void setFirstId(long firstIndex) {
+        assert firstIndex > 0;
+        this.firstId = firstIndex;
     }
 
-    void setLastKey(long lastIndex) {
-        this.lastKey = lastIndex;
+    void setLastId(long lastIndex) {
+        assert lastIndex > 0;
+        this.lastId = lastIndex;
     }
 
     void setFileSize(long fileSize) {
+        assert fileSize >= 0;
         this.fileSize = fileSize;
     }
 
@@ -29,11 +33,11 @@ class SSTableFileMetaInfo {
     }
 
     long getFirstId() {
-        return firstKey;
+        return firstId;
     }
 
     long getLastId() {
-        return lastKey;
+        return lastId;
     }
 
     long getFileSize() {
@@ -61,8 +65,8 @@ class SSTableFileMetaInfo {
     public String toString() {
         return "SSTableFileMetaInfo{" +
                 "fileNumber=" + fileNumber +
-                ", firstKey=" + firstKey +
-                ", lastKey=" + lastKey +
+                ", firstId=" + firstId +
+                ", lastId=" + lastId +
                 ", fileSize=" + fileSize +
                 '}';
     }

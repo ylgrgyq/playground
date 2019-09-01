@@ -14,7 +14,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Objects;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
@@ -29,29 +29,20 @@ final class Manifest {
     private LogWriter manifestRecordWriter;
     private int nextFileNumber = 1;
     private int dataLogFileNumber;
-    private int manifestFileNumber;
 
     Manifest(String baseDir) {
         this.baseDir = baseDir;
-        this.metas = new CopyOnWriteArrayList<>();
+        this.metas = new ArrayList<>();
         this.metasLock = new ReentrantLock();
     }
 
-    private void registerMetas(ManifestRecord record) {
-        metasLock.lock();
-        try {
-            metas.addAll(record.getMetas());
-        } finally {
-            metasLock.unlock();
-        }
-    }
-
     synchronized void logRecord(ManifestRecord record) throws IOException {
-        assert record.getDataLogFileNumber() >= dataLogFileNumber;
+        assert record.getType() != ManifestRecord.Type.PLAIN || record.getDataLogFileNumber() >= dataLogFileNumber;
 
         registerMetas(record);
 
         String manifestFileName = null;
+        int manifestFileNumber = 0;
         if (manifestRecordWriter == null) {
             final int fileNumber = getNextFileNumber();
             manifestFileNumber = fileNumber;
@@ -61,7 +52,9 @@ final class Manifest {
             manifestRecordWriter = new LogWriter(manifestFile);
         }
 
-        record.setNextFileNumber(nextFileNumber);
+        if (record.getType() == ManifestRecord.Type.PLAIN) {
+            record.setNextFileNumber(nextFileNumber);
+        }
         manifestRecordWriter.append(record.encode());
         manifestRecordWriter.flush();
 
@@ -69,8 +62,10 @@ final class Manifest {
 
         // only set CURRENT to the new manifest file after a new record has safely written to it
         if (manifestFileName != null) {
+            assert manifestFileNumber != 0;
             FileName.setCurrentFile(baseDir, manifestFileNumber);
         }
+        dataLogFileNumber = record.getDataLogFileNumber();
     }
 
     synchronized void recover(String manifestFileName) throws IOException, StorageException {
@@ -81,15 +76,24 @@ final class Manifest {
         }
 
         final FileChannel manifestFile = FileChannel.open(manifestFilePath, StandardOpenOption.READ);
-        try (final LogReader reader = new LogReader(manifestFile, true)) {
-            List<SSTableFileMetaInfo> ms = new ArrayList<>();
+        List<SSTableFileMetaInfo> ms = new ArrayList<>();
+        try (LogReader reader = new LogReader(manifestFile, true)) {
             while (true) {
                 final List<byte[]> logOpt = reader.readLog();
                 if (!logOpt.isEmpty()) {
                     final ManifestRecord record = ManifestRecord.decode(logOpt);
-                    nextFileNumber = record.getNextFileNumber();
-                    dataLogFileNumber = record.getDataLogFileNumber();
-                    ms.addAll(record.getMetas());
+                    switch (record.getType()) {
+                        case PLAIN:
+                            nextFileNumber = record.getNextFileNumber();
+                            dataLogFileNumber = record.getDataLogFileNumber();
+                            ms.addAll(record.getMetas());
+                            break;
+                        case REPLACE_METAS:
+                            ms = new ArrayList<>(record.getMetas());
+                            break;
+                        default:
+                            throw new StorageException("unknown manifest record type:" + record.getType());
+                    }
                 } else {
                     break;
                 }
@@ -136,6 +140,24 @@ final class Manifest {
         }
     }
 
+    boolean truncateToId(long toId) throws IOException {
+        if (toId > 0) {
+            List<SSTableFileMetaInfo> remainMetas = searchMetas(toId);
+            if (remainMetas.size() < metas.size()) {
+                ManifestRecord record = ManifestRecord.newReplaceAllExistedMetasRecord();
+                record.addMetas(remainMetas);
+                logRecord(record);
+
+                registerMetas(record);
+                return true;
+            } else {
+                assert remainMetas.size() == metas.size();
+            }
+        }
+
+        return false;
+    }
+
     synchronized void close() throws IOException {
         if (manifestRecordWriter != null) {
             manifestRecordWriter.close();
@@ -154,10 +176,9 @@ final class Manifest {
      * find all the SSTableFileMetaInfo who's index range intersect with startIndex and endIndex
      *
      * @param startKey target start key (inclusive)
-     * @param endKey   target end key (exclusive)
      * @return iterator for found SSTableFileMetaInfo
      */
-    List<SSTableFileMetaInfo> searchMetas(long startKey, long endKey) {
+    List<SSTableFileMetaInfo> searchMetas(long startKey) {
         metasLock.lock();
         try {
             int startMetaIndex;
@@ -167,13 +188,26 @@ final class Manifest {
                 startMetaIndex = traverseSearchStartMeta(startKey);
             }
 
-            return metas.subList(startMetaIndex, metas.size())
-                    .stream()
-                    .filter(meta -> meta.getFirstId() < endKey)
-                    .collect(Collectors.toList());
+            return metas.subList(startMetaIndex, metas.size());
         } finally {
             metasLock.unlock();
         }
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        final Manifest manifest = (Manifest) o;
+        return getNextFileNumber() == manifest.getNextFileNumber() &&
+                getDataLogFileNumber() == manifest.getDataLogFileNumber() &&
+                baseDir.equals(manifest.baseDir) &&
+                metas.equals(manifest.metas);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(baseDir, metas, getNextFileNumber(), getDataLogFileNumber());
     }
 
     private int traverseSearchStartMeta(long index) {
@@ -208,5 +242,17 @@ final class Manifest {
         }
 
         return start;
+    }
+
+    private void registerMetas(ManifestRecord record) {
+        metasLock.lock();
+        try {
+            if (record.getType() == ManifestRecord.Type.REPLACE_METAS) {
+                this.metas.clear();
+            }
+            this.metas.addAll(record.getMetas());
+        } finally {
+            metasLock.unlock();
+        }
     }
 }

@@ -20,19 +20,19 @@ public class TestingPayload implements Verifiable {
     }
 
     public TestingPayload(byte[] content) {
-        this.content = content;
+        this.content = Arrays.copyOf(content, content.length);
         this.id = idGenerator.incrementAndGet();
         this.valid = true;
     }
 
     public TestingPayload(long id, byte[] content) {
-        this.content = content;
+        this.content = Arrays.copyOf(content, content.length);
         this.id = id;
         this.valid = true;
     }
 
     public TestingPayload(long id, boolean valid, byte[] content) {
-        this.content = content;
+        this.content = Arrays.copyOf(content, content.length);
         this.id = id;
         this.valid = valid;
     }

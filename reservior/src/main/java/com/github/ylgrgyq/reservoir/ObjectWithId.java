@@ -12,7 +12,7 @@ public final class ObjectWithId {
         Objects.requireNonNull(objectInBytes, "objectInBytes");
 
         this.id = id;
-        this.objectInBytes = objectInBytes;
+        this.objectInBytes = Arrays.copyOf(objectInBytes, objectInBytes.length);
     }
 
     public long getId() {

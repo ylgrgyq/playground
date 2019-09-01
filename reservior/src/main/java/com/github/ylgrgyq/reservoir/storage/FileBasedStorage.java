@@ -60,7 +60,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         this.baseDir = storageBaseDir;
         this.firstIdInStorage = -1;
         this.lastIdInStorage = -1;
-        this.status = StorageStatus.NEED_INIT;
+        this.status = StorageStatus.INIT;
         this.tableCache = new TableCache(baseDir);
         this.manifest = new Manifest(baseDir);
         this.backgroundWriteSstableRunning = false;
@@ -72,7 +72,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
             logger.debug("Start init storage under {}", storageBaseDir);
 
-            final ManifestRecord record = new ManifestRecord();
+            final ManifestRecord record = ManifestRecord.newPlainRecord();
             final Path currentFilePath = Paths.get(storageBaseDir, FileName.getCurrentFileName());
             if (Files.exists(currentFilePath)) {
                 recoverStorage(currentFilePath, record);
@@ -415,7 +415,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
             itr = new Itr(itrs);
         } else {
-            itr = internalIterator(fromId, limit);
+            itr = internalIterator(fromId);
         }
 
         List<ObjectWithId> ret = new ArrayList<>();
@@ -491,13 +491,13 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             if (!imm.isEmpty()) {
                 assert imm.firstId() > manifest.getLastId();
                 final SSTableFileMetaInfo meta = writeMemTableToSSTable(imm);
-                record = new ManifestRecord();
+                record = ManifestRecord.newPlainRecord();
                 record.addMeta(meta);
                 record.setDataLogFileNumber(logFileNumber);
                 manifest.logRecord(record);
             }
 
-            final Set<Integer> remainMetasFileNumberSet = manifest.searchMetas(Long.MIN_VALUE, Long.MAX_VALUE)
+            final Set<Integer> remainMetasFileNumberSet = manifest.searchMetas(Long.MIN_VALUE)
                     .stream()
                     .map(SSTableFileMetaInfo::getFileNumber)
                     .collect(Collectors.toSet());
@@ -537,8 +537,8 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
         final int fileNumber = manifest.getNextFileNumber();
         meta.setFileNumber(fileNumber);
-        meta.setFirstKey(mm.firstId());
-        meta.setLastKey(mm.lastId());
+        meta.setFirstId(mm.firstId());
+        meta.setLastId(mm.lastId());
 
         final String tableFileName = FileName.getSSTableName(fileNumber);
         final Path tableFile = Paths.get(baseDir, tableFileName);
@@ -568,12 +568,12 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         return meta;
     }
 
-    private Itr internalIterator(long start, long end) throws StorageException {
-        List<SeekableIterator<Long, ObjectWithId>> itrs = getSSTableIterators(start, end);
+    private Itr internalIterator(long start) throws StorageException {
+        List<SeekableIterator<Long, ObjectWithId>> itrs = getSSTableIterators(start);
         if (imm != null) {
-            itrs.add(imm.iterator());
+            itrs.add(imm.iterator().seek(start));
         }
-        itrs.add(mm.iterator());
+        itrs.add(mm.iterator().seek(start));
         for (SeekableIterator<Long, ObjectWithId> itr : itrs) {
             itr.seek(start);
             if (itr.hasNext()) {
@@ -584,9 +584,9 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         return new Itr(itrs);
     }
 
-    private List<SeekableIterator<Long, ObjectWithId>> getSSTableIterators(long start, long end) throws StorageException {
+    private List<SeekableIterator<Long, ObjectWithId>> getSSTableIterators(long start) throws StorageException {
         try {
-            List<SSTableFileMetaInfo> metas = manifest.searchMetas(start, end);
+            List<SSTableFileMetaInfo> metas = manifest.searchMetas(start);
             List<SeekableIterator<Long, ObjectWithId>> ret = new ArrayList<>(metas.size());
             for (SSTableFileMetaInfo meta : metas) {
                 ret.add(tableCache.iterator(meta.getFileNumber(), meta.getFileSize()));
@@ -594,7 +594,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             return ret;
         } catch (IOException ex) {
             throw new StorageException(
-                    String.format("get sstable iterators start:%s end:%s from SSTable failed", start, end), ex);
+                    String.format("get sstable iterators start: %s from SSTable failed", start), ex);
         }
     }
 
