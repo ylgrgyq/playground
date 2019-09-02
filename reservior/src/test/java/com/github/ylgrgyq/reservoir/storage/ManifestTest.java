@@ -278,6 +278,7 @@ public class ManifestTest {
     private ManifestRecord newPlainManifestRecord(int number) {
         final ManifestRecord record = ManifestRecord.newPlainRecord();
         record.setDataLogFileNumber(number);
+        record.setConsumerCommitLogFileNumber(number);
         record.setNextFileNumber(number);
         return record;
     }
@@ -285,6 +286,7 @@ public class ManifestTest {
     private ManifestRecord newReplaceMetasManifestRecord(int number) {
         final ManifestRecord record = ManifestRecord.newReplaceAllExistedMetasRecord();
         record.setDataLogFileNumber(number);
+        record.setConsumerCommitLogFileNumber(number);
         record.setNextFileNumber(number);
         return record;
     }

@@ -8,9 +8,8 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.zip.CRC32;
+
+import static com.github.ylgrgyq.reservoir.storage.Block.readBlockFromChannel;
 
 final class Table implements Iterable<ObjectWithId> {
     private final Cache<Long, Block> dataBlockCache = Caffeine.newBuilder()
@@ -34,7 +33,7 @@ final class Table implements Iterable<ObjectWithId> {
         Footer footer = Footer.decode(footerBuffer.array());
 
         IndexBlockHandle indexBlockHandle = footer.getIndexBlockHandle();
-        Block indexBlock = readBlock(fileChannel, indexBlockHandle);
+        Block indexBlock = readBlockFromChannel(fileChannel, indexBlockHandle);
 
         return new Table(fileChannel, indexBlock);
     }
@@ -44,29 +43,10 @@ final class Table implements Iterable<ObjectWithId> {
         dataBlockCache.invalidateAll();
     }
 
-    private static Block readBlock(FileChannel fileChannel, IndexBlockHandle handle) throws IOException {
-        ByteBuffer content = ByteBuffer.allocate(handle.getSize());
-        fileChannel.read(content, handle.getOffset());
-
-        ByteBuffer trailer = ByteBuffer.allocate(Constant.kBlockTrailerSize);
-        fileChannel.read(trailer);
-        trailer.flip();
-
-        long expectChecksum = trailer.getLong();
-        CRC32 actualChecksum = new CRC32();
-        actualChecksum.update(content.array());
-        if (expectChecksum != actualChecksum.getValue()) {
-            throw new IllegalArgumentException("actualChecksum: " + actualChecksum.getValue()
-                    + " (expect: = " + expectChecksum + ")");
-        }
-
-        return new Block(content);
-    }
-
     private Block getBlock(IndexBlockHandle handle) throws IOException {
         Block block = dataBlockCache.getIfPresent(handle.getOffset());
         if (block == null) {
-            block = readBlock(fileChannel, handle);
+            block = readBlockFromChannel(fileChannel, handle);
             dataBlockCache.put(handle.getOffset(), block);
         }
 

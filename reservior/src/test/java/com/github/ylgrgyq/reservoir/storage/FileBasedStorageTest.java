@@ -1,12 +1,15 @@
 package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.*;
+import org.assertj.core.util.Lists;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
@@ -84,6 +87,23 @@ public class FileBasedStorageTest {
 
         assertThat(storage.fetch(0, 100, 100, TimeUnit.MILLISECONDS)).hasSize(0);
         storage.close();
+    }
+
+    @Test
+    public void testMemtableFull() throws Exception {
+        FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
+//        ObjectWithId obj = new ObjectWithId(100, new byte[Constant.kMaxMemtableSize]);
+
+        final int expectSize = 2;
+        List<ObjectWithId> objs = new ArrayList<>();
+        for (int i = 1; i < expectSize + 1; i++) {
+            ObjectWithId obj = new ObjectWithId(i, new byte[Constant.kMaxMemtableSize]);
+            objs.add(obj);
+        }
+
+        storage.store(objs);
+        assertThat(storage.fetch(0, 100, 100, TimeUnit.MILLISECONDS)).hasSize(2);
+
     }
 
     @Test

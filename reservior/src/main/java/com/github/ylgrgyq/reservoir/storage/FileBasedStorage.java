@@ -594,6 +594,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 final SSTableFileMetaInfo meta = writeMemTableToSSTable(imm);
                 record = ManifestRecord.newPlainRecord();
                 record.addMeta(meta);
+                record.setConsumerCommitLogFileNumber(consumerCommitLogFileNumber);
                 record.setDataLogFileNumber(dataLogFileNumber);
                 manifest.logRecord(record);
             }
@@ -608,7 +609,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 }
             }
 
-            FileName.deleteOutdatedFiles(baseDir, dataLogFileNumber, tableCache);
+            FileName.deleteOutdatedFiles(baseDir, dataLogFileNumber, consumerCommitLogFileNumber, tableCache);
 
             logger.debug("write mem table in background done with manifest record {}", record);
         } catch (Throwable t) {

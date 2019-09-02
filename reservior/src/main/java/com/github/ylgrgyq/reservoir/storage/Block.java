@@ -1,12 +1,34 @@
 package com.github.ylgrgyq.reservoir.storage;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.CRC32;
 
 final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
     private final ByteBuffer content;
     private final List<Integer> checkpoints;
+
+    static Block readBlockFromChannel(FileChannel fileChannel, IndexBlockHandle handle) throws IOException {
+        ByteBuffer content = ByteBuffer.allocate(handle.getSize());
+        fileChannel.read(content, handle.getOffset());
+
+        ByteBuffer trailer = ByteBuffer.allocate(Constant.kBlockTrailerSize);
+        fileChannel.read(trailer);
+        trailer.flip();
+
+        long expectChecksum = trailer.getLong();
+        CRC32 actualChecksum = new CRC32();
+        actualChecksum.update(content.array());
+        if (expectChecksum != actualChecksum.getValue()) {
+            throw new IllegalArgumentException("actualChecksum: " + actualChecksum.getValue()
+                    + " (expect: = " + expectChecksum + ")");
+        }
+
+        return new Block(content);
+    }
 
     Block(ByteBuffer content) {
         this.content = content;
