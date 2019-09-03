@@ -20,4 +20,15 @@ public class TestingUtils {
         }
         return nextInt;
     }
+
+    public static String makeString(String base, int expectSize) {
+        final int baseInNeed = expectSize / base.length();
+        final StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < baseInNeed; i++) {
+            builder.append(base);
+        }
+
+        builder.append(base, 0, expectSize - baseInNeed * base.length());
+        return builder.toString();
+    }
 }

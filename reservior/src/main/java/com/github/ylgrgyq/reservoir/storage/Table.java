@@ -8,10 +8,28 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-
-import static com.github.ylgrgyq.reservoir.storage.Block.readBlockFromChannel;
+import java.util.zip.CRC32;
 
 final class Table implements Iterable<ObjectWithId> {
+    static Block readBlockFromChannel(FileChannel fileChannel, IndexBlockHandle handle) throws IOException {
+        ByteBuffer content = ByteBuffer.allocate(handle.getSize());
+        fileChannel.read(content, handle.getOffset());
+
+        ByteBuffer trailer = ByteBuffer.allocate(Constant.kBlockTrailerSize);
+        fileChannel.read(trailer);
+        trailer.flip();
+
+        long expectChecksum = trailer.getLong();
+        CRC32 actualChecksum = new CRC32();
+        actualChecksum.update(content.array());
+        if (expectChecksum != actualChecksum.getValue()) {
+            throw new IllegalArgumentException("actualChecksum: " + actualChecksum.getValue()
+                    + " (expect: = " + expectChecksum + ")");
+        }
+
+        return new Block(content);
+    }
+
     private final Cache<Long, Block> dataBlockCache = Caffeine.newBuilder()
             .initialCapacity(1024)
             .maximumSize(2048)
@@ -59,9 +77,9 @@ final class Table implements Iterable<ObjectWithId> {
     }
 
     private class Itr implements SeekableIterator<Long, ObjectWithId> {
-        private final SeekableIterator<Long, KeyValueEntry<Long, byte[]>> indexBlockIter;
+        private final SeekableIterator<Long, ObjectWithId> indexBlockIter;
         @Nullable
-        private SeekableIterator<Long, KeyValueEntry<Long, byte[]>> innerBlockIter;
+        private SeekableIterator<Long, ObjectWithId> innerBlockIter;
 
         Itr(Block indexBlock) {
             this.indexBlockIter = indexBlock.iterator();
@@ -90,10 +108,10 @@ final class Table implements Iterable<ObjectWithId> {
             return innerBlockIter != null && innerBlockIter.hasNext();
         }
 
-        private SeekableIterator<Long, KeyValueEntry<Long, byte[]>> createInnerBlockIter() {
+        private SeekableIterator<Long, ObjectWithId> createInnerBlockIter() {
             try {
-                KeyValueEntry<Long, byte[]> kv = indexBlockIter.next();
-                IndexBlockHandle handle = IndexBlockHandle.decode(kv.getVal());
+                ObjectWithId kv = indexBlockIter.next();
+                IndexBlockHandle handle = IndexBlockHandle.decode(kv.getObjectInBytes());
                 Block block = getBlock(handle);
                 return block.iterator();
             } catch (IOException ex) {
@@ -105,8 +123,7 @@ final class Table implements Iterable<ObjectWithId> {
         public ObjectWithId next() {
             assert innerBlockIter != null;
             assert innerBlockIter.hasNext();
-            KeyValueEntry<Long, byte[]> ret = innerBlockIter.next();
-            return new ObjectWithId(ret.getKey(), ret.getVal());
+            return innerBlockIter.next();
         }
 
     }

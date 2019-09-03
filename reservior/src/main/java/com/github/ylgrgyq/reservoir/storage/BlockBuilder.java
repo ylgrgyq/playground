@@ -21,8 +21,7 @@ final class BlockBuilder {
 
     long add(long k, byte[] v) {
         assert !isBuilt;
-        assert v.length > 0 : String.format("actual:%s", v.length);
-        assert entryCounter >= 0;
+        assert v.length > 0 : "length: " + v.length;
 
         if ((entryCounter++ & (Constant.kBlockCheckpointInterval - 1)) == 0) {
             checkPoints.add(blockSize);
@@ -40,15 +39,19 @@ final class BlockBuilder {
         return blockSize;
     }
 
-    int getCurrentEstimateBlockSize() {
-        return blockSize
-                // checkpoints
-                + Integer.BYTES * checkPoints.size()
-                // checkpoints count
-                + Integer.BYTES;
+    int estimateBlockSize() {
+        if (isEmpty()) {
+            return 0;
+        } else {
+            return blockSize
+                    // checkpoints
+                    + Integer.BYTES * checkPoints.size()
+                    // checkpoints count
+                    + Integer.BYTES;
+        }
     }
 
-    long writeBlock(FileChannel fileChannel) throws IOException {
+    WriteBlockResult writeBlock(FileChannel fileChannel) throws IOException {
         assert !isBuilt;
         assert !buffers.isEmpty();
         assert !checkPoints.isEmpty();
@@ -72,19 +75,18 @@ final class BlockBuilder {
         }
         final ByteBuffer[] bufferArray = new ByteBuffer[buffers.size()];
         buffers.toArray(bufferArray);
-
         // maybe we have a lot of buffers which may not be written to channel at once, so we need loop and
         // tracking how many bytes we have written
-        long written = 0;
+        int written = 0;
         while (written < blockSize) {
             written += fileChannel.write(bufferArray);
         }
 
-        assert written > 0;
-        return checksum.getValue();
+        assert written > 0 && written == blockSize;
+        return new WriteBlockResult(checksum.getValue(), written);
     }
 
-    int getBlockSize() {
+    int getBlockDataSize() {
         return blockSize;
     }
 
@@ -98,5 +100,23 @@ final class BlockBuilder {
         blockSize = 0;
         entryCounter = 0;
         isBuilt = false;
+    }
+
+    static class WriteBlockResult {
+        private final long checksum;
+        private final int writtenBlockSize;
+
+        private WriteBlockResult(final long checksum, final int writtenBlockSize) {
+            this.checksum = checksum;
+            this.writtenBlockSize = writtenBlockSize;
+        }
+
+        long getChecksum() {
+            return checksum;
+        }
+
+        int getWrittenBlockSize() {
+            return writtenBlockSize;
+        }
     }
 }

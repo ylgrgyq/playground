@@ -1,5 +1,7 @@
 package com.github.ylgrgyq.reservoir.storage;
 
+import com.github.ylgrgyq.reservoir.ObjectWithId;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -7,28 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.CRC32;
 
-final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
+final class Block implements Iterable<ObjectWithId>{
     private final ByteBuffer content;
     private final List<Integer> checkpoints;
-
-    static Block readBlockFromChannel(FileChannel fileChannel, IndexBlockHandle handle) throws IOException {
-        ByteBuffer content = ByteBuffer.allocate(handle.getSize());
-        fileChannel.read(content, handle.getOffset());
-
-        ByteBuffer trailer = ByteBuffer.allocate(Constant.kBlockTrailerSize);
-        fileChannel.read(trailer);
-        trailer.flip();
-
-        long expectChecksum = trailer.getLong();
-        CRC32 actualChecksum = new CRC32();
-        actualChecksum.update(content.array());
-        if (expectChecksum != actualChecksum.getValue()) {
-            throw new IllegalArgumentException("actualChecksum: " + actualChecksum.getValue()
-                    + " (expect: = " + expectChecksum + ")");
-        }
-
-        return new Block(content);
-    }
 
     Block(ByteBuffer content) {
         this.content = content;
@@ -54,7 +37,7 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
     }
 
     @Override
-    public SeekableIterator<Long, KeyValueEntry<Long, byte[]>> iterator() {
+    public SeekableIterator<Long, ObjectWithId> iterator() {
         return new Itr(content);
     }
 
@@ -96,7 +79,7 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
         return buffer;
     }
 
-    private class Itr implements SeekableIterator<Long, KeyValueEntry<Long, byte[]>> {
+    private class Itr implements SeekableIterator<Long, ObjectWithId> {
         private final ByteBuffer content;
         private int offset;
 
@@ -105,7 +88,7 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
         }
 
         @Override
-        public SeekableIterator<Long, KeyValueEntry<Long, byte[]>> seek(Long key) {
+        public SeekableIterator<Long, ObjectWithId> seek(Long key) {
             final int checkpoint = findStartCheckpoint(key);
             offset = checkpoints.get(checkpoint);
             assert offset < content.limit();
@@ -129,7 +112,7 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
         }
 
         @Override
-        public KeyValueEntry<Long, byte[]> next() {
+        public ObjectWithId next() {
             assert offset < content.limit();
 
             content.position(offset);
@@ -140,7 +123,7 @@ final class Block implements Iterable<KeyValueEntry<Long, byte[]>>{
 
             offset += len + Long.BYTES + Integer.BYTES;
 
-            return new KeyValueEntry<>(k, val);
+            return new ObjectWithId(k, val);
         }
     }
 }

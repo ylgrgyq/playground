@@ -1,5 +1,7 @@
 package com.github.ylgrgyq.reservoir.storage;
 
+import com.github.ylgrgyq.reservoir.storage.BlockBuilder.WriteBlockResult;
+
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -34,7 +36,7 @@ final class TableBuilder {
 
         dataBlock.add(k, v);
 
-        if (dataBlock.getCurrentEstimateBlockSize() >= Constant.kMaxDataBlockCountInSStable) {
+        if (dataBlock.estimateBlockSize() >= Constant.kMaxDataBlockCountInSStable) {
             flushDataBlock();
         }
 
@@ -74,8 +76,9 @@ final class TableBuilder {
     }
 
     private IndexBlockHandle writeBlock(BlockBuilder block) throws IOException{
-        final long checksum = block.writeBlock(fileChannel);
-        final int blockSize = block.getBlockSize();
+        final WriteBlockResult result = block.writeBlock(fileChannel);
+        final long checksum = result.getChecksum();
+        final int blockSize = result.getWrittenBlockSize();
         final IndexBlockHandle handle = new IndexBlockHandle(offset, blockSize);
 
         // write trailer
