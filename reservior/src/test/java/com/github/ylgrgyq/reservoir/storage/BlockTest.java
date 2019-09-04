@@ -16,6 +16,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.github.ylgrgyq.reservoir.TestingUtils.numberString;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
@@ -61,7 +62,7 @@ public class BlockTest {
     @Test
     public void testReset() {
         for (long i = 0; i < 10000; i++) {
-            builder.add(i, TestingUtils.numberStringBytes(i));
+            addData(i, numberString(i));
         }
         assertThat(builder.estimateBlockSize()).isGreaterThan(0);
         assertThat(builder.getBlockDataSize()).isGreaterThan(0);
@@ -79,7 +80,7 @@ public class BlockTest {
         final List<ObjectWithId> expectDatas = new ArrayList<>();
         for (long i = 0; i < 10000; i++) {
             expectDatas.add(new ObjectWithId(i, TestingUtils.numberStringBytes(i)));
-            builder.add(i, TestingUtils.numberStringBytes(i));
+            addData(i, numberString(i));
         }
 
         final WriteBlockResult result = builder.writeBlock(testingFileChannel);
@@ -93,10 +94,10 @@ public class BlockTest {
 
     @Test
     public void testSeek() throws Exception {
-        final List<ObjectWithId> expectDatas = new ArrayList<>();
+        final List<ObjectWithId> addedDatas = new ArrayList<>();
         for (long i = 0; i < 1000; i++) {
-            expectDatas.add(new ObjectWithId(i, TestingUtils.numberStringBytes(i)));
-            builder.add(i, TestingUtils.numberStringBytes(i));
+            addedDatas.add(new ObjectWithId(i, TestingUtils.numberStringBytes(i)));
+            addData(i, numberString(i));
         }
 
         final WriteBlockResult result = builder.writeBlock(testingFileChannel);
@@ -104,13 +105,16 @@ public class BlockTest {
         testingFileChannel.read(actualBlockData, 0);
         final SeekableIterator<Long, ObjectWithId> actualBlockIterator = new Block(actualBlockData).iterator();
 
-        for (long i = 0; i < 1000; i++) {
+        for (long i = -100; i < 2000; i++) {
             actualBlockIterator.seek(i);
+            final List<ObjectWithId> expectDatas = addedDatas.subList(
+                    (int) Math.min(Math.max(0, i), addedDatas.size()),
+                    addedDatas.size());
             assertThat(actualBlockIterator)
                     .toIterable()
-                    .containsExactlyElementsOf(expectDatas.subList((int) i, expectDatas.size()))
-            ;
+                    .containsExactlyElementsOf(expectDatas);
         }
+        assertThat(actualBlockIterator).isExhausted();
     }
 
     private void addData(long id, String data) {

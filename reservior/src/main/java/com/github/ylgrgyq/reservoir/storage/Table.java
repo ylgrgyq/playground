@@ -11,16 +11,29 @@ import java.nio.channels.FileChannel;
 import java.util.zip.CRC32;
 
 final class Table implements Iterable<ObjectWithId> {
-    static Block readBlockFromChannel(FileChannel fileChannel, IndexBlockHandle handle) throws IOException {
-        ByteBuffer content = ByteBuffer.allocate(handle.getSize());
-        fileChannel.read(content, handle.getOffset());
+    static Table open(FileChannel fileChannel, long fileSize) throws IOException {
+        final long footerOffset = fileSize - Footer.tableFooterSize;
+        final ByteBuffer footerBuffer = ByteBuffer.allocate(Footer.tableFooterSize);
+        fileChannel.read(footerBuffer, footerOffset);
+        footerBuffer.flip();
+        final Footer footer = Footer.decode(footerBuffer.array());
+        final BlockIndexHandle blockIndexHandle = footer.getBlockIndexHandle();
+        final Block indexBlock = readBlockFromChannel(fileChannel, blockIndexHandle);
 
-        ByteBuffer trailer = ByteBuffer.allocate(Constant.kBlockTrailerSize);
+        return new Table(fileChannel, indexBlock);
+    }
+
+    private static Block readBlockFromChannel(FileChannel fileChannel, BlockIndexHandle handle) throws IOException {
+        final ByteBuffer content = ByteBuffer.allocate(handle.getBlockSize());
+        fileChannel.position(handle.getBlockStartOffset());
+        fileChannel.read(content);
+
+        final ByteBuffer trailer = ByteBuffer.allocate(Constant.kBlockTrailerSize);
         fileChannel.read(trailer);
         trailer.flip();
 
-        long expectChecksum = trailer.getLong();
-        CRC32 actualChecksum = new CRC32();
+        final long expectChecksum = trailer.getLong();
+        final CRC32 actualChecksum = new CRC32();
         actualChecksum.update(content.array());
         if (expectChecksum != actualChecksum.getValue()) {
             throw new IllegalArgumentException("actualChecksum: " + actualChecksum.getValue()
@@ -34,7 +47,6 @@ final class Table implements Iterable<ObjectWithId> {
             .initialCapacity(1024)
             .maximumSize(2048)
             .build();
-
     private final FileChannel fileChannel;
     private final Block indexBlock;
 
@@ -43,32 +55,9 @@ final class Table implements Iterable<ObjectWithId> {
         this.indexBlock = indexBlock;
     }
 
-    static Table open(FileChannel fileChannel, long fileSize) throws IOException {
-        long footerOffset = fileSize - Footer.tableFooterSize;
-        ByteBuffer footerBuffer = ByteBuffer.allocate(Footer.tableFooterSize);
-        fileChannel.read(footerBuffer, footerOffset);
-        footerBuffer.flip();
-        Footer footer = Footer.decode(footerBuffer.array());
-
-        IndexBlockHandle indexBlockHandle = footer.getIndexBlockHandle();
-        Block indexBlock = readBlockFromChannel(fileChannel, indexBlockHandle);
-
-        return new Table(fileChannel, indexBlock);
-    }
-
     void close() throws IOException {
         fileChannel.close();
         dataBlockCache.invalidateAll();
-    }
-
-    private Block getBlock(IndexBlockHandle handle) throws IOException {
-        Block block = dataBlockCache.getIfPresent(handle.getOffset());
-        if (block == null) {
-            block = readBlockFromChannel(fileChannel, handle);
-            dataBlockCache.put(handle.getOffset(), block);
-        }
-
-        return block;
     }
 
     @Override
@@ -108,17 +97,6 @@ final class Table implements Iterable<ObjectWithId> {
             return innerBlockIter != null && innerBlockIter.hasNext();
         }
 
-        private SeekableIterator<Long, ObjectWithId> createInnerBlockIter() {
-            try {
-                ObjectWithId kv = indexBlockIter.next();
-                IndexBlockHandle handle = IndexBlockHandle.decode(kv.getObjectInBytes());
-                Block block = getBlock(handle);
-                return block.iterator();
-            } catch (IOException ex) {
-                throw new StorageRuntimeException("create inner block iterator failed", ex);
-            }
-        }
-
         @Override
         public ObjectWithId next() {
             assert innerBlockIter != null;
@@ -126,7 +104,26 @@ final class Table implements Iterable<ObjectWithId> {
             return innerBlockIter.next();
         }
 
+        private SeekableIterator<Long, ObjectWithId> createInnerBlockIter() {
+            try {
+                final ObjectWithId kv = indexBlockIter.next();
+                final BlockIndexHandle handle = BlockIndexHandle.decode(kv.getObjectInBytes());
+                final Block block = getBlock(handle);
+                return block.iterator();
+            } catch (IOException ex) {
+                throw new StorageRuntimeException("create inner block iterator failed", ex);
+            }
+        }
+
+        private Block getBlock(BlockIndexHandle handle) throws IOException {
+            final Cache<Long, Block> cache = dataBlockCache;
+            Block block = cache.getIfPresent(handle.getBlockStartOffset());
+            if (block == null) {
+                block = readBlockFromChannel(fileChannel, handle);
+                cache.put(handle.getBlockStartOffset(), block);
+            }
+
+            return block;
+        }
     }
-
-
 }

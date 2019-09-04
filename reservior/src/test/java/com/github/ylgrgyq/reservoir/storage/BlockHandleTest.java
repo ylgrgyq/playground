@@ -8,7 +8,7 @@ public class BlockHandleTest {
 
     @Test
     public void testEncodeDecode() {
-        IndexBlockHandle handle = new IndexBlockHandle(Long.MIN_VALUE, Integer.MIN_VALUE);
-        assertThat(IndexBlockHandle.decode(handle.encode())).isEqualTo(handle);
+        BlockIndexHandle handle = new BlockIndexHandle(Long.MIN_VALUE, Integer.MIN_VALUE);
+        assertThat(BlockIndexHandle.decode(handle.encode())).isEqualTo(handle);
     }
 }

@@ -41,7 +41,6 @@ final class TableCache {
 
     SeekableIterator<Long, ObjectWithId> iterator(int fileNumber, long fileSize) throws IOException {
         Table t = findTable(fileNumber, fileSize);
-        assert t != null;
         return t.iterator();
     }
 

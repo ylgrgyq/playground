@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.CRC32;
 
-final class Block implements Iterable<ObjectWithId>{
+final class Block implements Iterable<ObjectWithId> {
     private final ByteBuffer content;
     private final List<Integer> checkpoints;
 
@@ -24,12 +24,12 @@ final class Block implements Iterable<ObjectWithId>{
         content.position(checkpointStart);
         int lastCheckpoint = -1;
         for (int i = 0; i < checkpointSize; i++) {
-            int checkpoint = content.getInt();
+            final int checkpoint = content.getInt();
             assert lastCheckpoint < checkpoint :
-                    String.format("checkpoint:%s, lastCheckpoint:%s", checkpoint, lastCheckpoint);
+                    "checkpoint: " + checkpoint + ", lastCheckpoint: " + lastCheckpoint;
             lastCheckpoint = checkpoint;
             assert checkpoint < checkpointStart :
-                    String.format("checkpoint:%s, checkpointStart:%s", checkpoint, checkpointStart);
+                    "checkpoint: " + checkpoint + ", checkpointStart: " + checkpointStart;
             this.checkpoints.add(checkpoint);
         }
         content.rewind();

@@ -5,7 +5,7 @@ final class Constant {
     static final int kLogHeaderSize = Long.BYTES + Short.BYTES + Byte.BYTES;
     static final int kLogBlockSize = 32768;
 
-    static final int kMaxDataBlockCountInSStable = 4096;
+    static final int kMaxDataBlockSize = 4096;
 
     // Block Trailer is checksum(Long)
     static final int kBlockTrailerSize = Long.BYTES;

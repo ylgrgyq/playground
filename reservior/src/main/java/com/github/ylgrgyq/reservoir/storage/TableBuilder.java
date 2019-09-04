@@ -9,17 +9,17 @@ import java.nio.channels.FileChannel;
 
 final class TableBuilder {
     private final FileChannel fileChannel;
-    private final BlockBuilder dataBlock;
+    private final BlockBuilder pendingDataBlock;
     private final BlockBuilder indexBlock;
-    @Nullable
-    private IndexBlockHandle pendingIndexBlockHandle;
     private long lastKey;
-    private long offset;
+    private long nextBlockOffset;
     private boolean isFinished;
+    @Nullable
+    private BlockIndexHandle pendingBlockIndexHandle;
 
     TableBuilder(FileChannel fileChannel) {
         this.fileChannel = fileChannel;
-        this.dataBlock = new BlockBuilder();
+        this.pendingDataBlock = new BlockBuilder();
         this.indexBlock = new BlockBuilder();
         this.lastKey = -1;
     }
@@ -29,14 +29,14 @@ final class TableBuilder {
         assert v.length > 0;
         assert !isFinished;
 
-        if (pendingIndexBlockHandle != null) {
-            indexBlock.add(k, pendingIndexBlockHandle.encode());
-            pendingIndexBlockHandle = null;
+        if (pendingBlockIndexHandle != null) {
+            indexBlock.add(k, pendingBlockIndexHandle.encode());
+            pendingBlockIndexHandle = null;
         }
 
-        dataBlock.add(k, v);
+        pendingDataBlock.add(k, v);
 
-        if (dataBlock.estimateBlockSize() >= Constant.kMaxDataBlockCountInSStable) {
+        if (pendingDataBlock.estimateBlockSize() >= Constant.kMaxDataBlockSize) {
             flushDataBlock();
         }
 
@@ -45,41 +45,42 @@ final class TableBuilder {
 
     long finishBuild() throws IOException {
         assert ! isFinished;
-        assert offset > 0;
+        // nextBlockOffset can equal to 0 when no data block has been written
+        assert nextBlockOffset >= 0;
 
         isFinished = true;
 
-        if (!dataBlock.isEmpty()) {
+        if (!pendingDataBlock.isEmpty()) {
             flushDataBlock();
         }
 
-        if (pendingIndexBlockHandle != null) {
-            indexBlock.add(lastKey + 1, pendingIndexBlockHandle.encode());
-            pendingIndexBlockHandle = null;
+        if (pendingBlockIndexHandle != null) {
+            indexBlock.add(lastKey + 1, pendingBlockIndexHandle.encode());
+            pendingBlockIndexHandle = null;
         }
 
-        IndexBlockHandle indexBlockHandle = writeBlock(indexBlock);
-
-        Footer footer = new Footer(indexBlockHandle);
-        byte[] footerBytes = footer.encode();
+        final BlockIndexHandle blockIndexHandle = writeBlock(indexBlock);
+        final Footer footer = new Footer(blockIndexHandle);
+        final byte[] footerBytes = footer.encode();
         fileChannel.write(ByteBuffer.wrap(footerBytes));
 
-        offset += footerBytes.length;
-
-        return offset;
+        return nextBlockOffset + footerBytes.length;
     }
 
     private void flushDataBlock() throws IOException {
-        assert ! dataBlock.isEmpty();
-        pendingIndexBlockHandle = writeBlock(dataBlock);
+        assert ! pendingDataBlock.isEmpty();
+        pendingBlockIndexHandle = writeBlock(pendingDataBlock);
         fileChannel.force(true);
     }
 
-    private IndexBlockHandle writeBlock(BlockBuilder block) throws IOException{
+    private BlockIndexHandle writeBlock(BlockBuilder block) throws IOException{
+        assert fileChannel.position() == nextBlockOffset :
+                "position: " + fileChannel.position() + " nextBlockOffset: " + nextBlockOffset;
+
+        final long blockStartOffset = nextBlockOffset;
         final WriteBlockResult result = block.writeBlock(fileChannel);
         final long checksum = result.getChecksum();
         final int blockSize = result.getWrittenBlockSize();
-        final IndexBlockHandle handle = new IndexBlockHandle(offset, blockSize);
 
         // write trailer
         final ByteBuffer trailer = ByteBuffer.allocate(Constant.kBlockTrailerSize);
@@ -87,9 +88,9 @@ final class TableBuilder {
         trailer.flip();
         fileChannel.write(trailer);
 
-        dataBlock.reset();
-        offset += blockSize + Constant.kBlockTrailerSize;
+        pendingDataBlock.reset();
+        nextBlockOffset += blockSize + Constant.kBlockTrailerSize;
 
-        return handle;
+        return new BlockIndexHandle(blockStartOffset, blockSize);
     }
 }
