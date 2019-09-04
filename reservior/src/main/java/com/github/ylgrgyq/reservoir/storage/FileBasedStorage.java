@@ -628,10 +628,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     }
 
     private SSTableFileMetaInfo writeMemTableToSSTable(Memtable mm) throws IOException {
-        return mergeMemTableAndSStable(mm);
-    }
-
-    private SSTableFileMetaInfo mergeMemTableAndSStable(Memtable mm) throws IOException {
         final SSTableFileMetaInfo meta = new SSTableFileMetaInfo();
 
         final int fileNumber = manifest.getNextFileNumber();
@@ -742,7 +738,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                     manifest.truncateToId(truncateId);
 
                     Thread.sleep(detectTruncateIntervalMillis);
-                    FileName.deleteOutdatedFiles(baseDir, dataLogFileNumber, consumerCommitLogFileNumber, tableCache);
                 } catch (InterruptedException ex) {
                     // continue
                 } catch (Exception ex) {
