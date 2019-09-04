@@ -68,9 +68,9 @@ public class TableTest {
     @Test
     public void testWriteReadManyBigData() throws Exception {
         final List<ObjectWithId> expectDatas = new ArrayList<>();
-        for (long i = 0; i < 1; i++) {
+        for (long i = 0; i < 1000; i++) {
             expectDatas.add(makeObjectWithId(i, makeString("Hello", Constant.kMaxDataBlockSize)));
-            addData(i, makeString("Hello", 10101));
+            addData(i, makeString("Hello", Constant.kMaxDataBlockSize));
         }
 
         final long tableSize = builder.finishBuild();

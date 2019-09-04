@@ -92,7 +92,6 @@ public class FileBasedStorageTest {
     @Test
     public void testMemtableFull() throws Exception {
         FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
-//        ObjectWithId obj = new ObjectWithId(100, new byte[Constant.kMaxMemtableSize]);
 
         final int expectSize = 2;
         List<ObjectWithId> objs = new ArrayList<>();
@@ -103,7 +102,6 @@ public class FileBasedStorageTest {
 
         storage.store(objs);
         assertThat(storage.fetch(0, 100, 100, TimeUnit.MILLISECONDS)).hasSize(2);
-
     }
 
     @Test
