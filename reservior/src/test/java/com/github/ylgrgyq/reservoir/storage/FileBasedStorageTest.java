@@ -112,10 +112,10 @@ public class FileBasedStorageTest {
         }
         storage.store(objs);
         storage.commitId(1000);
-        await().until(() -> {
-            List<ObjectWithId> actualObjs = storage.fetch(0, 100);
-            return actualObjs.iterator().next().getId() > 0;
-        });
+        objs.add(new ObjectWithId(1010101, "Trigger truncate".getBytes(StandardCharsets.UTF_8)));
+        List<ObjectWithId> actualObjs = storage.fetch(0, 100);
+        assertThat(actualObjs.iterator().next().getId()).isGreaterThan(1);
+
         storage.close();
     }
 

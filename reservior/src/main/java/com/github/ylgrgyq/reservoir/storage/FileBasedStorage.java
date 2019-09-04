@@ -14,6 +14,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
@@ -22,9 +23,7 @@ import static java.util.Objects.requireNonNull;
 
 public final class FileBasedStorage implements ObjectQueueStorage {
     private static final Logger logger = LoggerFactory.getLogger(FileBasedStorage.class.getName());
-    private static final ThreadFactory threadFactory = new NamedThreadFactory("storage-background-truncate-handler-");
 
-    private final Thread backgroundTruncateHandler;
     private final ExecutorService sstableWriterPool = Executors.newSingleThreadScheduledExecutor(
             new NamedThreadFactory("SSTable-Writer-"));
     private final String baseDir;
@@ -42,6 +41,8 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     private long firstIdInStorage;
     private long lastIdInStorage;
     private long lastCommittedId;
+    private long lastTryTruncateTime;
+    private long truncateIntervalNanos;
     private Memtable mm;
     @Nullable
     private volatile Memtable imm;
@@ -55,7 +56,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         this(path, readRetryIntervalMillis, TimeUnit.MINUTES.toMillis(1));
     }
 
-    public FileBasedStorage(String storageBaseDir, long readRetryIntervalMillis, long detectTruncateIntervalMillis) throws StorageException {
+    public FileBasedStorage(String storageBaseDir, long readRetryIntervalMillis, long truncateIntervalMillis) throws StorageException {
         requireNonNull(storageBaseDir, "storageBaseDir");
         Path baseDirPath = Paths.get(storageBaseDir);
 
@@ -72,6 +73,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         this.status = StorageStatus.INIT;
         this.tableCache = new TableCache(baseDir);
         this.manifest = new Manifest(baseDir);
+        this.truncateIntervalNanos = TimeUnit.MILLISECONDS.toNanos(truncateIntervalMillis);
 
         try {
             createStorageDir();
@@ -108,8 +110,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 this.lastIdInStorage = this.manifest.getLastId();
             }
 
-            this.backgroundTruncateHandler = threadFactory.newThread(new BackgroundTruncateHandler(detectTruncateIntervalMillis));
-            this.backgroundTruncateHandler.start();
+            this.lastTryTruncateTime = System.nanoTime();
             this.status = StorageStatus.OK;
         } catch (IOException | StorageException t) {
             throw new IllegalStateException("init storage failed", t);
@@ -136,6 +137,10 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 Bits.putLong(bs, 0, id);
                 consumerCommitLogWriter.append(bs);
                 lastCommittedId = id;
+
+                if (System.nanoTime() - lastTryTruncateTime > truncateIntervalNanos) {
+                    tryTruncate();
+                }
             }
         } catch (IOException ex) {
             throw new StorageException(ex);
@@ -249,11 +254,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         try {
             status = StorageStatus.SHUTTING_DOWN;
             sstableWriterPool.shutdown();
-
-            if (backgroundTruncateHandler != null) {
-                backgroundTruncateHandler.interrupt();
-                backgroundTruncateHandler.join();
-            }
 
             logger.debug("shutting file based storage down");
             sstableWriterPool.shutdownNow();
@@ -693,6 +693,17 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         }
     }
 
+    private synchronized void tryTruncate() {
+        try {
+            final long lastCommittedId = getLastCommittedId();
+            final long truncateId = Math.max(0, lastCommittedId);
+            manifest.truncateToId(truncateId);
+            lastTryTruncateTime = System.nanoTime();
+        } catch (Exception ex) {
+            logger.error("Truncate handler failed for entry", ex);
+        }
+    }
+
     private static class Itr implements Iterator<ObjectWithId> {
         private final List<SeekableIterator<Long, ObjectWithId>> iterators;
         private int lastItrIndex;
@@ -719,32 +730,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         public ObjectWithId next() {
             assert lastItrIndex >= 0 && lastItrIndex < iterators.size();
             return iterators.get(lastItrIndex).next();
-        }
-    }
-
-    private class BackgroundTruncateHandler implements Runnable {
-        private final long detectTruncateIntervalMillis;
-
-        BackgroundTruncateHandler(long detectTruncateIntervalMillis) {
-            this.detectTruncateIntervalMillis = detectTruncateIntervalMillis;
-        }
-
-        @Override
-        public void run() {
-            while (status != StorageStatus.SHUTTING_DOWN) {
-                try {
-                    final long lastCommittedId = getLastCommittedId();
-                    final long truncateId = Math.max(0, lastCommittedId);
-                    manifest.truncateToId(truncateId);
-
-                    Thread.sleep(detectTruncateIntervalMillis);
-                } catch (InterruptedException ex) {
-                    // continue
-                } catch (Exception ex) {
-                    logger.error("Truncate handler failed for entry", ex);
-                    break;
-                }
-            }
         }
     }
 }

@@ -32,25 +32,25 @@ final class TableCache {
     }
 
     Table loadTable(int fileNumber, long fileSize) throws IOException {
-        String tableFileName = FileName.getSSTableName(fileNumber);
-        FileChannel ch = FileChannel.open(Paths.get(baseDir, tableFileName), StandardOpenOption.READ);
-        Table t = Table.open(ch, fileSize);
+        final String tableFileName = FileName.getSSTableName(fileNumber);
+        final FileChannel ch = FileChannel.open(Paths.get(baseDir, tableFileName), StandardOpenOption.READ);
+        final Table t = Table.open(ch, fileSize);
         cache.put(fileNumber, t);
         return t;
     }
 
     SeekableIterator<Long, ObjectWithId> iterator(int fileNumber, long fileSize) throws IOException {
-        Table t = findTable(fileNumber, fileSize);
+        final Table t = findTable(fileNumber, fileSize);
         return t.iterator();
     }
 
     boolean hasTable(int fileNumber) {
-        Table t = cache.getIfPresent(fileNumber);
+        final Table t = cache.getIfPresent(fileNumber);
         return t != null;
     }
 
     void evict(int fileNumber) throws IOException {
-        Table t = cache.getIfPresent(fileNumber);
+        final Table t = cache.getIfPresent(fileNumber);
         if (t != null) {
             t.close();
         }
