@@ -737,11 +737,12 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         public void run() {
             while (status != StorageStatus.SHUTTING_DOWN) {
                 try {
-                    long lastCommittedId = getLastCommittedId();
-                    long truncateId = Math.max(0, lastCommittedId - 1000);
+                    final long lastCommittedId = getLastCommittedId();
+                    final long truncateId = Math.max(0, lastCommittedId);
                     manifest.truncateToId(truncateId);
 
                     Thread.sleep(detectTruncateIntervalMillis);
+                    FileName.deleteOutdatedFiles(baseDir, dataLogFileNumber, consumerCommitLogFileNumber, tableCache);
                 } catch (InterruptedException ex) {
                     // continue
                 } catch (Exception ex) {

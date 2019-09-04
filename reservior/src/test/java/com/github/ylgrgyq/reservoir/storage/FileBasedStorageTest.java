@@ -1,15 +1,12 @@
 package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.*;
-import org.assertj.core.util.Lists;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
@@ -106,7 +103,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void truncate() throws Exception {
-        FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
+        FileBasedStorage storage = new FileBasedStorage(tempFile.getPath(), 500, 500);
         final int expectSize = 2000;
         List<ObjectWithId> objs = new ArrayList<>();
         for (int i = 1; i < expectSize + 1; i++) {
@@ -114,10 +111,10 @@ public class FileBasedStorageTest {
             objs.add(obj);
         }
         storage.store(objs);
-        storage.commitId(2000);
+        storage.commitId(1000);
         await().until(() -> {
             List<ObjectWithId> actualObjs = storage.fetch(0, 100);
-            return actualObjs.iterator().next().getId() == 1000;
+            return actualObjs.iterator().next().getId() > 0;
         });
         storage.close();
     }
@@ -135,5 +132,4 @@ public class FileBasedStorageTest {
         assertThat(queue.fetch()).isEqualTo(payload);
         storage.close();
     }
-
 }
