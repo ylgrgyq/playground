@@ -1,6 +1,9 @@
 package com.github.ylgrgyq.reservoir.storage;
 
-import com.github.ylgrgyq.reservoir.*;
+import com.github.ylgrgyq.reservoir.Bits;
+import com.github.ylgrgyq.reservoir.ObjectQueueStorage;
+import com.github.ylgrgyq.reservoir.ObjectWithId;
+import com.github.ylgrgyq.reservoir.StorageException;
 import com.github.ylgrgyq.reservoir.storage.FileName.FileType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,9 +17,10 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
@@ -24,8 +28,7 @@ import static java.util.Objects.requireNonNull;
 public final class FileBasedStorage implements ObjectQueueStorage {
     private static final Logger logger = LoggerFactory.getLogger(FileBasedStorage.class.getName());
 
-    private final ExecutorService sstableWriterPool = Executors.newSingleThreadScheduledExecutor(
-            new NamedThreadFactory("SSTable-Writer-"));
+    private final ExecutorService sstableWriterPool;
     private final String baseDir;
     private final TableCache tableCache;
     private final Manifest manifest;
@@ -48,23 +51,17 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     private volatile Memtable imm;
     private volatile StorageStatus status;
 
-    public FileBasedStorage(String path) throws StorageException {
-        this(path, 500);
-    }
-
-    public FileBasedStorage(String path, long readRetryIntervalMillis) throws StorageException {
-        this(path, readRetryIntervalMillis, TimeUnit.MINUTES.toMillis(1));
-    }
-
-    public FileBasedStorage(String storageBaseDir, long readRetryIntervalMillis, long truncateIntervalMillis) throws StorageException {
-        requireNonNull(storageBaseDir, "storageBaseDir");
+    FileBasedStorage(FileBasedStorageBuilder builder) throws StorageException {
+        requireNonNull(builder, "builder");
+        final String storageBaseDir = builder.getStorageBaseDir();
         Path baseDirPath = Paths.get(storageBaseDir);
 
         if (Files.exists(baseDirPath) && !Files.isDirectory(baseDirPath)) {
             throw new IllegalArgumentException("\"" + storageBaseDir + "\" must be a directory");
         }
 
-        this.readRetryIntervalMillis = readRetryIntervalMillis;
+        this.sstableWriterPool = builder.getFlushMemtableExecutorService();
+        this.readRetryIntervalMillis = builder.getReadRetryIntervalMillis();
         this.mm = new Memtable();
         this.baseDir = storageBaseDir;
         this.firstIdInStorage = -1;
@@ -73,7 +70,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         this.status = StorageStatus.INIT;
         this.tableCache = new TableCache(baseDir);
         this.manifest = new Manifest(baseDir);
-        this.truncateIntervalNanos = TimeUnit.MILLISECONDS.toNanos(truncateIntervalMillis);
+        this.truncateIntervalNanos = TimeUnit.MILLISECONDS.toNanos(builder.getTruncateIntervalMillis());
 
         try {
             createStorageDir();
@@ -148,7 +145,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     }
 
     @Override
-    public synchronized long getLastCommittedId() throws StorageException {
+    public synchronized long getLastCommittedId() {
         return lastCommittedId;
     }
 
@@ -196,7 +193,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     }
 
     @Override
-    public synchronized long getLastProducedId() throws StorageException {
+    public synchronized long getLastProducedId() {
         if (status != StorageStatus.OK) {
             throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
         }

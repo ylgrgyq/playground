@@ -13,22 +13,23 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
 
 public class FileBasedStorageTest {
     private File tempFile;
+    private FileBasedStorageBuilder builder;
 
     @Before
     public void setUp() throws Exception {
-        String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
+        final String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
                 File.separator + "reservoir_test_" + System.nanoTime();
         tempFile = new File(tempDir);
         FileUtils.forceMkdir(tempFile);
+        builder = FileBasedStorageBuilder.newBuilder(tempFile.getPath());
     }
 
     @Test
     public void commitId() throws Exception {
-        FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
+        final FileBasedStorage storage = builder.build();
         storage.commitId(100);
         assertThat(storage.getLastCommittedId()).isEqualTo(100);
         storage.close();
@@ -36,11 +37,11 @@ public class FileBasedStorageTest {
 
     @Test
     public void simpleStore() throws Exception {
-        FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
+        final FileBasedStorage storage = builder.build();
         final int expectSize = 64;
-        List<ObjectWithId> objs = new ArrayList<>();
+        final List<ObjectWithId> objs = new ArrayList<>();
         for (int i = 1; i < expectSize + 1; i++) {
-            ObjectWithId obj = new ObjectWithId(i, TestingUtils.numberStringBytes(i));
+            final ObjectWithId obj = new ObjectWithId(i, TestingUtils.numberStringBytes(i));
             objs.add(obj);
         }
 
@@ -53,9 +54,9 @@ public class FileBasedStorageTest {
 
     @Test
     public void blockFetch() throws Exception {
-        FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
-        CyclicBarrier barrier = new CyclicBarrier(2);
-        CompletableFuture<List<ObjectWithId>> f = CompletableFuture.supplyAsync(() -> {
+        final FileBasedStorage storage = builder.build();
+        final CyclicBarrier barrier = new CyclicBarrier(2);
+        final CompletableFuture<List<ObjectWithId>> f = CompletableFuture.supplyAsync(() -> {
             try {
                 barrier.await();
                 return storage.fetch(0, 100);
@@ -66,7 +67,7 @@ public class FileBasedStorageTest {
 
         barrier.await();
         final int expectSize = 64;
-        List<ObjectWithId> objs = new ArrayList<>();
+        final List<ObjectWithId> objs = new ArrayList<>();
         for (int i = 1; i < expectSize + 1; i++) {
             ObjectWithId obj = new ObjectWithId(i, ("" + i).getBytes(StandardCharsets.UTF_8));
             objs.add(obj);
@@ -80,7 +81,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void blockFetchTimeout() throws Exception {
-        FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
+        final FileBasedStorage storage = builder.build();
 
         assertThat(storage.fetch(0, 100, 100, TimeUnit.MILLISECONDS)).hasSize(0);
         storage.close();
@@ -88,10 +89,10 @@ public class FileBasedStorageTest {
 
     @Test
     public void testMemtableFull() throws Exception {
-        FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
+        final FileBasedStorage storage = builder.build();
 
         final int expectSize = 2;
-        List<ObjectWithId> objs = new ArrayList<>();
+        final List<ObjectWithId> objs = new ArrayList<>();
         for (int i = 1; i < expectSize + 1; i++) {
             ObjectWithId obj = new ObjectWithId(i, new byte[Constant.kMaxMemtableSize]);
             objs.add(obj);
@@ -103,9 +104,11 @@ public class FileBasedStorageTest {
 
     @Test
     public void truncate() throws Exception {
-        FileBasedStorage storage = new FileBasedStorage(tempFile.getPath(), 500, 500);
+        final FileBasedStorage storage = builder
+                .setTruncateIntervalMillis(0, TimeUnit.MILLISECONDS)
+                .build();
         final int expectSize = 2000;
-        List<ObjectWithId> objs = new ArrayList<>();
+        final List<ObjectWithId> objs = new ArrayList<>();
         for (int i = 1; i < expectSize + 1; i++) {
             ObjectWithId obj = new ObjectWithId(i, new byte[Constant.kLogBlockSize]);
             objs.add(obj);
@@ -113,7 +116,8 @@ public class FileBasedStorageTest {
         storage.store(objs);
         storage.commitId(1000);
         objs.add(new ObjectWithId(1010101, "Trigger truncate".getBytes(StandardCharsets.UTF_8)));
-        List<ObjectWithId> actualObjs = storage.fetch(0, 100);
+
+        final List<ObjectWithId> actualObjs = storage.fetch(0, 100);
         assertThat(actualObjs.iterator().next().getId()).isGreaterThan(1);
 
         storage.close();
@@ -121,12 +125,12 @@ public class FileBasedStorageTest {
 
     @Test
     public void simpleProducenAndConsume() throws Exception {
-        FileBasedStorage storage = new FileBasedStorage(tempFile.getPath());
-        ObjectQueue<TestingPayload> queue = ObjectQueueBuilder.<TestingPayload>newBuilder()
+        final FileBasedStorage storage = builder.build();
+        final ObjectQueue<TestingPayload> queue = ObjectQueueBuilder.<TestingPayload>newBuilder()
                 .setStorage(storage)
                 .setCodec(new TestingPayloadCodec())
                 .buildQueue();
-        TestingPayload payload = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
+        final TestingPayload payload = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
         queue.produce(payload);
 
         assertThat(queue.fetch()).isEqualTo(payload);
