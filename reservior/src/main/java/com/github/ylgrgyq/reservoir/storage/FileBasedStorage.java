@@ -330,17 +330,9 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     private void recoverFromDataLogFiles(ManifestRecord record) throws IOException, StorageException {
         final int dataLogFileNumber = manifest.getDataLogFileNumber();
-        final File baseDirFile = new File(baseDir);
-        final File[] files = baseDirFile.listFiles();
-        List<FileName.FileNameMeta> dataLogFileMetas = Collections.emptyList();
-        if (files != null) {
-            dataLogFileMetas = Arrays.stream(files)
-                    .filter(File::isFile)
-                    .map(File::getName)
-                    .map(FileName::parseFileName)
-                    .filter(fileMeta -> fileMeta.getType() == FileName.FileType.Log && fileMeta.getFileNumber() >= dataLogFileNumber)
-                    .collect(Collectors.toList());
-        }
+        final List<FileName.FileNameMeta> dataLogFileMetas =
+                FileName.getFileNameMetas(baseDir, fileMeta -> fileMeta.getType() == FileType.Log
+                        && fileMeta.getFileNumber() >= dataLogFileNumber);
 
         for (int i = 0; i < dataLogFileMetas.size(); ++i) {
             final FileName.FileNameMeta fileMeta = dataLogFileMetas.get(i);
@@ -350,7 +342,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     private void recoverMemtableFromDataLogFiles(int fileNumber, ManifestRecord record, boolean lastLogFile) throws IOException, StorageException {
         final Path logFilePath = Paths.get(baseDir, FileName.getLogFileName(fileNumber));
-        if (Files.exists(logFilePath)) {
+        if (!Files.exists(logFilePath)) {
             logger.warn("Log file {} was deleted. We can't recover memtable from it.", logFilePath);
             return;
         }
@@ -404,18 +396,9 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     private synchronized void recoverLastConsumerCommittedId() throws IOException, StorageException {
         final int fileNumber = manifest.getConsumerCommittedIdLogFileNumber();
-        final File baseDirFile = new File(baseDir);
-        final File[] files = baseDirFile.listFiles();
-        List<FileName.FileNameMeta> consumerLogFileMetas = Collections.emptyList();
-        if (files != null) {
-            consumerLogFileMetas = Arrays.stream(files)
-                    .filter(File::isFile)
-                    .map(File::getName)
-                    .map(FileName::parseFileName)
-                    .filter(fileMeta -> fileMeta.getType() == FileType.ConsumerCommit
-                            && fileMeta.getFileNumber() >= fileNumber)
-                    .collect(Collectors.toList());
-        }
+        final List<FileName.FileNameMeta> consumerLogFileMetas =
+                FileName.getFileNameMetas(baseDir, fileMeta -> fileMeta.getType() == FileType.ConsumerCommit
+                        && fileMeta.getFileNumber() >= fileNumber);
 
         for (int i = consumerLogFileMetas.size() - 1; i >= 0; --i) {
             final FileName.FileNameMeta fileMeta = consumerLogFileMetas.get(i);
@@ -427,7 +410,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     private synchronized boolean recoverLastConsumerCommittedIdFromLogFile(int fileNumber) throws IOException, StorageException {
         final Path logFilePath = Paths.get(baseDir, FileName.getConsumerCommittedIdFileName(fileNumber));
-        if (Files.exists(logFilePath)) {
+        if (!Files.exists(logFilePath)) {
             logger.warn("Log file {} was deleted. We can't recover consumer committed id from it.", logFilePath);
             return false;
         }
@@ -450,9 +433,10 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             if (id > lastCommittedId) {
                 final FileChannel logFile = FileChannel.open(logFilePath, StandardOpenOption.WRITE);
                 assert consumerCommitLogWriter == null;
-                assert fileNumber == 0;
+                assert consumerCommitLogFileNumber == 0;
                 consumerCommitLogWriter = new LogWriter(logFile, readEndPosition);
                 consumerCommitLogFileNumber = fileNumber;
+                lastCommittedId = id;
                 return true;
             }
         } catch (BadRecordException ex) {

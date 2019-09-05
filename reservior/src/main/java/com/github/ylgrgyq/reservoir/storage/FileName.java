@@ -10,6 +10,7 @@ import java.nio.file.*;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 final class FileName {
@@ -106,6 +107,22 @@ final class FileName {
             }
         }
         return new FileNameMeta(fileName, fileNumber, type);
+    }
+
+    static List<FileName.FileNameMeta> getFileNameMetas(String baseDir, Predicate<? super FileNameMeta> filter) {
+        final File baseDirFile = new File(baseDir);
+        final File[] files = baseDirFile.listFiles();
+        List<FileName.FileNameMeta> consumerLogFileMetas = Collections.emptyList();
+        if (files != null) {
+            consumerLogFileMetas = Arrays.stream(files)
+                    .filter(File::isFile)
+                    .map(File::getName)
+                    .map(FileName::parseFileName)
+                    .filter(filter)
+                    .collect(Collectors.toList());
+        }
+
+        return consumerLogFileMetas;
     }
 
     private static List<Path> getOutdatedFiles(String baseDir, int dataLogFileNumber, int consumerCommittedIdLogFileNumber, TableCache tableCache) {

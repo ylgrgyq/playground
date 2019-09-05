@@ -1,6 +1,8 @@
 package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.*;
+import com.github.ylgrgyq.reservoir.storage.FileName.FileNameMeta;
+import com.github.ylgrgyq.reservoir.storage.FileName.FileType;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -28,11 +30,28 @@ public class FileBasedStorageTest {
     }
 
     @Test
-    public void commitId() throws Exception {
+    public void commitThenGetCommitId() throws Exception {
         final FileBasedStorage storage = builder.build();
         storage.commitId(100);
         assertThat(storage.getLastCommittedId()).isEqualTo(100);
         storage.close();
+    }
+
+    @Test
+    public void consecutiveCommitThenGetCommitIdAfterRecoverUsingSameFile() throws Exception {
+        FileBasedStorage storage = builder.build();
+        FileNameMeta expectMeta = FileName.getFileNameMetas(tempFile.getPath(),
+                meta -> meta.getType() == FileType.ConsumerCommit).get(0);
+
+        for (int i = 1; i < 100; i++) {
+            storage.commitId(i);
+            storage.close();
+            storage = builder.build();
+            assertThat(storage.getLastCommittedId()).isEqualTo(i);
+        }
+        assertThat(FileName.getFileNameMetas(tempFile.getPath(), meta -> meta.getType() == FileType.ConsumerCommit))
+                .hasSize(1).allMatch(meta ->
+                meta.getFileNumber() == expectMeta.getFileNumber());
     }
 
     @Test
