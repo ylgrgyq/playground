@@ -106,10 +106,10 @@ final class FileName {
         return new FileNameMeta(fileName, fileNumber, type);
     }
 
-    static List<FileName.FileNameMeta> getFileNameMetas(String baseDir, Predicate<? super FileNameMeta> filter) {
+    static List<FileNameMeta> getFileNameMetas(String baseDir, Predicate<? super FileNameMeta> filter) {
         final File baseDirFile = new File(baseDir);
         final File[] files = baseDirFile.listFiles();
-        List<FileName.FileNameMeta> consumerLogFileMetas = Collections.emptyList();
+        List<FileNameMeta> consumerLogFileMetas = Collections.emptyList();
         if (files != null) {
             consumerLogFileMetas = Arrays.stream(files)
                     .filter(File::isFile)
