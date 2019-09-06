@@ -62,7 +62,7 @@ public class TableTest {
         final Table table = Table.open(testingFileChannel, tableSize);
         assertThat(table.iterator())
                 .toIterable()
-                .containsExactlyElementsOf(expectDatas);
+                .isEqualTo(expectDatas);
     }
 
     @Test
@@ -77,7 +77,7 @@ public class TableTest {
         final Table table = Table.open(testingFileChannel, tableSize);
         assertThat(table.iterator())
                 .toIterable()
-                .containsExactlyElementsOf(expectDatas);
+                .isEqualTo(expectDatas);
     }
 
     private ObjectWithId makeObjectWithId(long id, String data) {

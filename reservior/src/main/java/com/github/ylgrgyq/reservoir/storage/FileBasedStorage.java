@@ -9,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
@@ -347,11 +346,11 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             return;
         }
 
-        final FileChannel ch = FileChannel.open(logFilePath, StandardOpenOption.READ);
-        long readEndPosition;
-        boolean noNewSSTable = true;
+        final FileChannel readLogChannel = FileChannel.open(logFilePath, StandardOpenOption.READ);
+        boolean flushedNewTable = false;
         Memtable recoveredMm = null;
-        try (LogReader reader = new LogReader(ch, true)) {
+        // 1. read all pending data from data log file
+        try (LogReader reader = new LogReader(readLogChannel, true)) {
             while (true) {
                 List<byte[]> logOpt = reader.readLog();
                 if (!logOpt.isEmpty()) {
@@ -363,7 +362,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                     if (recoveredMm.getMemoryUsedInBytes() > Constant.kMaxMemtableSize) {
                         final SSTableFileMetaInfo meta = writeMemTableToSSTable(recoveredMm);
                         record.addMeta(meta);
-                        noNewSSTable = false;
+                        flushedNewTable = true;
                         recoveredMm = null;
                     }
                 } else {
@@ -371,26 +370,24 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 }
             }
 
-            readEndPosition = ch.position();
-
-            if (lastLogFile && noNewSSTable) {
-                final FileChannel logFile = FileChannel.open(logFilePath, StandardOpenOption.WRITE);
+            if (lastLogFile && !flushedNewTable) {
+                // 3. after read the last data log file, try to reuse this data log file
+                // but we only reuse this old data log file when no sstable is flushed during reading this file
                 assert dataLogWriter == null;
                 assert dataLogFileNumber == 0;
-                dataLogWriter = new LogWriter(logFile, readEndPosition);
+                final FileChannel logFile = FileChannel.open(logFilePath, StandardOpenOption.WRITE);
+                dataLogWriter = new LogWriter(logFile, readLogChannel.position());
                 dataLogFileNumber = fileNumber;
                 if (recoveredMm != null) {
                     mm = recoveredMm;
-                    recoveredMm = null;
                 }
+            } else if (recoveredMm != null) {
+                // 2. flush pending data to sstable after read all the data from the log file
+                final SSTableFileMetaInfo meta = writeMemTableToSSTable(recoveredMm);
+                record.addMeta(meta);
             }
         } catch (BadRecordException ex) {
             logger.warn("got \"{}\" record in log file:\"{}\". ", ex.getType(), logFilePath);
-        }
-
-        if (recoveredMm != null) {
-            final SSTableFileMetaInfo meta = writeMemTableToSSTable(recoveredMm);
-            record.addMeta(meta);
         }
     }
 

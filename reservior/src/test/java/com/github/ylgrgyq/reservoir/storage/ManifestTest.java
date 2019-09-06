@@ -105,7 +105,7 @@ public class ManifestTest {
         manifest.logRecord(record);
 
         List<SSTableFileMetaInfo> metas = getAllMetas(manifest);
-        assertThat(metas).containsExactlyElementsOf(expectMetas);
+        assertThat(metas).isEqualTo(expectMetas);
     }
 
     @Test
@@ -130,7 +130,7 @@ public class ManifestTest {
         manifest.logRecord(record);
 
         List<SSTableFileMetaInfo> actualMetas = getAllMetas(manifest);
-        assertThat(actualMetas).containsExactlyElementsOf(expectMetas);
+        assertThat(actualMetas).isEqualTo(expectMetas);
     }
 
     @Test
@@ -197,18 +197,18 @@ public class ManifestTest {
         metas.forEach(record::addMeta);
         manifest.logRecord(record);
 
-        assertThat(manifest.searchMetas(0)).containsExactlyElementsOf(metas);
-        assertThat(manifest.searchMetas(10)).containsExactlyElementsOf(metas);
-        assertThat(manifest.searchMetas(50)).containsExactlyElementsOf(metas);
-        assertThat(manifest.searchMetas(100)).containsExactlyElementsOf(metas);
+        assertThat(manifest.searchMetas(0)).isEqualTo(metas);
+        assertThat(manifest.searchMetas(10)).isEqualTo(metas);
+        assertThat(manifest.searchMetas(50)).isEqualTo(metas);
+        assertThat(manifest.searchMetas(100)).isEqualTo(metas);
 
-        assertThat(manifest.searchMetas(101)).containsExactlyElementsOf(metas.subList(1,  metas.size()));
-        assertThat(manifest.searchMetas(400)).containsExactlyElementsOf(metas.subList(1,  metas.size()));
-        assertThat(manifest.searchMetas(500)).containsExactlyElementsOf(metas.subList(1,  metas.size()));
+        assertThat(manifest.searchMetas(101)).isEqualTo(metas.subList(1,  metas.size()));
+        assertThat(manifest.searchMetas(400)).isEqualTo(metas.subList(1,  metas.size()));
+        assertThat(manifest.searchMetas(500)).isEqualTo(metas.subList(1,  metas.size()));
 
-        assertThat(manifest.searchMetas(501)).containsExactlyElementsOf(metas.subList(2,  metas.size()));
-        assertThat(manifest.searchMetas(900)).containsExactlyElementsOf(metas.subList(2,  metas.size()));
-        assertThat(manifest.searchMetas(1000)).containsExactlyElementsOf(metas.subList(2,  metas.size()));
+        assertThat(manifest.searchMetas(501)).isEqualTo(metas.subList(2,  metas.size()));
+        assertThat(manifest.searchMetas(900)).isEqualTo(metas.subList(2,  metas.size()));
+        assertThat(manifest.searchMetas(1000)).isEqualTo(metas.subList(2,  metas.size()));
 
         assertThat(manifest.searchMetas(1001)).hasSize(1).containsExactly(metas.get(metas.size() - 1));
         assertThat(manifest.searchMetas(2000)).hasSize(1).containsExactly(metas.get(metas.size() - 1));
@@ -221,11 +221,11 @@ public class ManifestTest {
         final List<SSTableFileMetaInfo> metas = prepareTruncateTest();
 
         manifest.truncateToId(0);
-        assertThat(getAllMetas(manifest)).containsExactlyElementsOf(metas);
+        assertThat(getAllMetas(manifest)).isEqualTo(metas);
         manifest.truncateToId(10);
-        assertThat(getAllMetas(manifest)).containsExactlyElementsOf(metas);
+        assertThat(getAllMetas(manifest)).isEqualTo(metas);
         manifest.truncateToId(100);
-        assertThat(getAllMetas(manifest)).containsExactlyElementsOf(metas);
+        assertThat(getAllMetas(manifest)).isEqualTo(metas);
     }
 
     @Test
@@ -233,10 +233,10 @@ public class ManifestTest {
         final List<SSTableFileMetaInfo> metas = prepareTruncateTest();
 
         manifest.truncateToId(101);
-        assertThat(getAllMetas(manifest)).containsExactlyElementsOf(metas.subList(1, metas.size()));
+        assertThat(getAllMetas(manifest)).isEqualTo(metas.subList(1, metas.size()));
         Manifest recoveredManifest = new Manifest(testingBaseDir.getPath());
         recoveredManifest.recover(getCurrentManifestFileName());
-        assertThat(getAllMetas(recoveredManifest)).containsExactlyElementsOf(metas.subList(1, metas.size()));
+        assertThat(getAllMetas(recoveredManifest)).isEqualTo(metas.subList(1, metas.size()));
         assertThat(recoveredManifest).isEqualTo(manifest);
     }
 
@@ -245,10 +245,10 @@ public class ManifestTest {
         final List<SSTableFileMetaInfo> metas = prepareTruncateTest();
 
         manifest.truncateToId(500);
-        assertThat(getAllMetas(manifest)).containsExactlyElementsOf(metas.subList(1, metas.size()));
+        assertThat(getAllMetas(manifest)).isEqualTo(metas.subList(1, metas.size()));
         Manifest recoveredManifest = new Manifest(testingBaseDir.getPath());
         recoveredManifest.recover(getCurrentManifestFileName());
-        assertThat(getAllMetas(recoveredManifest)).containsExactlyElementsOf(metas.subList(1, metas.size()));
+        assertThat(getAllMetas(recoveredManifest)).isEqualTo(metas.subList(1, metas.size()));
         assertThat(recoveredManifest).isEqualTo(manifest);
     }
 
@@ -257,10 +257,10 @@ public class ManifestTest {
         final List<SSTableFileMetaInfo> metas = prepareTruncateTest();
 
         manifest.truncateToId(501);
-        assertThat(getAllMetas(manifest)).containsExactlyElementsOf(metas.subList(2, metas.size()));
+        assertThat(getAllMetas(manifest)).isEqualTo(metas.subList(2, metas.size()));
         Manifest recoveredManifest = new Manifest(testingBaseDir.getPath());
         recoveredManifest.recover(getCurrentManifestFileName());
-        assertThat(getAllMetas(recoveredManifest)).containsExactlyElementsOf(metas.subList(2, metas.size()));
+        assertThat(getAllMetas(recoveredManifest)).isEqualTo(metas.subList(2, metas.size()));
         assertThat(recoveredManifest).isEqualTo(manifest);
     }
 

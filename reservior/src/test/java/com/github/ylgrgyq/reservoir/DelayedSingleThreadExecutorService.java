@@ -7,15 +7,22 @@ public class DelayedSingleThreadExecutorService extends AbstractExecutorService 
     private static final ThreadFactory threadFactory = new NamedThreadFactory("delayed-single-thread-pool-");
     private final long defaultDelayedMillis;
     private final ExecutorService executorService;
+    private final Semaphore semaphore;
 
     public DelayedSingleThreadExecutorService() {
-        this.executorService = Executors.newSingleThreadExecutor(threadFactory);
-        this.defaultDelayedMillis = 0;
+        this(0, 0, TimeUnit.MILLISECONDS);
     }
 
     public DelayedSingleThreadExecutorService(long defaultDelayed, TimeUnit unit) {
+        this(0, defaultDelayed, unit);
+    }
+
+    public DelayedSingleThreadExecutorService(int noDelayForFirstNTasks, long defaultDelayed, TimeUnit unit) {
         this.executorService = Executors.newSingleThreadExecutor(threadFactory);
         this.defaultDelayedMillis = unit.toMillis(defaultDelayed);
+        this.semaphore = new Semaphore(Integer.MAX_VALUE);
+        this.semaphore.drainPermits();
+        this.semaphore.release(noDelayForFirstNTasks);
     }
 
     @Override
@@ -43,54 +50,23 @@ public class DelayedSingleThreadExecutorService extends AbstractExecutorService 
         return executorService.awaitTermination(timeout, unit);
     }
 
-    @Override
-    public void execute(Runnable command) {
-        executorService.execute(() -> {
-            if (!(command instanceof DelayedRunnable)) {
-                boolean interrupted = false;
-                try {
-                    Thread.sleep(defaultDelayedMillis);
-                } catch (InterruptedException ex) {
-                    interrupted = true;
-                }
-
-                if (interrupted) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-            command.run();
-        });
+    public void breakDelay() {
+        semaphore.release();
     }
 
-    public static class DelayedRunnable implements Runnable {
-        private final CountDownLatch latch;
-        private final long delayMillis;
-        private final Runnable command;
-
-        public DelayedRunnable(Runnable command, long delayMillis) {
-            this.delayMillis = delayMillis;
-            this.latch = new CountDownLatch(1);
-            this.command = command;
-        }
-
-        public void breakDelay() {
-            latch.countDown();
-        }
-
-        @Override
-        public void run() {
-            boolean interrupted = false;
-            try {
-                latch.await(delayMillis, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException ex) {
-                interrupted = true;
-            }
-
-            if (interrupted) {
-                Thread.currentThread().interrupt();
-            }
-
+    @Override
+    public void execute(Runnable command) {
+        if (semaphore.tryAcquire()){
             command.run();
+        } else {
+            executorService.execute(() -> {
+                try {
+                    semaphore.tryAcquire(defaultDelayedMillis, TimeUnit.MILLISECONDS);
+                    command.run();
+                } catch (InterruptedException ex) {
+                    // ignore
+                }
+            });
         }
     }
 }

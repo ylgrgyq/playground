@@ -4,6 +4,7 @@ import com.github.ylgrgyq.reservoir.*;
 import com.github.ylgrgyq.reservoir.storage.FileName.FileNameMeta;
 import com.github.ylgrgyq.reservoir.storage.FileName.FileType;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -82,7 +83,7 @@ public class FileBasedStorageTest {
         }
         storage.store(objs);
         assertThat(storage.getLastProducedId()).isEqualTo(expectSize);
-        assertThat(f.get()).containsExactlyElementsOf(objs);
+        assertThat(f.get()).isEqualTo(objs);
         storage.close();
     }
 
@@ -132,8 +133,7 @@ public class FileBasedStorageTest {
         storage.store(objs);
 
         assertThat(storage.getLastProducedId()).isEqualTo(expectSize);
-        assertThat(objs)
-                .containsExactly((ObjectWithId[]) storage.fetch(0, 100).toArray(new ObjectWithId[expectSize]));
+        assertThat(storage.fetch(0, 100)).isEqualTo(objs);
         storage.close();
     }
 
@@ -148,8 +148,7 @@ public class FileBasedStorageTest {
 
         storage = builder.build();
         assertThat(storage.getLastProducedId()).isEqualTo(expectSize);
-        assertThat(objs)
-                .containsExactly((ObjectWithId[]) storage.fetch(0, 100).toArray(new ObjectWithId[expectSize]));
+        assertThat(storage.fetch(0, 100)).isEqualTo(objs);
         storage.close();
     }
 
@@ -164,7 +163,7 @@ public class FileBasedStorageTest {
         storage.store(objs);
 
         triggerFlushMemtable(storage, 1000);
-        assertThat(storage.fetch(1, 64)).containsExactlyElementsOf(objs);
+        assertThat(storage.fetch(0, 64)).isEqualTo(objs);
         storage.close();
     }
 
@@ -184,38 +183,46 @@ public class FileBasedStorageTest {
                 // builder is closed when the previous storage closed
                 .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS))
                 .build();
-        assertThat(storage.fetch(1, 64)).containsExactlyElementsOf(objs);
+        assertThat(storage.fetch(0, 64)).isEqualTo(objs);
         storage.close();
     }
 
-
     @Test
-    public void testMemtableFull() throws Exception {
-        final FileBasedStorage storage = builder.build();
+    public void fetchDataFromSstableImmutableMemtableAndMemtable() throws Exception {
+        final FileBasedStorage storage = builder
+                // allow only one flush task finish immediately
+                .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, 1, TimeUnit.DAYS))
+                .build();
 
-        final int expectSize = 2;
-        final List<ObjectWithId> objs = new ArrayList<>();
-        for (int i = 1; i < expectSize + 1; i++) {
-            ObjectWithId obj = new ObjectWithId(i, new byte[Constant.kMaxMemtableSize]);
-            objs.add(obj);
-        }
+        // 1. write some data
+        final List<ObjectWithId> expectData = generateSimpleTestingObjectWithIds(64);
+        storage.store(expectData);
+        // 2. flush for the first time, make every data write before flushed to sstable
+        expectData.addAll(triggerFlushMemtable(storage, 1000));
+        // 3. write some more data
+        final List<ObjectWithId> objInMem = generateSimpleTestingObjectWithIds(2000, 128);
+        expectData.addAll(objInMem);
+        storage.store(objInMem);
+        // 4. flush again, but this time the flush task will be blocked so
+        // every data write in step 3 will be stay in immutable table and the data triggering
+        // the flush task will stay in memtable
+        expectData.addAll(triggerFlushMemtable(storage, 3000));
 
-        storage.store(objs);
-        assertThat(storage.fetch(0, 100, 100, TimeUnit.MILLISECONDS)).hasSize(2);
+        // add one to limit to ensure there's no more data in storage than in expectData
+        assertThat(storage.fetch(0, expectData.size() + 1)).isEqualTo(expectData);
+        storage.close();
     }
 
     @Test
     public void truncate() throws Exception {
         final FileBasedStorage storage = builder
+                .setFlushMemtableExecutorService(new ImmediateExecutorService())
                 .setTruncateIntervalMillis(0, TimeUnit.MILLISECONDS)
                 .build();
-        final int expectSize = 2000;
-        final List<ObjectWithId> objs = new ArrayList<>();
-        for (int i = 1; i < expectSize + 1; i++) {
-            ObjectWithId obj = new ObjectWithId(i, new byte[Constant.kLogBlockSize]);
-            objs.add(obj);
-        }
+        final int expectSize = 64;
+        final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
         storage.store(objs);
+        objs.addAll(triggerFlushMemtable(storage, 70));
         storage.commitId(1000);
         objs.add(new ObjectWithId(1010101, "Trigger truncate".getBytes(StandardCharsets.UTF_8)));
 
@@ -240,8 +247,12 @@ public class FileBasedStorageTest {
     }
 
     private List<ObjectWithId> generateSimpleTestingObjectWithIds(int expectSize) {
+        return generateSimpleTestingObjectWithIds(1L, expectSize);
+    }
+
+    private List<ObjectWithId> generateSimpleTestingObjectWithIds(long startId, int expectSize) {
         final List<ObjectWithId> objs = new ArrayList<>();
-        for (int i = 1; i < expectSize + 1; i++) {
+        for (long i = startId; i < startId + expectSize; i++) {
             final ObjectWithId obj = new ObjectWithId(i, numberStringBytes(i));
             objs.add(obj);
         }

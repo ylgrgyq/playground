@@ -89,14 +89,14 @@ public class BlockTest {
 
         assertThat(new Block(actualBlockData).iterator())
                 .toIterable()
-                .containsExactlyElementsOf(expectDatas);
+                .isEqualTo(expectDatas);
     }
 
     @Test
     public void testSeek() throws Exception {
-        final List<ObjectWithId> addedDatas = new ArrayList<>();
+        final List<ObjectWithId> addedData = new ArrayList<>();
         for (long i = 0; i < 1000; i++) {
-            addedDatas.add(new ObjectWithId(i, TestingUtils.numberStringBytes(i)));
+            addedData.add(new ObjectWithId(i, TestingUtils.numberStringBytes(i)));
             addData(i, numberString(i));
         }
 
@@ -107,12 +107,12 @@ public class BlockTest {
 
         for (long i = -100; i < 2000; i++) {
             actualBlockIterator.seek(i);
-            final List<ObjectWithId> expectDatas = addedDatas.subList(
-                    (int) Math.min(Math.max(0, i), addedDatas.size()),
-                    addedDatas.size());
+            final List<ObjectWithId> expectDatas = addedData.subList(
+                    (int) Math.min(Math.max(0, i + 1), addedData.size()),
+                    addedData.size());
             assertThat(actualBlockIterator)
                     .toIterable()
-                    .containsExactlyElementsOf(expectDatas);
+                    .isEqualTo(expectDatas);
         }
         assertThat(actualBlockIterator).isExhausted();
     }

@@ -97,7 +97,7 @@ final class Block implements Iterable<ObjectWithId> {
                 final long k = content.getLong();
                 final int len = content.getInt();
                 assert len > 0;
-                if (k < key) {
+                if (k <= key) {
                     offset += len + Long.BYTES + Integer.BYTES;
                 } else {
                     break;

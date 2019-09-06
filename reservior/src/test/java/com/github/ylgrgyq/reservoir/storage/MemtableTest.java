@@ -70,7 +70,7 @@ public class MemtableTest {
 
         assertThat(mm.getEntries(Long.MIN_VALUE, 100))
                 .hasSize(100)
-                .containsExactlyElementsOf(savedElements.subList(0, 100));
+                .isEqualTo(savedElements.subList(0, 100));
     }
 
     @Test
@@ -83,7 +83,7 @@ public class MemtableTest {
             final List<ObjectWithId> expect = savedElements.subList((int) (i - startId + 1), (int) (i - startId + bound + 1));
             assertThat(mm.getEntries(i, bound))
                     .hasSize(bound)
-                    .containsExactlyElementsOf(expect);
+                    .isEqualTo(expect);
         }
     }
 
@@ -94,7 +94,7 @@ public class MemtableTest {
         for (long i = 1; i < savedElements.size(); ++i) {
             final List<ObjectWithId> expect = savedElements.subList((int) i, savedElements.size());
             assertThat(mm.getEntries(i, 100))
-                    .containsExactlyElementsOf(expect);
+                    .isEqualTo(expect);
         }
     }
 
@@ -106,8 +106,8 @@ public class MemtableTest {
     @Test
     public void testIterateBeforeStart() {
         final List<ObjectWithId> savedElements = addElementsToMemtable(10000);
-        assertThat(mm.iterator()).toIterable().containsExactlyElementsOf(savedElements);
-        assertThat(mm.iterator().seek(Long.MIN_VALUE)).toIterable().containsExactlyElementsOf(savedElements);
+        assertThat(mm.iterator()).toIterable().isEqualTo(savedElements);
+        assertThat(mm.iterator().seek(Long.MIN_VALUE)).toIterable().isEqualTo(savedElements);
     }
 
     @Test
@@ -118,7 +118,7 @@ public class MemtableTest {
             final List<ObjectWithId> expect = savedElements.subList((int) i, savedElements.size());
             assertThat(mm.iterator().seek(i))
                     .toIterable()
-                    .containsExactlyElementsOf(expect);
+                    .isEqualTo(expect);
         }
     }
 
