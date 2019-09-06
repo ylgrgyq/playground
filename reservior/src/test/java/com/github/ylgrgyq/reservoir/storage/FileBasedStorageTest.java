@@ -133,7 +133,10 @@ public class FileBasedStorageTest {
         storage.store(objs);
 
         assertThat(storage.getLastProducedId()).isEqualTo(expectSize);
-        assertThat(storage.fetch(0, 100)).isEqualTo(objs);
+
+        for (int i = 0; i < expectSize; i += 10) {
+            assertThat(storage.fetch(i, 100)).isEqualTo(objs.subList(i, objs.size()));
+        }
         storage.close();
     }
 
@@ -168,7 +171,22 @@ public class FileBasedStorageTest {
     }
 
     @Test
-    public void fetchDataFromRecoveredImmutableMemtable() throws Exception {
+    public void fetchDataOnlyFromImmutableMemtableAndMemtable() throws Exception {
+        final FileBasedStorage storage = builder
+                // block flush memtable job, so immutable memtable will stay in mem during the test
+                .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS))
+                .build();
+
+        final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(64);
+        storage.store(objs);
+
+        objs.addAll(triggerFlushMemtable(storage, 1000));
+        assertThat(storage.fetch(32, 1000)).isEqualTo(objs.subList(32, objs.size()));
+        storage.close();
+    }
+
+    @Test
+    public void fetchDataFromRecoveredSstable() throws Exception {
         FileBasedStorage storage = builder
                 // block flush memtable job, so immutable memtable will stay in mem during the test
                 .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS))
