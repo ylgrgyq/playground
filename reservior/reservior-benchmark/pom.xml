@@ -11,5 +11,15 @@
 
     <artifactId>reservior-benchmark</artifactId>
 
+    <dependencies>
+        <dependency>
+            <groupId>com.github.ylgrgyq</groupId>
+            <artifactId>reservior-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.rocksdb</groupId>
+            <artifactId>rocksdbjni</artifactId>
+        </dependency>
+    </dependencies>
 
 </project>
