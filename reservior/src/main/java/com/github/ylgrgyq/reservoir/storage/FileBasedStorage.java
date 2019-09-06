@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
@@ -75,7 +76,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     private long truncateIntervalNanos;
     private Memtable mm;
     @Nullable
-    private volatile Memtable imm;
+    private Memtable imm;
     private volatile boolean closed;
     @Nullable
     private Thread safeCloseThread;
@@ -299,6 +300,10 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
         releaseStorageLock();
         logger.debug("File based storage shutdown successfully");
+    }
+
+    boolean closed() {
+        return closed;
     }
 
     private void createStorageDir() throws IOException {
@@ -566,7 +571,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         mm = new Memtable();
         logger.debug("Trigger compaction, new log file number={}", dataLogFileNumber);
         try {
-            sstableWriterPool.submit(this::writeMemTable);
+            sstableWriterPool.submit(() -> writeMemtable(imm));
         } catch (RejectedExecutionException ex) {
             throw new StorageException("flush memtable task was rejected", ex);
         }
@@ -592,15 +597,21 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         return writer;
     }
 
-    private void writeMemTable() {
+    /**
+     * It's difficult to test this method as a asynchronous process. So we set it's access level to package
+     * to make test easier.
+     *
+     * @param immutableMemtable the immutable memtable to flush
+     */
+    @SuppressWarnings("WeakerAccess")
+    void writeMemtable(Memtable immutableMemtable) {
         logger.debug("start write mem table in background");
         boolean writeMemtableSuccess = false;
         try {
             ManifestRecord record = null;
-            assert imm != null;
-            if (!imm.isEmpty()) {
-                assert imm.firstId() > manifest.getLastId();
-                final SSTableFileMetaInfo meta = writeMemTableToSSTable(imm);
+            if (!immutableMemtable.isEmpty()) {
+                assert immutableMemtable.firstId() > manifest.getLastId();
+                final SSTableFileMetaInfo meta = writeMemTableToSSTable(immutableMemtable);
                 record = ManifestRecord.newPlainRecord();
                 record.addMeta(meta);
                 record.setConsumerCommitLogFileNumber(consumerCommitLogFileNumber);
@@ -618,7 +629,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 }
             }
 
-            FileName.deleteOutdatedFiles(baseDir, dataLogFileNumber, consumerCommitLogFileNumber, tableCache);
+            deleteOutdatedFiles(baseDir, dataLogFileNumber, consumerCommitLogFileNumber, tableCache);
 
             writeMemtableSuccess = true;
             logger.debug("write mem table in background done with manifest record {}", record);
@@ -629,6 +640,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 if (!writeMemtableSuccess) {
                     safeClose();
                 } else {
+                    assert imm == immutableMemtable;
                     imm = null;
                 }
 
@@ -738,6 +750,53 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             safeCloseThread.join();
         } catch (InterruptedException ex) {
             // ignore
+        }
+    }
+
+    private void deleteOutdatedFiles(String baseDir, int dataLogFileNumber,
+                                     int consumerCommittedIdLogFileNumber, TableCache tableCache) {
+        final List<Path> outdatedFilePaths = getOutdatedFiles(baseDir, dataLogFileNumber,
+                consumerCommittedIdLogFileNumber, tableCache);
+        try {
+            for (Path path : outdatedFilePaths) {
+                Files.deleteIfExists(path);
+            }
+        } catch (IOException t) {
+            logger.error("delete outdated files:{} failed", outdatedFilePaths, t);
+        }
+    }
+
+    private static List<Path> getOutdatedFiles(String baseDir, int dataLogFileNumber,
+                                               int consumerCommittedIdLogFileNumber, TableCache tableCache) {
+        final File dirFile = new File(baseDir);
+        final File[] files = dirFile.listFiles();
+
+        if (files != null) {
+            return Arrays.stream(files)
+                    .filter(File::isFile)
+                    .map(File::getName)
+                    .map(FileName::parseFileName)
+                    .filter(meta -> {
+                        switch (meta.getType()) {
+                            case ConsumerCommit:
+                                return meta.getFileNumber() < consumerCommittedIdLogFileNumber;
+                            case Log:
+                                return meta.getFileNumber() < dataLogFileNumber;
+                            case SSTable:
+                                return !tableCache.hasTable(meta.getFileNumber());
+                            case Current:
+                            case Lock:
+                            case TempManifest:
+                            case Manifest:
+                            case Unknown:
+                            default:
+                                return false;
+                        }
+                    })
+                    .map(meta -> Paths.get(baseDir, meta.getFileName()))
+                    .collect(Collectors.toList());
+        } else {
+            return Collections.emptyList();
         }
     }
 }

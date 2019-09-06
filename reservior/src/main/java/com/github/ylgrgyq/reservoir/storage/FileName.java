@@ -1,8 +1,5 @@
 package com.github.ylgrgyq.reservoir.storage;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -15,7 +12,6 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 final class FileName {
-    private static final Logger logger = LoggerFactory.getLogger(FileName.class.getName());
     private static final String CURRENT_FILE_PREFIX = "CURRENT";
     private static final String LOCK_FILE_PREFIX = "LOCK";
     private static final String LOG_FILE_PREFIX = "LOG";
@@ -125,55 +121,6 @@ final class FileName {
         }
 
         return consumerLogFileMetas;
-    }
-
-    private static List<Path> getOutdatedFiles(String baseDir, int dataLogFileNumber, int consumerCommittedIdLogFileNumber, TableCache tableCache) {
-        try {
-            File dirFile = new File(baseDir);
-            File[] files = dirFile.listFiles();
-
-            if (files != null) {
-                return Arrays.stream(files)
-                        .filter(File::isFile)
-                        .map(File::getName)
-                        .map(FileName::parseFileName)
-                        .filter(meta -> {
-                            switch (meta.getType()) {
-                                case Current:
-                                case Lock:
-                                case TempManifest:
-                                case Manifest:
-                                    return false;
-                                case Unknown:
-                                    return false;
-                                case Log:
-                                    return meta.getFileNumber() < dataLogFileNumber;
-                                case SSTable:
-                                    return !tableCache.hasTable(meta.getFileNumber());
-                                default:
-                                    return false;
-                            }
-                        })
-                        .map(meta -> Paths.get(baseDir, meta.getFileName()))
-                        .collect(Collectors.toList());
-            } else {
-                return Collections.emptyList();
-            }
-        } catch (Throwable ex) {
-            logger.error("get outdated files under dir:{} failed", baseDir, ex);
-            return Collections.emptyList();
-        }
-    }
-
-    static void deleteOutdatedFiles(String baseDir, int dataLogFileNumber, int consumerCommittedIdLogFileNumber, TableCache tableCache) {
-        List<Path> outdatedFilePaths = getOutdatedFiles(baseDir, dataLogFileNumber, consumerCommittedIdLogFileNumber, tableCache);
-        try {
-            for (Path path : outdatedFilePaths) {
-                Files.deleteIfExists(path);
-            }
-        } catch (Throwable t) {
-            logger.error("delete outdated files:{} failed", outdatedFilePaths, t);
-        }
     }
 
     static class FileNameMeta {

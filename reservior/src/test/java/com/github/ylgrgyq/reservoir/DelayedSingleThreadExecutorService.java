@@ -47,7 +47,7 @@ public class DelayedSingleThreadExecutorService extends AbstractExecutorService 
 
     @Override
     public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
-        return executorService.awaitTermination(timeout, unit);
+        return true;
     }
 
     public void breakDelay() {

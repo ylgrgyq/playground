@@ -4,7 +4,6 @@ import com.github.ylgrgyq.reservoir.*;
 import com.github.ylgrgyq.reservoir.storage.FileName.FileNameMeta;
 import com.github.ylgrgyq.reservoir.storage.FileName.FileType;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -20,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 import static com.github.ylgrgyq.reservoir.TestingUtils.numberStringBytes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 
 public class FileBasedStorageTest {
     private File tempFile;
@@ -232,12 +232,47 @@ public class FileBasedStorageTest {
     }
 
     @Test
+    public void fetchDataFromMultiSstables() throws Exception {
+        final FileBasedStorage storage = builder
+                .setFlushMemtableExecutorService(new ImmediateExecutorService())
+                .build();
+
+        final List<ObjectWithId> expectData = new ArrayList<>();
+        for (int i = 0; i < 10; ++i) {
+            List<ObjectWithId> batch = generateSimpleTestingObjectWithIds(storage.getLastProducedId() + 1, 64);
+            expectData.addAll(batch);
+            storage.store(batch);
+            expectData.addAll(triggerFlushMemtable(storage, storage.getLastProducedId() + 1));
+        }
+
+        assertThat(storage.fetch(-1, expectData.size() + 1)).isEqualTo(expectData);
+        storage.close();
+    }
+
+    @Test
+    public void testBlockOnWriteImm() {
+        // imm 写的特别慢时候会卡住
+    }
+
+    @Test
+    // add this to pass null to writeMemtable to throw exception
+    @SuppressWarnings("ConstantConditions")
+    public void testFlushMemtableFailedThenStorageClosed() throws Exception {
+        final FileBasedStorage storage = builder
+                .setFlushMemtableExecutorService(new ImmediateExecutorService())
+                .build();
+
+        storage.writeMemtable(null);
+        await().until(storage::closed);
+    }
+
+    @Test
     public void truncate() throws Exception {
         final FileBasedStorage storage = builder
                 .setFlushMemtableExecutorService(new ImmediateExecutorService())
                 .setTruncateIntervalMillis(0, TimeUnit.MILLISECONDS)
                 .build();
-        final int expectSize = 64;
+        final int expectSize = 65;
         final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
         storage.store(objs);
         objs.addAll(triggerFlushMemtable(storage, 70));
