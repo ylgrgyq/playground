@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -119,6 +120,7 @@ final class FileName {
                     .map(File::getName)
                     .map(FileName::parseFileName)
                     .filter(filter)
+                    .sorted(Comparator.comparingInt(FileNameMeta::getFileNumber))
                     .collect(Collectors.toList());
         }
 

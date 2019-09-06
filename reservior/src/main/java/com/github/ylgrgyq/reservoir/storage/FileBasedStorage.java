@@ -221,10 +221,10 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         }
 
         try {
-            long lastIndex = -1;
+            long lastIndex = getLastProducedId();
             for (ObjectWithId e : batch) {
                 if (e.getId() <= lastIndex) {
-                    throw new IllegalStateException("log entries being appended is not monotone increasing: " + batch);
+                    throw new IllegalArgumentException("data being appended is not monotone increasing: " + batch);
                 }
 
                 lastIndex = e.getId();

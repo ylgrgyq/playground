@@ -67,10 +67,11 @@ public class FileBasedStorageBuilder {
         return flushMemtableExecutorService;
     }
 
-    public void setFlushMemtableExecutorService(ExecutorService flushMemtableExecutorService) {
+    public FileBasedStorageBuilder setFlushMemtableExecutorService(ExecutorService flushMemtableExecutorService) {
         requireNonNull(flushMemtableExecutorService, "flushMemtableExecutorService");
 
         this.flushMemtableExecutorService = flushMemtableExecutorService;
+        return this;
     }
 
     public FileBasedStorage build() throws StorageException {
