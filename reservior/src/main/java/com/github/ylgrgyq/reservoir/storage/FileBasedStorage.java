@@ -1,9 +1,6 @@
 package com.github.ylgrgyq.reservoir.storage;
 
-import com.github.ylgrgyq.reservoir.Bits;
-import com.github.ylgrgyq.reservoir.ObjectQueueStorage;
-import com.github.ylgrgyq.reservoir.ObjectWithId;
-import com.github.ylgrgyq.reservoir.StorageException;
+import com.github.ylgrgyq.reservoir.*;
 import com.github.ylgrgyq.reservoir.storage.FileName.FileType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +16,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -26,6 +24,36 @@ import static java.util.Objects.requireNonNull;
 
 public final class FileBasedStorage implements ObjectQueueStorage {
     private static final Logger logger = LoggerFactory.getLogger(FileBasedStorage.class.getName());
+    private static final ThreadFactory safeCloseThreadFactory = new NamedThreadFactory("safe-close-thread-");
+
+    private static class Itr implements Iterator<ObjectWithId> {
+        private final List<SeekableIterator<Long, ObjectWithId>> iterators;
+        private int lastItrIndex;
+
+        Itr(List<SeekableIterator<Long, ObjectWithId>> iterators) {
+            this.iterators = iterators;
+        }
+
+        @Override
+        public boolean hasNext() {
+            for (int i = lastItrIndex; i < iterators.size(); i++) {
+                SeekableIterator<Long, ObjectWithId> itr = iterators.get(i);
+                if (itr.hasNext()) {
+                    lastItrIndex = i;
+                    return true;
+                }
+            }
+
+            lastItrIndex = iterators.size();
+            return false;
+        }
+
+        @Override
+        public ObjectWithId next() {
+            assert lastItrIndex >= 0 && lastItrIndex < iterators.size();
+            return iterators.get(lastItrIndex).next();
+        }
+    }
 
     private final ExecutorService sstableWriterPool;
     private final String baseDir;
@@ -48,7 +76,9 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     private Memtable mm;
     @Nullable
     private volatile Memtable imm;
-    private volatile StorageStatus status;
+    private volatile boolean closed;
+    @Nullable
+    private Thread safeCloseThread;
 
     FileBasedStorage(FileBasedStorageBuilder builder) throws StorageException {
         requireNonNull(builder, "builder");
@@ -66,11 +96,12 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         this.firstIdInStorage = -1;
         this.lastIdInStorage = -1;
         this.lastCommittedId = Long.MIN_VALUE;
-        this.status = StorageStatus.INIT;
         this.tableCache = new TableCache(baseDir);
         this.manifest = new Manifest(baseDir);
         this.truncateIntervalNanos = TimeUnit.MILLISECONDS.toNanos(builder.getTruncateIntervalMillis());
+        this.closed = false;
 
+        boolean initStorageSuccess = false;
         try {
             createStorageDir();
 
@@ -107,25 +138,24 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             }
 
             this.lastTryTruncateTime = System.nanoTime();
-            this.status = StorageStatus.OK;
+            initStorageSuccess = true;
         } catch (IOException | StorageException t) {
             throw new IllegalStateException("init storage failed", t);
         } catch (Exception ex) {
             throw new StorageException(ex);
         } finally {
-            if (status != StorageStatus.OK) {
-                status = StorageStatus.ERROR;
-                try {
-                    releaseStorageLock();
-                } catch (IOException ex) {
-                    logger.error("Release storage lock failed", ex);
-                }
+            if (!initStorageSuccess) {
+                blockSafeClose();
             }
         }
     }
 
     @Override
     public synchronized void commitId(long id) throws StorageException {
+        if (closed) {
+            throw new IllegalStateException("storage is closed");
+        }
+
         try {
             if (id > lastCommittedId) {
                 assert consumerCommitLogWriter != null;
@@ -150,8 +180,8 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     @Override
     public List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
-        if (status != StorageStatus.OK) {
-            throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
+        if (closed) {
+            throw new IllegalStateException("storage is closed");
         }
 
         List<ObjectWithId> entries;
@@ -170,6 +200,9 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     @Override
     public List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
+        if (closed) {
+            throw new IllegalStateException("storage is closed");
+        }
 
         final long end = System.nanoTime() + unit.toNanos(timeout);
         List<ObjectWithId> entries;
@@ -193,10 +226,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     @Override
     public synchronized long getLastProducedId() {
-        if (status != StorageStatus.OK) {
-            throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
-        }
-
         assert mm.isEmpty() || mm.lastId() == lastIdInStorage :
                 String.format("actual lastIndex:%s lastIndexInMm:%s", lastIdInStorage, mm.lastId());
         return lastIdInStorage;
@@ -205,8 +234,8 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     @Override
     public synchronized void store(List<ObjectWithId> batch) throws StorageException {
         requireNonNull(batch, "batch");
-        if (status != StorageStatus.OK) {
-            throw new IllegalStateException("FileBasedStorage's status is not normal, currently: " + status);
+        if (closed) {
+            throw new IllegalStateException("storage is closed");
         }
 
         if (batch.isEmpty()) {
@@ -242,37 +271,34 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     }
 
     @Override
-    public void close() throws Exception {
-        if (status == StorageStatus.SHUTTING_DOWN) {
+    public synchronized void close() throws Exception {
+        if (closed) {
             return;
         }
 
-        try {
-            status = StorageStatus.SHUTTING_DOWN;
-            sstableWriterPool.shutdown();
+        closed = true;
 
-            logger.debug("shutting file based storage down");
+        sstableWriterPool.shutdown();
+        sstableWriterPool.awaitTermination(1, TimeUnit.DAYS);
+
+        if (!sstableWriterPool.isTerminated()) {
             sstableWriterPool.shutdownNow();
-
-            if (dataLogWriter != null) {
-                dataLogWriter.close();
-            }
-
-            if (consumerCommitLogWriter != null) {
-                consumerCommitLogWriter.close();
-            }
-
-            manifest.close();
-
-            tableCache.evictAll();
-
-            releaseStorageLock();
-            logger.debug("file based storage shutdown successfully");
-
-
-        } catch (RejectedExecutionException ex) {
-            throw new StorageException(ex);
         }
+
+        if (dataLogWriter != null) {
+            dataLogWriter.close();
+        }
+
+        if (consumerCommitLogWriter != null) {
+            consumerCommitLogWriter.close();
+        }
+
+        manifest.close();
+
+        tableCache.evictAll();
+
+        releaseStorageLock();
+        logger.debug("File based storage shutdown successfully");
     }
 
     private void createStorageDir() throws IOException {
@@ -437,7 +463,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                 return true;
             }
         } catch (BadRecordException ex) {
-            logger.warn("got \"{}\" record in log file:\"{}\". ", ex.getType(), logFilePath);
+            logger.warn("got \"{}\" record in data log file:\"{}\". ", ex.getType(), logFilePath);
         }
         return false;
     }
@@ -505,13 +531,15 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         }
     }
 
-    private synchronized boolean makeRoomForEntry(boolean force) {
+    private synchronized boolean makeRoomForEntry(boolean force) throws IOException, StorageException {
         try {
             boolean forceRun = force;
             while (true) {
-                if (status != StorageStatus.OK) {
+                if (closed) {
                     return false;
-                } else if (forceRun || mm.getMemoryUsedInBytes() > Constant.kMaxMemtableSize) {
+                }
+
+                if (forceRun || mm.getMemoryUsedInBytes() > Constant.kMaxMemtableSize) {
                     if (imm != null) {
                         this.wait();
                         continue;
@@ -523,13 +551,12 @@ public final class FileBasedStorage implements ObjectQueueStorage {
                     return true;
                 }
             }
-        } catch (IOException | InterruptedException t) {
-            logger.error("make room for new entry failed", t);
+        } catch (InterruptedException t) {
+            throw new StorageException("thread was interrupted when waiting room for new entry");
         }
-        return false;
     }
 
-    private void makeRoomForEntry0() throws IOException {
+    private void makeRoomForEntry0() throws IOException, StorageException {
         final LogWriter logWriter = createNewDataLogWriter();
         if (dataLogWriter != null) {
             dataLogWriter.close();
@@ -538,7 +565,11 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         imm = mm;
         mm = new Memtable();
         logger.debug("Trigger compaction, new log file number={}", dataLogFileNumber);
-        sstableWriterPool.submit(this::writeMemTable);
+        try {
+            sstableWriterPool.submit(this::writeMemTable);
+        } catch (RejectedExecutionException ex) {
+            throw new StorageException("flush memtable task was rejected", ex);
+        }
     }
 
     private LogWriter createNewDataLogWriter() throws IOException {
@@ -563,7 +594,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     private void writeMemTable() {
         logger.debug("start write mem table in background");
-        StorageStatus status = StorageStatus.OK;
+        boolean writeMemtableSuccess = false;
         try {
             ManifestRecord record = null;
             assert imm != null;
@@ -589,18 +620,19 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
             FileName.deleteOutdatedFiles(baseDir, dataLogFileNumber, consumerCommitLogFileNumber, tableCache);
 
+            writeMemtableSuccess = true;
             logger.debug("write mem table in background done with manifest record {}", record);
         } catch (Throwable t) {
             logger.error("write memtable in background failed", t);
-            status = StorageStatus.ERROR;
         } finally {
             synchronized (this) {
-                if (status == StorageStatus.OK) {
-                    imm = null;
+                if (!writeMemtableSuccess) {
+                    safeClose();
                 } else {
-                    this.status = status;
+                    imm = null;
                 }
-                this.notifyAll();
+
+                notifyAll();
             }
         }
     }
@@ -682,32 +714,30 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         }
     }
 
-    private static class Itr implements Iterator<ObjectWithId> {
-        private final List<SeekableIterator<Long, ObjectWithId>> iterators;
-        private int lastItrIndex;
-
-        Itr(List<SeekableIterator<Long, ObjectWithId>> iterators) {
-            this.iterators = iterators;
-        }
-
-        @Override
-        public boolean hasNext() {
-            for (int i = lastItrIndex; i < iterators.size(); i++) {
-                SeekableIterator<Long, ObjectWithId> itr = iterators.get(i);
-                if (itr.hasNext()) {
-                    lastItrIndex = i;
-                    return true;
+    private synchronized void safeClose() {
+        if (safeCloseThread == null) {
+            final Thread t = safeCloseThreadFactory.newThread(() -> {
+                try {
+                    close();
+                } catch (Exception ex) {
+                    logger.error("Close storage under directory: {} failed", baseDir, ex);
                 }
-            }
+            });
 
-            lastItrIndex = iterators.size();
-            return false;
+            t.setDaemon(true);
+            t.start();
+
+            safeCloseThread = t;
         }
+    }
 
-        @Override
-        public ObjectWithId next() {
-            assert lastItrIndex >= 0 && lastItrIndex < iterators.size();
-            return iterators.get(lastItrIndex).next();
+    private void blockSafeClose() {
+        safeClose();
+        try {
+            assert safeCloseThread != null;
+            safeCloseThread.join();
+        } catch (InterruptedException ex) {
+            // ignore
         }
     }
 }
