@@ -27,7 +27,7 @@
                 <version>${project.version}</version>
             </dependency>
 
-            <!-- dependencies-->
+            <!-- log dependencies-->
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
@@ -48,6 +48,8 @@
                 <artifactId>log4j-core</artifactId>
                 <version>2.11.2</version>
             </dependency>
+
+            <!-- other dependencies-->
             <dependency>
                 <groupId>com.spotify</groupId>
                 <artifactId>completable-futures</artifactId>
@@ -111,6 +113,7 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
     <build>
         <pluginManagement>
             <plugins>

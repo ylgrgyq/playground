@@ -11,9 +11,13 @@ public class BenchmarkRunner {
     private long coolDownIntervalMillis = 5000;
 
     public static void main(String[] args) throws Exception {
-        FileStorageStoreBench storeBench = new FileStorageStoreBench(100, 100, 10);
-        BenchmarkRunner runner = new BenchmarkRunner();
+        final FileStorageStoreBench storeBench = new FileStorageStoreBench(100, 10, 100);
+        final BenchmarkRunner runner = new BenchmarkRunner();
         runner.runTest(storeBench);
+
+//        final RocksDbStorageStoreBench storeBench = new RocksDbStorageStoreBench(100, 100, 10);
+//        final BenchmarkRunner runner = new BenchmarkRunner();
+//        runner.runTest(storeBench);
     }
 
     private void runTest(BenchmarkTest test) throws Exception {
@@ -33,7 +37,9 @@ public class BenchmarkRunner {
             logger.info("The {} test done. Result: \n{}\n", ordinalNumber(i), report);
             test.teardown();
 
-            Thread.sleep(coolDownIntervalMillis);
+            if (i != repeatTimes) {
+                Thread.sleep(coolDownIntervalMillis);
+            }
         }
     }
 
