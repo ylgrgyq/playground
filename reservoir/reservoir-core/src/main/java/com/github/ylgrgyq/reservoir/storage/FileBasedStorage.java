@@ -69,7 +69,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     @Nullable
     private LogWriter consumerCommitLogWriter;
     private volatile int consumerCommitLogFileNumber;
-    private long firstIdInStorage;
     private long lastIdInStorage;
     private long lastCommittedId;
     private long lastTryTruncateTime;
@@ -94,7 +93,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         this.readRetryIntervalMillis = builder.getReadRetryIntervalMillis();
         this.mm = new Memtable();
         this.baseDir = storageBaseDir;
-        this.firstIdInStorage = -1;
         this.lastIdInStorage = -1;
         this.lastCommittedId = Long.MIN_VALUE;
         this.tableCache = new TableCache(baseDir);
@@ -127,11 +125,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             record.setDataLogFileNumber(this.dataLogFileNumber);
             record.setConsumerCommitLogFileNumber(this.consumerCommitLogFileNumber);
             this.manifest.logRecord(record);
-
-            this.firstIdInStorage = this.manifest.getFirstId();
-            if (this.firstIdInStorage < 0) {
-                this.firstIdInStorage = this.mm.firstId();
-            }
 
             this.lastIdInStorage = this.mm.lastId();
             if (this.lastIdInStorage < 0) {
@@ -242,11 +235,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         if (batch.isEmpty()) {
             logger.warn("append with empty entries");
             return;
-        }
-
-        if (firstIdInStorage < 0) {
-            final ObjectWithId first = batch.get(0);
-            firstIdInStorage = first.getId();
         }
 
         try {

@@ -37,6 +37,7 @@ public class BenchmarkRunner {
             logger.info("The {} test done. Result: \n{}\n", ordinalNumber(i), report);
             test.teardown();
 
+            // cool down a while except for after the last test
             if (i != repeatTimes) {
                 Thread.sleep(coolDownIntervalMillis);
             }
