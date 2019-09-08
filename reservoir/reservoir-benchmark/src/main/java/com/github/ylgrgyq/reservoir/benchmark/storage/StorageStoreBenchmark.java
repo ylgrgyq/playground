@@ -57,7 +57,7 @@ abstract class StorageStoreBenchmark implements BenchmarkTest {
                 "storage path: " + baseDir + "\n" +
                 "size in bytes for each data: " + dataSize + "\n" +
                 "number of data per batch: " + numDataPerBatch + "\n" +
-                "number of batches: " + numBatches + "\n";
+                "number of batches: " + numBatches;
     }
 
     @Override

@@ -21,7 +21,8 @@ public class BenchmarkRunner {
     }
 
     private void runTest(BenchmarkTest test) throws Exception {
-        logger.info("Testing spec:\n{}", test.testingSpec());
+        logger.info("\nEnvironment spec:\n{}\n", EnvironmentInfo.generateEnvironmentSpec());
+        logger.info("\nTesting spec:\n{}\n", test.testingSpec());
         logger.info("Warm up for {} times.", warmUpTimes);
         doTest(test, warmUpTimes);
 
