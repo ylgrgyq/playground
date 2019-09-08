@@ -4,7 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class BenchmarkRunner {
-    private static final Logger logger = LoggerFactory.getLogger(BenchmarkRunner.class);
+    private static final Logger logger = LoggerFactory.getLogger(BenchmarkRunner.class.getSimpleName());
 
     private int warmUpTimes = 5;
     private int testTimes = 5;
@@ -17,7 +17,7 @@ public class BenchmarkRunner {
     }
 
     private void runTest(BenchmarkTest test) throws Exception {
-        logger.info("Testing with {}", test.testInfo());
+        logger.info("Testing spec:\n{}", test.testingSpec());
         logger.info("Warm up for {} times.", warmUpTimes);
         doTest(test, warmUpTimes);
 

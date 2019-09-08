@@ -7,5 +7,5 @@ public interface BenchmarkTest {
 
     BenchmarkTestReport runTest() throws Exception;
 
-    String testInfo();
+    String testingSpec();
 }
