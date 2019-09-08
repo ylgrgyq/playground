@@ -17,6 +17,7 @@ abstract class StorageStoreBenchmark implements BenchmarkTest {
     private final int dataSize;
     private final int numDataPerBatch;
     private final List<List<ObjectWithId>> testingData;
+    private final String baseDir;
     @Nullable
     private ObjectQueueStorage storage;
     @Nullable
@@ -27,13 +28,17 @@ abstract class StorageStoreBenchmark implements BenchmarkTest {
         this.numBatches = numBatches;
         this.numDataPerBatch = numDataPerBatch;
         this.testingData = new ArrayList<>(TestingDataGenerator.generate(dataSize, numBatches, numDataPerBatch));
+
+        final String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
+                File.separator + "reservoir_benchmark_" + System.nanoTime();
+        final File tempFile = new File(tempDir);
+        this.baseDir = tempFile.getPath();
     }
 
     @Override
     public void setup() throws Exception {
         // Use new storage and timer every time to prevent interference between each test
-        final String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
-                File.separator + "reservoir_test_bench_" + System.nanoTime();
+        final String tempDir = baseDir + File.separator + "test_only_store" + System.nanoTime();
         final File tempFile = new File(tempDir);
         FileUtils.forceMkdir(tempFile);
         storage = createStorage(tempFile.getPath());
@@ -49,6 +54,7 @@ abstract class StorageStoreBenchmark implements BenchmarkTest {
     @Override
     public String testingSpec() {
         return "description: " + getTestDescription() + "\n" +
+                "storage path: " + baseDir + "\n" +
                 "size in bytes for each data: " + dataSize + "\n" +
                 "number of data per batch: " + numDataPerBatch + "\n" +
                 "number of batches: " + numBatches + "\n";

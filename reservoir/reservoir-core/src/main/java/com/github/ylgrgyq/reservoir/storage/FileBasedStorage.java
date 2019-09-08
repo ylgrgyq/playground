@@ -15,10 +15,7 @@ import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
@@ -76,7 +73,8 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     private Memtable mm;
     @Nullable
     private Memtable imm;
-    private volatile boolean closed;
+    @Nullable
+    private volatile CompletableFuture<Void> closeFuture;
     @Nullable
     private Thread safeCloseThread;
 
@@ -98,7 +96,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         this.tableCache = new TableCache(baseDir);
         this.manifest = new Manifest(baseDir);
         this.truncateIntervalNanos = TimeUnit.MILLISECONDS.toNanos(builder.getTruncateIntervalMillis());
-        this.closed = false;
+        this.closeFuture = null;
 
         boolean initStorageSuccess = false;
         try {
@@ -146,7 +144,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     @Override
     public synchronized void commitId(long id) throws StorageException {
-        if (closed) {
+        if (closed()) {
             throw new IllegalStateException("storage is closed");
         }
 
@@ -174,7 +172,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     @Override
     public List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
-        if (closed) {
+        if (closed()) {
             throw new IllegalStateException("storage is closed");
         }
 
@@ -194,7 +192,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
     @Override
     public List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
-        if (closed) {
+        if (closed()) {
             throw new IllegalStateException("storage is closed");
         }
 
@@ -228,7 +226,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     @Override
     public synchronized void store(List<ObjectWithId> batch) throws StorageException {
         requireNonNull(batch, "batch");
-        if (closed) {
+        if (closed()) {
             throw new IllegalStateException("storage is closed");
         }
 
@@ -260,38 +258,128 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     }
 
     @Override
-    public synchronized void close() throws Exception {
-        if (closed) {
-            return;
+    public void close() {
+        close(false);
+    }
+
+    void close(boolean force) {
+        CompletableFuture<Void> f = closeFuture;
+        if (f == null) {
+            synchronized (this) {
+                f = closeFuture;
+                if (f == null) {
+                    f = new CompletableFuture<>();
+                    closeFuture = f;
+                    final PostClose task = new PostClose(f);
+                    boolean shutdownNow = force;
+                    if (!force) {
+                        try {
+                            sstableWriterPool.submit(task);
+                        } catch (RejectedExecutionException unused) {
+                            shutdownNow = true;
+                        }
+                    }
+
+                    if (shutdownNow) {
+                        sstableWriterPool.shutdownNow();
+                        task.run();
+                    }
+                }
+            }
         }
 
-        closed = true;
-
-        sstableWriterPool.shutdown();
-        sstableWriterPool.awaitTermination(1, TimeUnit.DAYS);
-
-        if (!sstableWriterPool.isTerminated()) {
-            sstableWriterPool.shutdownNow();
-        }
-
-        if (dataLogWriter != null) {
-            dataLogWriter.close();
-        }
-
-        if (consumerCommitLogWriter != null) {
-            consumerCommitLogWriter.close();
-        }
-
-        manifest.close();
-
-        tableCache.evictAll();
-
-        releaseStorageLock();
-        logger.debug("File based storage shutdown successfully");
+        assert f == closeFuture;
+        f.join();
     }
 
     boolean closed() {
-        return closed;
+        return closeFuture != null;
+    }
+
+    /**
+     * It's difficult to test this method throw some exception then stop the storage. So we set it's access level to package
+     * to make test easier.
+     *
+     * @param immutableMemtable the immutable memtable to flush
+     */
+    void writeMemtable(Memtable immutableMemtable) {
+        logger.debug("start write mem table in background");
+        boolean writeMemtableSuccess = false;
+        try {
+            ManifestRecord record = null;
+            if (!immutableMemtable.isEmpty()) {
+                assert immutableMemtable.firstId() > manifest.getLastId();
+                final SSTableFileMetaInfo meta = writeMemTableToSSTable(immutableMemtable);
+                record = ManifestRecord.newPlainRecord();
+                record.addMeta(meta);
+                record.setConsumerCommitLogFileNumber(consumerCommitLogFileNumber);
+                record.setDataLogFileNumber(dataLogFileNumber);
+                manifest.logRecord(record);
+            }
+
+            final Set<Integer> remainMetasFileNumberSet = manifest.searchMetas(Long.MIN_VALUE)
+                    .stream()
+                    .map(SSTableFileMetaInfo::getFileNumber)
+                    .collect(Collectors.toSet());
+            for (Integer fileNumber : tableCache.getAllFileNumbers()) {
+                if (!remainMetasFileNumberSet.contains(fileNumber)) {
+                    tableCache.evict(fileNumber);
+                }
+            }
+
+            deleteOutdatedFiles(baseDir, dataLogFileNumber, consumerCommitLogFileNumber, tableCache);
+
+            writeMemtableSuccess = true;
+            logger.debug("write mem table in background done with manifest record {}", record);
+        } catch (Throwable t) {
+            logger.error("write memtable in background failed", t);
+        } finally {
+            synchronized (this) {
+                if (!writeMemtableSuccess) {
+                    safeClose();
+                } else {
+                    assert imm == immutableMemtable;
+                    imm = null;
+                }
+
+                notifyAll();
+            }
+        }
+    }
+
+    private class PostClose implements Runnable {
+        private final CompletableFuture<Void> closeFuture;
+
+        private PostClose(CompletableFuture<Void> closeFuture) {
+            this.closeFuture = closeFuture;
+        }
+
+        @Override
+        public void run() {
+            synchronized (FileBasedStorage.this) {
+                try {
+                    sstableWriterPool.shutdown();
+
+                    if (dataLogWriter != null) {
+                        dataLogWriter.close();
+                    }
+
+                    if (consumerCommitLogWriter != null) {
+                        consumerCommitLogWriter.close();
+                    }
+
+                    manifest.close();
+
+                    tableCache.evictAll();
+
+                    releaseStorageLock();
+                    logger.debug("File based storage shutdown successfully");
+                    closeFuture.complete(null);
+                } catch (Exception ex) {
+                    closeFuture.completeExceptionally(ex);
+                }
+            }
+        }
     }
 
     private void createStorageDir() throws IOException {
@@ -528,7 +616,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         try {
             boolean forceRun = force;
             while (true) {
-                if (closed) {
+                if (closed()) {
                     return false;
                 }
 
@@ -583,58 +671,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         final LogWriter writer = new LogWriter(logFile);
         consumerCommitLogFileNumber = nextLogFileNumber;
         return writer;
-    }
-
-    /**
-     * It's difficult to test this method as a asynchronous process. So we set it's access level to package
-     * to make test easier.
-     *
-     * @param immutableMemtable the immutable memtable to flush
-     */
-    @SuppressWarnings("WeakerAccess")
-    void writeMemtable(Memtable immutableMemtable) {
-        logger.debug("start write mem table in background");
-        boolean writeMemtableSuccess = false;
-        try {
-            ManifestRecord record = null;
-            if (!immutableMemtable.isEmpty()) {
-                assert immutableMemtable.firstId() > manifest.getLastId();
-                final SSTableFileMetaInfo meta = writeMemTableToSSTable(immutableMemtable);
-                record = ManifestRecord.newPlainRecord();
-                record.addMeta(meta);
-                record.setConsumerCommitLogFileNumber(consumerCommitLogFileNumber);
-                record.setDataLogFileNumber(dataLogFileNumber);
-                manifest.logRecord(record);
-            }
-
-            final Set<Integer> remainMetasFileNumberSet = manifest.searchMetas(Long.MIN_VALUE)
-                    .stream()
-                    .map(SSTableFileMetaInfo::getFileNumber)
-                    .collect(Collectors.toSet());
-            for (Integer fileNumber : tableCache.getAllFileNumbers()) {
-                if (!remainMetasFileNumberSet.contains(fileNumber)) {
-                    tableCache.evict(fileNumber);
-                }
-            }
-
-            deleteOutdatedFiles(baseDir, dataLogFileNumber, consumerCommitLogFileNumber, tableCache);
-
-            writeMemtableSuccess = true;
-            logger.debug("write mem table in background done with manifest record {}", record);
-        } catch (Throwable t) {
-            logger.error("write memtable in background failed", t);
-        } finally {
-            synchronized (this) {
-                if (!writeMemtableSuccess) {
-                    safeClose();
-                } else {
-                    assert imm == immutableMemtable;
-                    imm = null;
-                }
-
-                notifyAll();
-            }
-        }
     }
 
     private SSTableFileMetaInfo writeMemTableToSSTable(Memtable mm) throws IOException {

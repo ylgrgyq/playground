@@ -18,7 +18,7 @@ public class DelayedSingleThreadExecutorService extends AbstractExecutorService 
     }
 
     public DelayedSingleThreadExecutorService(int noDelayForFirstNTasks, long defaultDelayed, TimeUnit unit) {
-        this.executorService = Executors.newSingleThreadExecutor(threadFactory);
+        this.executorService = Executors.newSingleThreadScheduledExecutor(threadFactory);
         this.defaultDelayedMillis = unit.toMillis(defaultDelayed);
         this.semaphore = new Semaphore(Integer.MAX_VALUE);
         this.semaphore.drainPermits();
@@ -46,17 +46,13 @@ public class DelayedSingleThreadExecutorService extends AbstractExecutorService 
     }
 
     @Override
-    public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+    public boolean awaitTermination(long timeout, TimeUnit unit) {
         return true;
-    }
-
-    public void breakDelay() {
-        semaphore.release();
     }
 
     @Override
     public void execute(Runnable command) {
-        if (semaphore.tryAcquire()){
+        if (semaphore.tryAcquire()) {
             command.run();
         } else {
             executorService.execute(() -> {

@@ -11,11 +11,11 @@ public class BenchmarkRunner {
     private long coolDownIntervalMillis = 5000;
 
     public static void main(String[] args) throws Exception {
-        final FileStorageStoreBench storeBench = new FileStorageStoreBench(100, 10, 100);
+        final FileStorageStoreBench storeBench = new FileStorageStoreBench(100, 10, 10000);
         final BenchmarkRunner runner = new BenchmarkRunner();
         runner.runTest(storeBench);
 
-//        final RocksDbStorageStoreBench storeBench = new RocksDbStorageStoreBench(100, 100, 10);
+//        final RocksDbStorageStoreBench storeBench = new RocksDbStorageStoreBench(100, 100, 10000);
 //        final BenchmarkRunner runner = new BenchmarkRunner();
 //        runner.runTest(storeBench);
     }

@@ -167,7 +167,7 @@ public class FileBasedStorageTest {
 
         triggerFlushMemtable(storage, 1000);
         assertThat(storage.fetch(0, 64)).isEqualTo(objs);
-        storage.close();
+        storage.close(true);
     }
 
     @Test
@@ -182,7 +182,7 @@ public class FileBasedStorageTest {
 
         objs.addAll(triggerFlushMemtable(storage, 1000));
         assertThat(storage.fetch(32, 1000)).isEqualTo(objs.subList(32, objs.size()));
-        storage.close();
+        storage.close(true);
     }
 
     @Test
@@ -195,14 +195,14 @@ public class FileBasedStorageTest {
         final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(64);
         storage.store(objs);
         triggerFlushMemtable(storage, 1000);
-        storage.close();
+        storage.close(true);
         storage = builder
                 // create executor service again, because the previous executor service in the storage
                 // builder is closed when the previous storage closed
                 .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS))
                 .build();
         assertThat(storage.fetch(0, 64)).isEqualTo(objs);
-        storage.close();
+        storage.close(true);
     }
 
     @Test
@@ -228,7 +228,7 @@ public class FileBasedStorageTest {
 
         // add one to limit to ensure there's no more data in storage than in expectData
         assertThat(storage.fetch(0, expectData.size() + 1)).isEqualTo(expectData);
-        storage.close();
+        storage.close(true);
     }
 
     @Test
