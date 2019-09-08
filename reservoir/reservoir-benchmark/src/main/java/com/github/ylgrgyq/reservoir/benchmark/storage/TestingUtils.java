@@ -31,4 +31,8 @@ public class TestingUtils {
         builder.append(base, 0, expectSize - baseInNeed * base.length());
         return builder.toString();
     }
+
+    public static byte[] makeStringInBytes(String base, int expectSize) {
+        return makeString(base, expectSize).getBytes(StandardCharsets.UTF_8);
+    }
 }
