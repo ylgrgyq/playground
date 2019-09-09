@@ -9,6 +9,8 @@ import java.util.zip.CRC32;
 final class LogWriter implements Closeable {
     private final FileChannel workingFileChannel;
     private final ByteBuffer headerBuffer;
+    private final ByteBuffer zeros;
+    private final CRC32 checksum;
     private int blockOffset;
 
     LogWriter(FileChannel workingFileChannel) throws IOException {
@@ -20,6 +22,8 @@ final class LogWriter implements Closeable {
         this.workingFileChannel = workingFileChannel;
         this.headerBuffer = ByteBuffer.allocateDirect(Constant.kLogHeaderSize);
         this.blockOffset = 0;
+        this.zeros = ByteBuffer.allocate(Constant.kLogHeaderSize);
+        this.checksum = new CRC32();
     }
 
     void flush() throws IOException {
@@ -80,28 +84,33 @@ final class LogWriter implements Closeable {
 
         if (blockLeft > 0) {
             // padding with bytes array full of zero
-            ByteBuffer buffer = ByteBuffer.allocate(blockLeft);
-            workingFileChannel.write(buffer);
+            final ByteBuffer padding = zeros;
+            padding.position(Constant.kLogHeaderSize - blockLeft);
+            workingFileChannel.write(padding);
         }
     }
 
     private void writeRecord(RecordType type, byte[] blockPayload) throws IOException {
         assert blockOffset + Constant.kLogHeaderSize + blockPayload.length <= Constant.kLogBlockSize;
 
-        // format header
-        headerBuffer.clear();
         // checksum includes the record type and record payload
-        final CRC32 checksum = new CRC32();
-        checksum.update(type.getCode());
-        checksum.update(blockPayload);
-        headerBuffer.putLong(checksum.getValue());
-        headerBuffer.putShort((short) blockPayload.length);
-        headerBuffer.put(type.getCode());
-        headerBuffer.flip();
+        final CRC32 crc32 = checksum;
+        crc32.reset();
+        crc32.update(type.getCode());
+        crc32.update(blockPayload);
+
+        // format header
+        final ByteBuffer header = headerBuffer;
+        header.clear();
+        header.putLong(crc32.getValue());
+        header.putShort((short) blockPayload.length);
+        header.put(type.getCode());
+        header.flip();
 
         // write header and payload
-        workingFileChannel.write(headerBuffer);
-        workingFileChannel.write(ByteBuffer.wrap(blockPayload));
+        final FileChannel ch = workingFileChannel;
+        ch.write(header);
+        ch.write(ByteBuffer.wrap(blockPayload));
         blockOffset += blockPayload.length + Constant.kLogHeaderSize;
     }
 }
