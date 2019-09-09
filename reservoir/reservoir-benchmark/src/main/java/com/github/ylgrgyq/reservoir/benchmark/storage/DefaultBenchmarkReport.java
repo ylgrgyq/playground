@@ -6,7 +6,7 @@ import com.codahale.metrics.Timer;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
-public class DefaultBenchmarkReport implements BenchmarkTestReport {
+public final class DefaultBenchmarkReport implements BenchmarkTestReport {
     private final long testTimeElapsed;
     private final Timer timer;
 

@@ -2,7 +2,7 @@ package com.github.ylgrgyq.reservoir.benchmark.storage;
 
 import com.github.ylgrgyq.reservoir.ObjectQueueStorage;
 
-public class RocksDbStorageStoreBench extends StorageStoreBenchmark {
+public final class RocksDbStorageStoreBench extends StorageStoreBenchmark {
     RocksDbStorageStoreBench(int dataSize, int numDataPerBatch, int numBatches) {
         super(dataSize, numDataPerBatch, numBatches);
     }

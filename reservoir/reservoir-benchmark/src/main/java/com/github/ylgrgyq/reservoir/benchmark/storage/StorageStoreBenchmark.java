@@ -4,7 +4,6 @@ import com.codahale.metrics.Timer;
 import com.codahale.metrics.Timer.Context;
 import com.github.ylgrgyq.reservoir.FileUtils;
 import com.github.ylgrgyq.reservoir.ObjectQueueStorage;
-import com.github.ylgrgyq.reservoir.ObjectWithId;
 import com.github.ylgrgyq.reservoir.StorageException;
 
 import javax.annotation.Nullable;
@@ -16,7 +15,7 @@ abstract class StorageStoreBenchmark implements BenchmarkTest {
     private final int numBatches;
     private final int dataSize;
     private final int numDataPerBatch;
-    private final List<List<ObjectWithId>> testingData;
+    private final List<List<byte[]>> testingData;
     private final String baseDir;
     @Nullable
     private ObjectQueueStorage storage;
@@ -65,7 +64,7 @@ abstract class StorageStoreBenchmark implements BenchmarkTest {
         assert timer != null;
         assert storage != null;
         final long start = System.nanoTime();
-        for (List<ObjectWithId> data : testingData) {
+        for (List<byte[]> data : testingData) {
             final Context cxt = timer.time();
             try {
                 storage.store(data);

@@ -3,7 +3,7 @@ package com.github.ylgrgyq.reservoir.benchmark.storage;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
 
-public class TestingUtils {
+public final class TestingUtils {
     public static String numberString(Number num) {
         return "" + num;
     }

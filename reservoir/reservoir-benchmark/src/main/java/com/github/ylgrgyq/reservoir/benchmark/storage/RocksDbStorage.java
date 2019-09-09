@@ -130,8 +130,7 @@ public final class RocksDbStorage implements ObjectQueueStorage {
         }
     }
 
-    @Override
-    public long getLastProducedId() {
+    long getLastProducedId() {
         try (final RocksIterator it = db.newIterator(columnFamilyHandle, readOptions)) {
             it.seekToLast();
             if (it.isValid()) {
@@ -207,13 +206,14 @@ public final class RocksDbStorage implements ObjectQueueStorage {
     }
 
     @Override
-    public void store(List<ObjectWithId> queue) {
+    public void store(List<byte[]> queue) {
         requireNonNull(queue, "queue");
 
         try {
             final WriteBatch batch = new WriteBatch();
-            for (ObjectWithId e : queue) {
-                batch.put(columnFamilyHandle, getKeyBytes(e.getId()), e.getObjectInBytes());
+            long id = getLastProducedId();
+            for (byte[] e : queue) {
+                batch.put(columnFamilyHandle, getKeyBytes(id++), e);
             }
             db.write(writeOptions, batch);
         } catch (final RocksDBException e) {

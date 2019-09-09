@@ -66,7 +66,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     @Nullable
     private LogWriter consumerCommitLogWriter;
     private volatile int consumerCommitLogFileNumber;
-    private long lastIdInStorage;
     private long lastCommittedId;
     private long lastTryTruncateTime;
     private long truncateIntervalNanos;
@@ -91,7 +90,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         this.readRetryIntervalMillis = builder.getReadRetryIntervalMillis();
         this.mm = new Memtable();
         this.baseDir = storageBaseDir;
-        this.lastIdInStorage = -1;
         this.lastCommittedId = Long.MIN_VALUE;
         this.tableCache = new TableCache(baseDir);
         this.manifest = new Manifest(baseDir);
@@ -123,11 +121,6 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             record.setDataLogFileNumber(this.dataLogFileNumber);
             record.setConsumerCommitLogFileNumber(this.consumerCommitLogFileNumber);
             this.manifest.logRecord(record);
-
-            this.lastIdInStorage = this.mm.lastId();
-            if (this.lastIdInStorage < 0) {
-                this.lastIdInStorage = this.manifest.getLastId();
-            }
 
             this.lastTryTruncateTime = System.nanoTime();
             initStorageSuccess = true;
@@ -216,15 +209,18 @@ public final class FileBasedStorage implements ObjectQueueStorage {
         return Collections.unmodifiableList(entries);
     }
 
-    @Override
-    public synchronized long getLastProducedId() {
-        assert mm.isEmpty() || mm.lastId() == lastIdInStorage :
-                String.format("actual lastIndex:%s lastIndexInMm:%s", lastIdInStorage, mm.lastId());
-        return lastIdInStorage;
+    synchronized long getLastProducedId() {
+        if (!mm.isEmpty()) {
+            return mm.lastId();
+        } else if (imm != null && !imm.isEmpty()){
+            return imm.lastId();
+        } else {
+            return manifest.getLastId();
+        }
     }
 
     @Override
-    public synchronized void store(List<ObjectWithId> batch) throws StorageException {
+    public synchronized void store(List<byte[]> batch) throws StorageException {
         requireNonNull(batch, "batch");
         if (closed()) {
             throw new IllegalStateException("storage is closed");
@@ -235,19 +231,14 @@ public final class FileBasedStorage implements ObjectQueueStorage {
             return;
         }
 
+        long id = getLastProducedId();
         try {
-            long lastIndex = getLastProducedId();
-            for (ObjectWithId e : batch) {
-                if (e.getId() <= lastIndex) {
-                    throw new IllegalArgumentException("data being appended is not monotone increasing: " + batch);
-                }
-
-                lastIndex = e.getId();
+            for (byte[] bs : batch) {
+                final ObjectWithId e = new ObjectWithId(++id, bs);
                 if (makeRoomForEntry(false)) {
                     assert dataLogWriter != null;
                     dataLogWriter.append(encodeObjectWithId(e));
                     mm.add(e);
-                    lastIdInStorage = e.getId();
                 } else {
                     throw new StorageException("no more room to storage data");
                 }

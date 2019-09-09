@@ -4,7 +4,7 @@ import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.util.List;
 
-class EnvironmentInfo {
+final class EnvironmentInfo {
     static String generateEnvironmentSpec() {
         return "OS: " + System.getProperty("os.name") + "\n" +
                 "JDK: " + System.getProperty("java.version") + "\n" +

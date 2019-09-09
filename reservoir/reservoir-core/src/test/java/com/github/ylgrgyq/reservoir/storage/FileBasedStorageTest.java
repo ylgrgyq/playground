@@ -10,15 +10,14 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static com.github.ylgrgyq.reservoir.TestingUtils.numberStringBytes;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 public class FileBasedStorageTest {
@@ -67,7 +66,7 @@ public class FileBasedStorageTest {
         final CompletableFuture<List<ObjectWithId>> f = CompletableFuture.supplyAsync(() -> {
             try {
                 barrier.await();
-                return storage.fetch(0, 100);
+                return storage.fetch(Integer.MIN_VALUE, 100);
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
             }
@@ -76,14 +75,10 @@ public class FileBasedStorageTest {
         // waiting fetch thread in position, then feed some data in storage
         barrier.await();
         final int expectSize = 64;
-        final List<ObjectWithId> objs = new ArrayList<>();
-        for (int i = 1; i < expectSize + 1; i++) {
-            ObjectWithId obj = new ObjectWithId(i, numberStringBytes(i));
-            objs.add(obj);
-        }
-        storage.store(objs);
-        assertThat(storage.getLastProducedId()).isEqualTo(expectSize);
-        assertThat(f.get()).isEqualTo(objs);
+        final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
+        storeObjectWithIds(storage, objs);
+        assertThat(storage.getLastProducedId()).isEqualTo(expectSize - 1);
+        assertThat(f.get()).containsExactlyElementsOf(objs);
         storage.close();
     }
 
@@ -96,46 +91,16 @@ public class FileBasedStorageTest {
     }
 
     @Test
-    public void storeDuplicateData() throws Exception {
-        final FileBasedStorage storage = builder.build();
-        final int expectSize = 64;
-
-        final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
-        storage.store(objs);
-        assertThatThrownBy(() -> storage.store(objs))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("data being appended is not monotone increasing");
-
-        storage.close();
-    }
-
-    @Test
-    public void storeDataWithIdNotMonotoneIncreasing() throws Exception {
-        final FileBasedStorage storage = builder.build();
-
-        storage.store(Collections.singletonList(new ObjectWithId(1, numberStringBytes(1))));
-        storage.store(Collections.singletonList(new ObjectWithId(2, numberStringBytes(2))));
-
-        assertThatThrownBy(() ->
-                storage.store(Collections.singletonList(new ObjectWithId(2, numberStringBytes(2)))))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("data being appended is not monotone increasing");
-
-        storage.close();
-    }
-
-    @Test
     public void fetchDataFromMemtable() throws Exception {
         final FileBasedStorage storage = builder.build();
         final int expectSize = 64;
 
         final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
-        storage.store(objs);
+        storeObjectWithIds(storage, objs);
+        assertThat(storage.getLastProducedId()).isEqualTo(expectSize - 1);
 
-        assertThat(storage.getLastProducedId()).isEqualTo(expectSize);
-
-        for (int i = 0; i < expectSize; i += 10) {
-            assertThat(storage.fetch(i, 100)).isEqualTo(objs.subList(i, objs.size()));
+        for (int i = -1; i < expectSize; i += 10) {
+            assertThat(storage.fetch(i, 100)).isEqualTo(objs.subList(i + 1, objs.size()));
         }
         storage.close();
     }
@@ -146,12 +111,12 @@ public class FileBasedStorageTest {
         final int expectSize = 64;
 
         final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
-        storage.store(objs);
+        storeObjectWithIds(storage, objs);
         storage.close();
 
         storage = builder.build();
-        assertThat(storage.getLastProducedId()).isEqualTo(expectSize);
-        assertThat(storage.fetch(0, 100)).isEqualTo(objs);
+        assertThat(storage.getLastProducedId()).isEqualTo(expectSize - 1);
+        assertThat(storage.fetch(-1, 100)).isEqualTo(objs);
         storage.close();
     }
 
@@ -163,10 +128,10 @@ public class FileBasedStorageTest {
                 .build();
 
         final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(64);
-        storage.store(objs);
+        storeObjectWithIds(storage, objs);
 
-        triggerFlushMemtable(storage, 1000);
-        assertThat(storage.fetch(0, 64)).isEqualTo(objs);
+        triggerFlushMemtable(storage);
+        assertThat(storage.fetch(-1, 64)).isEqualTo(objs);
         storage.close(true);
     }
 
@@ -178,12 +143,13 @@ public class FileBasedStorageTest {
                 .build();
 
         final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(64);
-        storage.store(objs);
+        storeObjectWithIds(storage, objs);
 
-        objs.addAll(triggerFlushMemtable(storage, 1000));
-        assertThat(storage.fetch(32, 1000)).isEqualTo(objs.subList(32, objs.size()));
+        objs.addAll(triggerFlushMemtable(storage));
+        assertThat(storage.fetch(31, 1000)).isEqualTo(objs.subList(32, objs.size()));
         storage.close(true);
     }
+
 
     @Test
     public void fetchDataFromRecoveredSstable() throws Exception {
@@ -193,15 +159,15 @@ public class FileBasedStorageTest {
                 .build();
 
         final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(64);
-        storage.store(objs);
-        triggerFlushMemtable(storage, 1000);
+        storeObjectWithIds(storage, objs);
+        triggerFlushMemtable(storage);
         storage.close(true);
         storage = builder
                 // create executor service again, because the previous executor service in the storage
                 // builder is closed when the previous storage closed
                 .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS))
                 .build();
-        assertThat(storage.fetch(0, 64)).isEqualTo(objs);
+        assertThat(storage.fetch(-1, 64)).isEqualTo(objs);
         storage.close(true);
     }
 
@@ -214,20 +180,20 @@ public class FileBasedStorageTest {
 
         // 1. write some data
         final List<ObjectWithId> expectData = generateSimpleTestingObjectWithIds(64);
-        storage.store(expectData);
+        storeObjectWithIds(storage, expectData);
         // 2. flush for the first time, make every data write before flushed to sstable
-        expectData.addAll(triggerFlushMemtable(storage, 1000));
+        expectData.addAll(triggerFlushMemtable(storage));
         // 3. write some more data
-        final List<ObjectWithId> objInMem = generateSimpleTestingObjectWithIds(2000, 128);
+        final List<ObjectWithId> objInMem = generateSimpleTestingObjectWithIds(storage.getLastProducedId() + 1, 128);
         expectData.addAll(objInMem);
-        storage.store(objInMem);
+        storeObjectWithIds(storage, objInMem);
         // 4. flush again, but this time the flush task will be blocked so
         // every data write in step 3 will be stay in immutable table and the data triggering
         // the flush task will stay in memtable
-        expectData.addAll(triggerFlushMemtable(storage, 3000));
+        expectData.addAll(triggerFlushMemtable(storage));
 
         // add one to limit to ensure there's no more data in storage than in expectData
-        assertThat(storage.fetch(0, expectData.size() + 1)).isEqualTo(expectData);
+        assertThat(storage.fetch(-1, expectData.size() + 1)).isEqualTo(expectData);
         storage.close(true);
     }
 
@@ -241,18 +207,14 @@ public class FileBasedStorageTest {
         for (int i = 0; i < 10; ++i) {
             List<ObjectWithId> batch = generateSimpleTestingObjectWithIds(storage.getLastProducedId() + 1, 64);
             expectData.addAll(batch);
-            storage.store(batch);
-            expectData.addAll(triggerFlushMemtable(storage, storage.getLastProducedId() + 1));
+            storeObjectWithIds(storage, batch);
+            expectData.addAll(triggerFlushMemtable(storage));
         }
 
         assertThat(storage.fetch(-1, expectData.size() + 1)).isEqualTo(expectData);
         storage.close();
     }
 
-    @Test
-    public void testBlockOnWriteImm() {
-        // imm 写的特别慢时候会卡住
-    }
 
     @Test
     // add this to pass null to writeMemtable to throw exception
@@ -274,8 +236,8 @@ public class FileBasedStorageTest {
                 .build();
         final int expectSize = 65;
         final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
-        storage.store(objs);
-        objs.addAll(triggerFlushMemtable(storage, 70));
+        storeObjectWithIds(storage, objs);
+        objs.addAll(triggerFlushMemtable(storage));
         storage.commitId(1000);
         objs.add(new ObjectWithId(1010101, "Trigger truncate".getBytes(StandardCharsets.UTF_8)));
 
@@ -300,7 +262,7 @@ public class FileBasedStorageTest {
     }
 
     private List<ObjectWithId> generateSimpleTestingObjectWithIds(int expectSize) {
-        return generateSimpleTestingObjectWithIds(1L, expectSize);
+        return generateSimpleTestingObjectWithIds(0L, expectSize);
     }
 
     private List<ObjectWithId> generateSimpleTestingObjectWithIds(long startId, int expectSize) {
@@ -312,10 +274,21 @@ public class FileBasedStorageTest {
         return objs;
     }
 
-    private List<ObjectWithId> triggerFlushMemtable(FileBasedStorage storage, long nextId) throws StorageException {
-        List<ObjectWithId> triggerDatas = Arrays.asList(new ObjectWithId(nextId, new byte[Constant.kMaxMemtableSize]),
+    private long lastIdInBatch(List<ObjectWithId> batch) {
+        assert !batch.isEmpty();
+        return batch.get(batch.size() - 1).getId();
+    }
+
+    private void storeObjectWithIds(FileBasedStorage storage, List<ObjectWithId> batch) throws StorageException {
+        storage.store(batch.stream().map(ObjectWithId::getObjectInBytes).collect(Collectors.toList()));
+    }
+
+    private List<ObjectWithId> triggerFlushMemtable(FileBasedStorage storage) throws StorageException {
+        long nextId = storage.getLastProducedId() + 1;
+        List<ObjectWithId> triggerDatas = Arrays.asList(
+                new ObjectWithId(nextId, new byte[Constant.kMaxMemtableSize]),
                 new ObjectWithId(nextId + 1, numberStringBytes(nextId + 1)));
-        storage.store(triggerDatas);
+        storeObjectWithIds(storage, triggerDatas);
         return triggerDatas;
     }
 }

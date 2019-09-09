@@ -3,7 +3,7 @@ package com.github.ylgrgyq.reservoir.benchmark.storage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class BenchmarkRunner {
+public final class BenchmarkRunner {
     private static final Logger logger = LoggerFactory.getLogger(BenchmarkRunner.class.getSimpleName());
 
     private int warmUpTimes = 5;
