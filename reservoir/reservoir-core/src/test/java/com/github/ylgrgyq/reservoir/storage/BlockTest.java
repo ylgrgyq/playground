@@ -29,7 +29,7 @@ public class BlockTest {
     public void setUp() throws Exception {
         builder = new BlockBuilder();
 
-        String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
+        String tempDir = System.getProperty("java.io.tmpdir", "/tmp") + File.separator +
                 "reservoir_block_test_" + System.nanoTime();
         FileUtils.forceMkdir(new File(tempDir));
         tempLogFileName = tempDir + File.separator + "log_test";

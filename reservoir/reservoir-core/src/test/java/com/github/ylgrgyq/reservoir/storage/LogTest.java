@@ -31,7 +31,7 @@ public class LogTest {
 
     @Before
     public void setUp() throws Exception {
-        String tempDir = System.getProperty("java.io.tmpdir", "/tmp") +
+        String tempDir = System.getProperty("java.io.tmpdir", "/tmp") + File.separator +
                 "reservoir_log_test_" + System.nanoTime();
         FileUtils.forceMkdir(new File(tempDir));
         this.tempLogFile = tempDir + File.separator + "log_test";
