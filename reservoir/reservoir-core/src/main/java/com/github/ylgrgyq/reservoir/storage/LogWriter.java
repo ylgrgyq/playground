@@ -15,8 +15,8 @@ final class LogWriter implements Closeable {
         this(workingFileChannel, 0);
     }
 
-    LogWriter(FileChannel workingFileChannel, long writePosotion) throws IOException {
-        workingFileChannel.position(writePosotion);
+    LogWriter(FileChannel workingFileChannel, long writePosition) throws IOException {
+        workingFileChannel.position(writePosition);
         this.workingFileChannel = workingFileChannel;
         this.headerBuffer = ByteBuffer.allocateDirect(Constant.kLogHeaderSize);
         this.blockOffset = 0;
