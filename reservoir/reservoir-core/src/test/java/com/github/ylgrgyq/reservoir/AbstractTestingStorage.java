@@ -26,12 +26,7 @@ abstract class AbstractTestingStorage  implements ObjectQueueStorage {
     }
 
     @Override
-    public long getLastProducedId() throws StorageException {
-        return 0;
-    }
-
-    @Override
-    public void store(List<ObjectWithId> batch) throws StorageException {
+    public void store(List<byte[]> batch) throws StorageException {
 
     }
 
