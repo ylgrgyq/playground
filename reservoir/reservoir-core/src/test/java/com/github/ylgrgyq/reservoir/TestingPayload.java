@@ -6,48 +6,39 @@ import java.util.Base64;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class TestingPayload implements Verifiable {
-    private static AtomicLong idGenerator = new AtomicLong();
     private static TestingPayloadCodec codec = new TestingPayloadCodec();
 
     private boolean valid;
-    private long id;
     private byte[] content;
 
     public TestingPayload() {
         this.content = ("Hello").getBytes(StandardCharsets.UTF_8);
-        this.id = idGenerator.incrementAndGet();
         this.valid = true;
     }
 
     public TestingPayload(byte[] content) {
         this.content = Arrays.copyOf(content, content.length);
-        this.id = idGenerator.incrementAndGet();
         this.valid = true;
     }
 
-    public TestingPayload(long id, byte[] content) {
+    public TestingPayload(String contentString) {
+        byte[] content = contentString.getBytes(StandardCharsets.UTF_8);
         this.content = Arrays.copyOf(content, content.length);
-        this.id = id;
         this.valid = true;
     }
 
-    public TestingPayload(long id, boolean valid, byte[] content) {
+    public TestingPayload(boolean valid, byte[] content) {
         this.content = Arrays.copyOf(content, content.length);
-        this.id = id;
         this.valid = valid;
-    }
-
-    public long getId() {
-        return id;
     }
 
     public byte[] getContent() {
         return content;
     }
 
-    public ObjectWithId createObjectWithId() {
+    public byte[] serialize() {
         try {
-            return new ObjectWithId(id, codec.serialize(this));
+            return codec.serialize(this);
         } catch (SerializationException ex) {
             throw new RuntimeException(ex);
         }
@@ -79,7 +70,6 @@ public class TestingPayload implements Verifiable {
     @Override
     public String toString() {
         return "TestingPayload{" +
-                "id=" + id +
                 "content=" + Base64.getEncoder().encodeToString(content) +
                 '}';
     }

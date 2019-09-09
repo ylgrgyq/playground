@@ -19,12 +19,11 @@ public class TestingPayloadCodec implements Codec<TestingPayload> {
 
         ByteBuffer buffer = ByteBuffer.wrap(bytes);
         boolean valid = buffer.get() == (byte) 1;
-        long id = buffer.getLong();
         int len = buffer.getInt();
         byte[] content = new byte[len];
         buffer.get(content);
 
-        return new TestingPayload(id, valid, content);
+        return new TestingPayload(valid, content);
     }
 
 
@@ -33,7 +32,6 @@ public class TestingPayloadCodec implements Codec<TestingPayload> {
         byte[] bs = new byte[MINIMUM_LENGTH + obj.getContent().length];
         ByteBuffer buffer = ByteBuffer.wrap(bs);
         buffer.put(obj.isValid() ? (byte) 1 : (byte) 0);
-        buffer.putLong(obj.getId());
         buffer.putInt(obj.getContent().length);
         buffer.put(obj.getContent());
         return buffer.array();

@@ -5,6 +5,8 @@ import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
@@ -28,15 +30,12 @@ public class ManualCommitObjectQueueConsumerTest {
 
     @Test
     public void simpleFetch() throws Exception {
-        final ArrayList<ObjectWithId> storedPayload = new ArrayList<>();
-        TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
-        TestingPayload second = new TestingPayload(2, "second".getBytes(StandardCharsets.UTF_8));
-        storedPayload.add(first.createObjectWithId());
-        storedPayload.add(second.createObjectWithId());
+        final TestingPayload first = new TestingPayload("first");
+        final TestingPayload second = new TestingPayload("second");
 
-        storage.store(storedPayload);
+        storage.store(Arrays.asList(first.serialize(), second.serialize()));
 
-        ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
+        final ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
 
         TestingPayload payload = consumer.fetch();
         assertThat(consumer.fetch()).isSameAs(payload).isEqualTo(first);
@@ -61,16 +60,16 @@ public class ManualCommitObjectQueueConsumerTest {
 
     @Test
     public void deserializeObjectFailed() throws Exception {
-        ObjectQueueConsumer<TestingPayload> consumer = builder
+        final ObjectQueueConsumer<TestingPayload> consumer = builder
                 .setCodec(new BadTestingPayloadCodec())
                 .buildConsumer();
 
-        TestingPayload first = new TestingPayload(12345, "first".getBytes(StandardCharsets.UTF_8));
-        storage.add(first.createObjectWithId());
+        TestingPayload first = new TestingPayload("first");
+        storage.store(Collections.singletonList(first.serialize()));
 
         assertThatThrownBy(consumer::fetch)
                 .isInstanceOf(DeserializationException.class)
-                .hasMessageContaining("deserialize object with id: 12345 failed. Content in Base64 string is: ");
+                .hasMessageContaining("deserialize object with id: 1 failed. Content in Base64 string is: ");
         consumer.close();
     }
 
@@ -84,14 +83,10 @@ public class ManualCommitObjectQueueConsumerTest {
 
     @Test
     public void blockFetch() throws Exception {
-        final ArrayList<ObjectWithId> storedPayload = new ArrayList<>();
-        final TestingPayload first = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
-        storedPayload.add(first.createObjectWithId());
-
-        ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
-
-        CyclicBarrier barrier = new CyclicBarrier(2);
-        CompletableFuture<TestingPayload> f = CompletableFuture.supplyAsync(() -> {
+        final TestingPayload first = new TestingPayload("first");
+        final ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
+        final CyclicBarrier barrier = new CyclicBarrier(2);
+        final CompletableFuture<TestingPayload> f = CompletableFuture.supplyAsync(() -> {
             try {
                 barrier.await();
                 return consumer.fetch();
@@ -100,7 +95,7 @@ public class ManualCommitObjectQueueConsumerTest {
             }
         });
         barrier.await();
-        storage.store(storedPayload);
+        storage.store(Collections.singletonList(first.serialize()));
 
         await().until(f::isDone);
         assertThat(f).isCompletedWithValue(first);

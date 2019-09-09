@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -46,7 +47,7 @@ public class RocksDbStorageTest {
             ObjectWithId obj = new ObjectWithId(i, ("" + i).getBytes(StandardCharsets.UTF_8));
             objs.add(obj);
         }
-        storage.store(objs);
+        storeObjectWithId(storage, objs);
         assertThat(storage.getLastProducedId()).isEqualTo(expectSize);
         assertThat(objs)
                 .containsExactly((ObjectWithId[]) storage.fetch(0, 100).toArray(new ObjectWithId[expectSize]));
@@ -73,7 +74,7 @@ public class RocksDbStorageTest {
             ObjectWithId obj = new ObjectWithId(i, ("" + i).getBytes(StandardCharsets.UTF_8));
             objs.add(obj);
         }
-        storage.store(objs);
+        storeObjectWithId(storage, objs);
         assertThat(storage.getLastProducedId()).isEqualTo(expectSize);
         assertThat(objs)
                 .containsExactly((ObjectWithId[]) f.get().toArray(new ObjectWithId[expectSize]));
@@ -97,7 +98,7 @@ public class RocksDbStorageTest {
             ObjectWithId obj = new ObjectWithId(i, TestingUtils.numberStringBytes(i));
             objs.add(obj);
         }
-        storage.store(objs);
+        storeObjectWithId(storage, objs);
         storage.commitId(2000);
         await().until(() -> {
             List<ObjectWithId> actualObjs = storage.fetch(0, 100);
@@ -107,16 +108,20 @@ public class RocksDbStorageTest {
     }
 
     @Test
-    public void simpleProducenAndConsume() throws Exception {
-        RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true);
-        ObjectQueue<TestingPayload> queue = ObjectQueueBuilder.<TestingPayload>newBuilder()
+    public void simpleProduceAndConsume() throws Exception {
+        final RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true);
+        final ObjectQueue<TestingPayload> queue = ObjectQueueBuilder.<TestingPayload>newBuilder()
                 .setStorage(storage)
                 .setCodec(new TestingPayloadCodec())
                 .buildQueue();
-        TestingPayload payload = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
+        final TestingPayload payload = new TestingPayload("first");
         queue.produce(payload);
 
         assertThat(queue.fetch()).isEqualTo(payload);
-        storage.close();
+        queue.close();
+    }
+
+    private void storeObjectWithId(RocksDbStorage storage, List<ObjectWithId> batch) {
+        storage.store(batch.stream().map(ObjectWithId::getObjectInBytes).collect(Collectors.toList()));
     }
 }

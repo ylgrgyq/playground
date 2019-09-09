@@ -3,33 +3,25 @@ package com.github.ylgrgyq.reservoir;
 import com.spotify.futures.CompletableFutures;
 import org.junit.Before;
 import org.junit.Test;
+import sun.security.krb5.internal.crypto.Des;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.stream.Collectors;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.github.ylgrgyq.reservoir.TestingUtils.numberStringBytes;
+import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
 
 public class DisruptorBackedObjectQueueProducerTest {
     private final TestingStorage storage = new TestingStorage();
+    private final TestingPayloadCodec codec = new TestingPayloadCodec();
     private final ObjectQueueBuilder<TestingPayload> builder = ObjectQueueBuilder.<TestingPayload>newBuilder()
             .setStorage(storage)
-            .setCodec(new Codec<TestingPayload>() {
-                @Override
-                public TestingPayload deserialize(byte[] bytes) throws DeserializationException {
-                    return new TestingPayload(bytes);
-                }
-
-                @Override
-                public byte[] serialize(TestingPayload obj) throws SerializationException {
-                    return obj.getContent();
-                }
-            });
+            .setCodec(codec);
 
     @Before
     public void setUp() {
@@ -40,11 +32,13 @@ public class DisruptorBackedObjectQueueProducerTest {
     public void simpleProduceAndFlush() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder.buildProducer();
 
-        ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
+        final List<TestingPayload> producedPayload = new ArrayList<>();
+        final ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 64; i++) {
-            TestingPayload payload = new TestingPayload(("" + i).getBytes(StandardCharsets.UTF_8));
-            CompletableFuture<Void> f = producer.produce(payload);
+            final TestingPayload payload = new TestingPayload(numberStringBytes(i));
+            final CompletableFuture<Void> f = producer.produce(payload);
             assertThat(f).isNotNull();
+            producedPayload.add(payload);
             futures.add(f);
         }
 
@@ -53,33 +47,44 @@ public class DisruptorBackedObjectQueueProducerTest {
 
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
 
-        List<ObjectWithId> payloads = storage.getProdcedPayloads();
-        for (int i = 0; i < payloads.size(); i++) {
-            assertThat(payloads.get(i).getId()).isEqualTo(i + 1);
-            assertThat(new String(payloads.get(i).getObjectInBytes(), StandardCharsets.UTF_8)).isEqualTo("" + i);
-        }
+        final List<ObjectWithId> payloads = storage.getProdcedPayloads();
+        assertThat(producedPayload).isEqualTo(
+                payloads.stream().map(payload -> {
+                            try {
+                                return codec.deserialize(payload.getObjectInBytes());
+                            } catch (DeserializationException ex) {
+                                throw new RuntimeException(ex);
+                            }
+                        }
+                ).collect(Collectors.toList()));
     }
 
     @Test
     public void simpleProduceAndAutoFlush() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder.buildProducer();
-
-        ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
+        final List<TestingPayload> producedPayloads = new ArrayList<>();
+        final ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 1024; i++) {
-            TestingPayload payload = new TestingPayload(("" + i).getBytes(StandardCharsets.UTF_8));
+            final TestingPayload payload = new TestingPayload(numberStringBytes(i));
             CompletableFuture<Void> f = producer.produce(payload);
             assertThat(f).isNotNull();
             futures.add(f);
+            producedPayloads.add(payload);
         }
 
         await().until(() -> CompletableFutures.allAsList(futures).isDone());
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
 
-        List<ObjectWithId> payloads = storage.getProdcedPayloads();
-        for (int i = 0; i < payloads.size(); i++) {
-            assertThat(payloads.get(i).getId()).isEqualTo(i + 1);
-            assertThat(new String(payloads.get(i).getObjectInBytes(), StandardCharsets.UTF_8)).isEqualTo("" + i);
-        }
+        final List<ObjectWithId> payloads = storage.getProdcedPayloads();
+        assertThat(producedPayloads).isEqualTo(
+                payloads.stream().map(payload -> {
+                            try {
+                                return codec.deserialize(payload.getObjectInBytes());
+                            } catch (DeserializationException ex) {
+                                throw new RuntimeException(ex);
+                            }
+                        }
+                ).collect(Collectors.toList()));
     }
 
     @Test
@@ -88,7 +93,7 @@ public class DisruptorBackedObjectQueueProducerTest {
                 .setBatchSize(5)
                 .setStorage(new AbstractTestingStorage() {
                     @Override
-                    public void store(List<ObjectWithId> batch) throws StorageException {
+                    public void store(List<byte[]> batch) throws StorageException {
                         try {
                             Thread.sleep(200);
                         } catch (Exception ex) {
@@ -99,7 +104,7 @@ public class DisruptorBackedObjectQueueProducerTest {
 
         ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            TestingPayload payload = new TestingPayload(("" + i).getBytes(StandardCharsets.UTF_8));
+            final TestingPayload payload = new TestingPayload(numberStringBytes(i));
             CompletableFuture<Void> f = producer.produce(payload);
             assertThat(f).isNotNull();
             futures.add(f);
@@ -136,7 +141,7 @@ public class DisruptorBackedObjectQueueProducerTest {
     public void storageThrowsStorageException() throws Exception {
         ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
             @Override
-            public void store(List<ObjectWithId> batch) throws StorageException {
+            public void store(List<byte[]> batch) throws StorageException {
                 throw new StorageException("deliberate store failed");
             }
         }).buildProducer();
@@ -151,7 +156,7 @@ public class DisruptorBackedObjectQueueProducerTest {
     public void storageThrowsOtherException() throws Exception {
         ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
             @Override
-            public void store(List<ObjectWithId> batch) {
+            public void store(List<byte[]> batch) {
                 throw new RuntimeException("deliberate store failed");
             }
         }).buildProducer();

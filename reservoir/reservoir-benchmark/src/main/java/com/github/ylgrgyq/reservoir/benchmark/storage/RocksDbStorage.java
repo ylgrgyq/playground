@@ -213,7 +213,7 @@ public final class RocksDbStorage implements ObjectQueueStorage {
             final WriteBatch batch = new WriteBatch();
             long id = getLastProducedId();
             for (byte[] e : queue) {
-                batch.put(columnFamilyHandle, getKeyBytes(id++), e);
+                batch.put(columnFamilyHandle, getKeyBytes(++id), e);
             }
             db.write(writeOptions, batch);
         } catch (final RocksDBException e) {

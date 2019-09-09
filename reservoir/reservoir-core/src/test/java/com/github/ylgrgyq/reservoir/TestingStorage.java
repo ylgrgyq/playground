@@ -3,6 +3,7 @@ package com.github.ylgrgyq.reservoir;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class TestingStorage extends AbstractTestingStorage{
     private final ArrayList<ObjectWithId> producedPayloads;
@@ -94,20 +95,11 @@ public class TestingStorage extends AbstractTestingStorage{
     }
 
     @Override
-    public long getLastProducedId() {
-        return lastProducedId;
-    }
-
-    @Override
-    public synchronized void store(List<ObjectWithId> batch) {
-        for (ObjectWithId objectWithId : batch) {
-            doAdd(objectWithId);
+    public synchronized void store(List<byte[]> batch) {
+        long id = lastProducedId;
+        for (byte[] data : batch) {
+            doAdd(new ObjectWithId(++id, data));
         }
-        notify();
-    }
-
-    synchronized void add(ObjectWithId obj) {
-        doAdd(obj);
         notify();
     }
 

@@ -248,17 +248,17 @@ public class FileBasedStorageTest {
     }
 
     @Test
-    public void simpleProducenAndConsume() throws Exception {
+    public void simpleProduceAndConsume() throws Exception {
         final FileBasedStorage storage = builder.build();
         final ObjectQueue<TestingPayload> queue = ObjectQueueBuilder.<TestingPayload>newBuilder()
                 .setStorage(storage)
                 .setCodec(new TestingPayloadCodec())
                 .buildQueue();
-        final TestingPayload payload = new TestingPayload(1, "first".getBytes(StandardCharsets.UTF_8));
+        final TestingPayload payload = new TestingPayload("first");
         queue.produce(payload);
 
         assertThat(queue.fetch()).isEqualTo(payload);
-        storage.close();
+        queue.close();
     }
 
     private List<ObjectWithId> generateSimpleTestingObjectWithIds(int expectSize) {
@@ -272,11 +272,6 @@ public class FileBasedStorageTest {
             objs.add(obj);
         }
         return objs;
-    }
-
-    private long lastIdInBatch(List<ObjectWithId> batch) {
-        assert !batch.isEmpty();
-        return batch.get(batch.size() - 1).getId();
     }
 
     private void storeObjectWithIds(FileBasedStorage storage, List<ObjectWithId> batch) throws StorageException {

@@ -9,10 +9,10 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFuture;
 import static java.util.Objects.requireNonNull;
@@ -28,7 +28,7 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
     private final Codec<E> serializer;
     private volatile boolean closed;
 
-    public DisruptorBackedObjectQueueProducer(ObjectQueueBuilder<E> builder) throws StorageException {
+    public DisruptorBackedObjectQueueProducer(ObjectQueueBuilder<E> builder) {
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
@@ -44,9 +44,7 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
         ));
 
         this.disruptor.start();
-        this.translator = new
-
-                ProducerTranslator(storage.getLastProducedId());
+        this.translator = new ProducerTranslator();
         this.ringBuffer = disruptor.getRingBuffer();
         this.executor = builder.getExecutorService();
         this.serializer = builder.getCodec();
@@ -101,11 +99,6 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
 
     private final static class ProducerTranslator
             implements EventTranslatorThreeArg<ProducerEvent, byte[], CompletableFuture<Void>, Boolean> {
-        private final AtomicLong nextId;
-
-        ProducerTranslator(long nextId) {
-            this.nextId = new AtomicLong(nextId);
-        }
 
         @Override
         public void translateTo(ProducerEvent event, long sequence, byte[] payload, CompletableFuture<Void> future, Boolean flush) {
@@ -116,20 +109,20 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
             }
 
             if (payload != null) {
-                event.objectWithId = new ObjectWithId(nextId.incrementAndGet(), payload);
+                event.payload = payload;
             }
         }
     }
 
     private final static class ProducerEvent {
         @Nullable
-        private ObjectWithId objectWithId;
+        private byte[] payload;
         @Nullable
         private CompletableFuture<Void> future;
         private boolean flush;
 
         void reset() {
-            objectWithId = null;
+            payload = null;
             future = null;
             flush = false;
         }
@@ -137,7 +130,7 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
         @Override
         public String toString() {
             return "ProducerEvent{" +
-                    "objectWithId=" + objectWithId +
+                    "payload=" + Base64.getEncoder().encodeToString(payload) +
                     ", flush=" + flush +
                     '}';
         }
@@ -145,7 +138,7 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
 
     private final class ProduceHandler implements EventHandler<ProducerEvent> {
         private final int batchSize;
-        private final List<ObjectWithId> batchPayload;
+        private final List<byte[]> batchPayload;
         private final List<CompletableFuture<Void>> batchFutures;
 
         ProduceHandler(int batchSize) {
@@ -164,7 +157,7 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
                 }
                 executor.execute(() -> event.future.complete(null));
             } else {
-                batchPayload.add(event.objectWithId);
+                batchPayload.add(event.payload);
                 batchFutures.add(event.future);
                 if (batchPayload.size() >= batchSize || endOfBatch) {
                     flush();

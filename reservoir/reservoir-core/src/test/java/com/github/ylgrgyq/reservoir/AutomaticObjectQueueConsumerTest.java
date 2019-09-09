@@ -4,12 +4,12 @@ import org.assertj.core.api.Condition;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
+import static com.github.ylgrgyq.reservoir.TestingUtils.numberStringBytes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
@@ -31,21 +31,19 @@ public class AutomaticObjectQueueConsumerTest {
 
     @Test
     public void simpleConsume() throws Exception {
-        final List<ObjectWithId> storedPayload = generateTestingPayload(64, true);
+        final List<TestingPayload> storedPayload = generateTestingPayload(64, true);
         final AlwaysSuccessConsumeObjectHandler<TestingPayload> handler = new AlwaysSuccessConsumeObjectHandler<>();
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder.setConsumeObjectHandler(handler).build();
 
         await().until(() -> handler.getReceivedObjects().size() == storedPayload.size());
-        assertThat(handler.getReceivedObjects().stream()
-                .map(TestingPayload::createObjectWithId)
-                .collect(Collectors.toList()))
+        assertThat(handler.getReceivedObjects())
                 .isEqualTo(storedPayload);
         consumer.close();
     }
 
     @Test
     public void consumeInvalidObject() throws Exception {
-        final List<ObjectWithId> storedPayload = generateTestingPayload(64, false);
+        final List<TestingPayload> storedPayload = generateTestingPayload(64, false);
 
         final AlwaysSuccessConsumeObjectHandler<TestingPayload> handler = new AlwaysSuccessConsumeObjectHandler<>();
 
@@ -55,9 +53,7 @@ public class AutomaticObjectQueueConsumerTest {
                 .build();
 
         await().until(() -> listener.getInvalidObjects().size() == storedPayload.size());
-        assertThat(listener.getInvalidObjects().stream()
-                .map(TestingPayload::createObjectWithId)
-                .collect(Collectors.toList()))
+        assertThat(listener.getInvalidObjects())
                 .isEqualTo(storedPayload);
         consumer.close();
     }
@@ -82,7 +78,7 @@ public class AutomaticObjectQueueConsumerTest {
     public void retryAfterConsumeObjectFailed() throws Exception {
         generateTestingPayload(1, true);
 
-        RetryAfterFailedHandler<TestingPayload> handler = new RetryAfterFailedHandler<>(10);
+        final RetryAfterFailedHandler<TestingPayload> handler = new RetryAfterFailedHandler<>(10);
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
                 .setConsumeObjectHandler(handler)
                 .build();
@@ -93,7 +89,7 @@ public class AutomaticObjectQueueConsumerTest {
 
     @Test
     public void ignoreAfterConsumeObjectFailed() throws Exception {
-        final List<ObjectWithId> storedObjects = generateTestingPayload(64, true);
+        final List<TestingPayload> storedObjects = generateTestingPayload(64, true);
 
         final List<TestingPayload> handledPayloads = new ArrayList<>();
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
@@ -107,9 +103,7 @@ public class AutomaticObjectQueueConsumerTest {
                 .build();
 
         await().until(() -> handledPayloads.size() == storedObjects.size());
-        assertThat(handledPayloads.stream()
-                .map(TestingPayload::createObjectWithId)
-                .collect(Collectors.toList()))
+        assertThat(handledPayloads)
                 .isEqualTo(storedObjects);
         consumer.close();
     }
@@ -144,23 +138,21 @@ public class AutomaticObjectQueueConsumerTest {
 
     @Test
     public void testListenerOnSuccessObjectsCalled() throws Exception {
-        final List<ObjectWithId> storedPayload = generateTestingPayload(64, true);
+        final List<TestingPayload> storedPayload = generateTestingPayload(64, true);
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
                 .setConsumeObjectHandler(new AlwaysSuccessConsumeObjectHandler<>())
                 .addConsumeElementListener(listener)
                 .build();
 
         await().until(() -> listener.getSuccessObjects().size() == storedPayload.size());
-        assertThat(listener.getSuccessObjects().stream()
-                .map(TestingPayload::createObjectWithId)
-                .collect(Collectors.toList()))
+        assertThat(listener.getSuccessObjects())
                 .isEqualTo(storedPayload);
         consumer.close();
     }
 
     @Test
     public void testListenerOnFailedObjectsCalled() throws Exception {
-        List<ObjectWithId> storedObjects = generateTestingPayload(1, true);
+        List<TestingPayload> storedObjects = generateTestingPayload(1, true);
 
         final AutomaticObjectQueueConsumer<TestingPayload> consumer = builder
                 .addConsumeElementListener(listener)
@@ -174,21 +166,20 @@ public class AutomaticObjectQueueConsumerTest {
 
         await().until(() -> listener.getFailedObjects().size() == 1);
         await().until(consumer::closed);
-        assertThat(listener.getFailedObjects().stream()
-                .map(TestingPayload::createObjectWithId)
-                .collect(Collectors.toList()))
+        assertThat(listener.getFailedObjects())
                 .isEqualTo(storedObjects);
         assertThat(listener.getFailedExceptions()).are(runtimeException);
         consumer.close();
     }
 
-    private List<ObjectWithId> generateTestingPayload(int size, boolean valid) {
-        final List<ObjectWithId> storedPayload = new ArrayList<>();
+    private List<TestingPayload> generateTestingPayload(int size, boolean valid) {
+        final List<TestingPayload> storedPayload = new ArrayList<>();
         for (int i = 1; i < size + 1; i++) {
-            TestingPayload payload = new TestingPayload(i, ("" + i).getBytes(StandardCharsets.UTF_8)).setValid(valid);
-            storedPayload.add(payload.createObjectWithId());
+            TestingPayload payload = new TestingPayload(numberStringBytes(i)).setValid(valid);
+            storedPayload.add(payload);
         }
-        storage.store(storedPayload);
+
+        storage.store(storedPayload.stream().map(TestingPayload::serialize).collect(Collectors.toList()));
         return storedPayload;
     }
 
