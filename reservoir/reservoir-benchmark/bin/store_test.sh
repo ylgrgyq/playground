@@ -14,5 +14,6 @@ java \
     -Dlog4j.configurationFile=file:$LOG4J_CONFIG \
     -XX:+UseParallelGC \
     -cp $CLASSPATH \
-    com.github.ylgrgyq.reservoir.benchmark.storage.BenchmarkRunner
+    com.github.ylgrgyq.reservoir.benchmark.storage.BenchmarkBootstrap \
+    $@
 

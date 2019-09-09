@@ -10,17 +10,7 @@ public final class BenchmarkRunner {
     private int testTimes = 5;
     private long coolDownIntervalMillis = 5000;
 
-    public static void main(String[] args) throws Exception {
-        final FileStorageStoreBench storeBench = new FileStorageStoreBench(100, 10, 10000);
-        final BenchmarkRunner runner = new BenchmarkRunner();
-        runner.runTest(storeBench);
-
-//        final RocksDbStorageStoreBench storeBench = new RocksDbStorageStoreBench(100, 100, 10000);
-//        final BenchmarkRunner runner = new BenchmarkRunner();
-//        runner.runTest(storeBench);
-    }
-
-    private void runTest(BenchmarkTest test) throws Exception {
+    public void runTest(BenchmarkTest test) throws Exception {
         logger.info("\nEnvironment spec:\n{}\n", EnvironmentInfo.generateEnvironmentSpec());
         logger.info("\nTesting spec:\n{}\n", test.testingSpec());
         logger.info("Warm up for {} times.", warmUpTimes);
