@@ -50,6 +50,10 @@ public class DelayedSingleThreadExecutorService extends AbstractExecutorService 
         return true;
     }
 
+    public void letOnePass() {
+        semaphore.release(1);
+    }
+
     @Override
     public void execute(Runnable command) {
         if (semaphore.tryAcquire()) {

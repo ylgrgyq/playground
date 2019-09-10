@@ -215,6 +215,42 @@ public class FileBasedStorageTest {
         storage.close();
     }
 
+    @Test
+    public void testWriteImmutableTableBlock() throws Exception {
+        final DelayedSingleThreadExecutorService executorService = new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS);
+        final FileBasedStorage storage = builder
+                .setFlushMemtableExecutorService(executorService)
+                .build();
+
+        // 1. trigger immutable table flush
+        final List<ObjectWithId> expectData = generateSimpleTestingObjectWithIds(storage.getLastProducedId() + 1, 64);
+        storeObjectWithIds(storage, expectData);
+        expectData.addAll(triggerFlushMemtable(storage));
+
+        final CyclicBarrier barrier = new CyclicBarrier(2);
+        final CompletableFuture<Void> f = CompletableFuture.runAsync(() -> {
+            try {
+                barrier.await();
+                // 2. trigger another immutable table flush, this one will block until the first one finish
+                expectData.addAll(triggerFlushMemtable(storage));
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        });
+
+        barrier.await();
+        // 3. release the first immutable table flush
+        executorService.letOnePass();
+        // the second immutable table flush is not complete yet
+        assertThat(f.isDone()).isFalse();
+        // 4. release the second immutable table flush
+        executorService.letOnePass();
+        // 5. wait the second immutable table flush task done
+        f.join();
+        assertThat(storage.fetch(-1, Integer.MAX_VALUE)).containsExactlyElementsOf(expectData);
+
+        storage.close(true);
+    }
 
     @Test
     // add this to pass null to writeMemtable to throw exception
