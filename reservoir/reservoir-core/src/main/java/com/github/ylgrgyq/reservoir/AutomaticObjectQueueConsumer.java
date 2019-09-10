@@ -25,18 +25,18 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
     private final Set<ConsumeObjectListener<E>> listeners;
     private volatile boolean closed;
 
-    public AutomaticObjectQueueConsumer(ObjectQueue<E> queue,
+    public AutomaticObjectQueueConsumer(ObjectQueueConsumer<E> queue,
                                         ConsumeObjectHandler<E> handler) {
         this(queue, handler, null, Collections.emptyList());
     }
 
-    public AutomaticObjectQueueConsumer(ObjectQueue<E> queue,
+    public AutomaticObjectQueueConsumer(ObjectQueueConsumer<E> queue,
                                         ConsumeObjectHandler<E> handler,
                                         @Nullable Executor listenerExecutor) {
         this(queue, handler, listenerExecutor, Collections.emptyList());
     }
 
-    public AutomaticObjectQueueConsumer(ObjectQueue<E> queue,
+    public AutomaticObjectQueueConsumer(ObjectQueueConsumer<E> queue,
                                         ConsumeObjectHandler<E> handler,
                                         @Nullable Executor listenerExecutor,
                                         List<ConsumeObjectListener<E>> listeners) {
