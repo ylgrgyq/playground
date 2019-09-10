@@ -79,7 +79,11 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
     }
 
     @Override
-    public void close() throws Exception {
+    public synchronized void close() throws Exception {
+        if (closed) {
+            return;
+        }
+
         closed = true;
 
         final CompletableFuture<Void> future = doFlush();

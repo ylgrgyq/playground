@@ -3,6 +3,9 @@ package com.github.ylgrgyq.reservoir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.Executor;
@@ -17,28 +20,57 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
 
     private final ObjectQueueConsumer<E> backupQueue;
     private final Thread worker;
+    @Nullable
     private final Executor listenerExecutor;
     private final Set<ConsumeObjectListener<E>> listeners;
     private volatile boolean closed;
 
-    AutomaticObjectQueueConsumer(AutomaticObjectQueueConsumerBuilder<E> builder) {
-        requireNonNull(builder, "builder");
+    public AutomaticObjectQueueConsumer(ObjectQueue<E> queue,
+                                        ConsumeObjectHandler<E> handler) {
+        this(queue, handler, null, Collections.emptyList());
+    }
 
-        this.backupQueue = builder.getConsumer();
-        this.worker = threadFactory.newThread(new Worker(builder.getConsumeObjectHandler()));
-        this.listenerExecutor = builder.getListenerExecutor();
-        this.listeners = new CopyOnWriteArraySet<>(builder.getConsumeElementListeners());
+    public AutomaticObjectQueueConsumer(ObjectQueue<E> queue,
+                                        ConsumeObjectHandler<E> handler,
+                                        @Nullable Executor listenerExecutor) {
+        this(queue, handler, listenerExecutor, Collections.emptyList());
+    }
+
+    public AutomaticObjectQueueConsumer(ObjectQueue<E> queue,
+                                        ConsumeObjectHandler<E> handler,
+                                        @Nullable Executor listenerExecutor,
+                                        List<ConsumeObjectListener<E>> listeners) {
+        requireNonNull(queue, "queue");
+        requireNonNull(handler, "handler");
+        requireNonNull(listeners, "listeners");
+
+        if (listenerExecutor == null && !listeners.isEmpty()) {
+            throw new IllegalArgumentException("listenerExecutor is null but listeners is not empty");
+        }
+
+        this.backupQueue = queue;
+        this.worker = threadFactory.newThread(new Worker(handler));
+        this.listenerExecutor = listenerExecutor;
+        this.listeners = new CopyOnWriteArraySet<>(listeners);
         this.worker.start();
     }
 
     public void addListener(ConsumeObjectListener<E> listener) {
         requireNonNull(listener, "listener");
 
+        if (listenerExecutor == null) {
+            throw new IllegalStateException("listenerExecutor is null");
+        }
+
         listeners.add(listener);
     }
 
     public boolean removeListener(ConsumeObjectListener<E> listener) {
         requireNonNull(listener, "listener");
+
+        if (listenerExecutor == null) {
+            throw new IllegalStateException("listenerExecutor is null");
+        }
 
         return listeners.remove(listener);
     }
@@ -145,6 +177,10 @@ public final class AutomaticObjectQueueConsumer<E extends Verifiable> implements
     }
 
     private void sendNotification(Consumer<ConsumeObjectListener<E>> consumer) {
+        if (listenerExecutor == null) {
+            return;
+        }
+
         try {
             listenerExecutor.execute(() -> {
                 for (ConsumeObjectListener<E> l : listeners) {
