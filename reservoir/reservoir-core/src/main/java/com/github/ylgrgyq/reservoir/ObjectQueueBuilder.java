@@ -16,8 +16,8 @@ public final class ObjectQueueBuilder<E> {
     }
 
     private ExecutorService executorService = Executors.newSingleThreadExecutor(threadFactory);
-    private int ringBufferSize = 512;
-    private int batchSize = 128;
+    private int producerRingBufferSize = 512;
+    private int consumerFetchBatchSize = 128;
     private boolean autoCommit = true;
 
     @Nullable
@@ -58,29 +58,29 @@ public final class ObjectQueueBuilder<E> {
         return this;
     }
 
-    int getBatchSize() {
-        return batchSize;
+    int getConsumerFetchBatchSize() {
+        return consumerFetchBatchSize;
     }
 
-    public ObjectQueueBuilder<E> setBatchSize(int batchSize) {
-        if (batchSize <= 0) {
-            throw new IllegalArgumentException("batchSize: " + batchSize + " (expected: > 0)");
+    public ObjectQueueBuilder<E> setConsumerFetchBatchSize(int consumerFetchBatchSize) {
+        if (consumerFetchBatchSize <= 0) {
+            throw new IllegalArgumentException("consumerFetchBatchSize: " + consumerFetchBatchSize + " (expected: > 0)");
         }
 
-        this.batchSize = batchSize;
+        this.consumerFetchBatchSize = consumerFetchBatchSize;
         return this;
     }
 
-    int getRingBufferSize() {
-        return ringBufferSize;
+    int getProducerRingBufferSize() {
+        return producerRingBufferSize;
     }
 
-    public ObjectQueueBuilder<E> setRingBufferSize(int ringBufferSize) {
-        if (ringBufferSize <= 0) {
-            throw new IllegalArgumentException("ringBufferSize: " + ringBufferSize + " (expected: > 0)");
+    public ObjectQueueBuilder<E> setProducerRingBufferSize(int producerRingBufferSize) {
+        if (producerRingBufferSize <= 0) {
+            throw new IllegalArgumentException("producerRingBufferSize: " + producerRingBufferSize + " (expected: > 0)");
         }
 
-        this.ringBufferSize = ringBufferSize;
+        this.producerRingBufferSize = producerRingBufferSize;
         return this;
     }
 

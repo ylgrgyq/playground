@@ -3,7 +3,6 @@ package com.github.ylgrgyq.reservoir;
 import com.spotify.futures.CompletableFutures;
 import org.junit.Before;
 import org.junit.Test;
-import sun.security.krb5.internal.crypto.Des;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -90,7 +89,7 @@ public class DisruptorBackedObjectQueueProducerTest {
     @Test
     public void flushAllProducedObjectOnClose() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder
-                .setBatchSize(5)
+                .setConsumerFetchBatchSize(5)
                 .setStorage(new AbstractTestingStorage() {
                     @Override
                     public void store(List<byte[]> batch) throws StorageException {

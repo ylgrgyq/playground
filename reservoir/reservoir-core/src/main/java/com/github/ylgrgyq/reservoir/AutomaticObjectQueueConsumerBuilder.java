@@ -73,7 +73,7 @@ public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
     }
 
     int getBatchSize() {
-        return consumerBuilder.getBatchSize();
+        return consumerBuilder.getConsumerFetchBatchSize();
     }
 
     public AutomaticObjectQueueConsumerBuilder<E> setBatchSize(int batchSize) {
@@ -81,7 +81,7 @@ public final class AutomaticObjectQueueConsumerBuilder<E extends Verifiable> {
             throw new IllegalArgumentException("batchSize: " + batchSize + " (expected: > 0)");
         }
 
-        consumerBuilder.setBatchSize(batchSize);
+        consumerBuilder.setConsumerFetchBatchSize(batchSize);
         return this;
     }
 

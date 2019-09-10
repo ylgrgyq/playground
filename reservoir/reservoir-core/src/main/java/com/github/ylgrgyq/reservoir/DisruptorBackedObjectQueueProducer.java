@@ -32,9 +32,9 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
-        this.disruptor = new Disruptor<>(ProducerEvent::new, builder.getRingBufferSize(),
+        this.disruptor = new Disruptor<>(ProducerEvent::new, builder.getProducerRingBufferSize(),
                 new NamedThreadFactory("producer-worker-"));
-        this.disruptor.handleEventsWith(new ProduceHandler(builder.getBatchSize()));
+        this.disruptor.handleEventsWith(new ProduceHandler(builder.getConsumerFetchBatchSize()));
         this.disruptor.setDefaultExceptionHandler(new LogExceptionHandler<>("object-queue-producer",
                 (event, ex) -> {
                     if (event.future != null) {

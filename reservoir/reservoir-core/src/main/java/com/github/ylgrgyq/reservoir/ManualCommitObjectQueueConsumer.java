@@ -25,7 +25,7 @@ final class ManualCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E>
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
-        this.batchSize = builder.getBatchSize();
+        this.batchSize = builder.getConsumerFetchBatchSize();
         this.queue = new ArrayBlockingQueue<>(2 * this.batchSize);
         this.lastCommittedId = storage.getLastCommittedId();
         this.deserializer = builder.getCodec();
