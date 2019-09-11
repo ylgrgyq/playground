@@ -57,7 +57,19 @@ public class FileUtils {
         }
     }
 
-
+    /**
+     * Deletes a file. If file is a directory, delete it and all sub-directories.
+     *
+     * The difference between File.delete() and this method are:
+     *
+     * A directory to be deleted does not have to be empty.
+     * You get exceptions when a file or directory cannot be deleted. (java.io.File methods returns a boolean)
+     *
+     * @param file file or directory to delete, must not be null
+     * @throws NullPointerException  - if the directory is null
+     * @throws FileNotFoundException - if the file was not found
+     * @throws IOException           - in case deletion is unsuccessful
+     */
     public static void forceDelete(File file) throws IOException {
         if (file.isDirectory()) {
             deleteDirectory(file);
@@ -110,7 +122,6 @@ public class FileUtils {
      * @param file file or directory to delete, can be {@code null}
      * @return {@code true} if the file or directory was deleted, otherwise
      * {@code false}
-     *
      * @since 1.4
      */
     public static boolean deleteQuietly(final File file) {
@@ -133,6 +144,7 @@ public class FileUtils {
 
     /**
      * Lists files in a directory, asserting that the supplied directory satisfies exists and is a directory
+     *
      * @param directory The directory to list
      * @return The files in the directory, never null.
      * @throws IOException if an I/O error occurs

@@ -267,12 +267,12 @@ public final class RocksDbStorage implements ObjectQueueStorage {
     }
 
     private ColumnFamilyOptions createDefaultColumnFamilyOptions() {
-        final BlockBasedTableConfig tableConfig = new BlockBasedTableConfig(). //
-                setIndexType(IndexType.kHashSearch). // use hash search(btree) for prefix scan.
-                setBlockSize(4 * SizeUnit.KB).//
-                setFilterPolicy(new BloomFilter(16, false)).
-                setCacheIndexAndFilterBlocks(true). //
-                setBlockCache(new LRUCache(512 * SizeUnit.MB, 8));
+//        final BlockBasedTableConfig tableConfig = new BlockBasedTableConfig(). //
+//                setIndexType(IndexType.kHashSearch). // use hash search(btree) for prefix scan.
+//                setBlockSize(4 * SizeUnit.KB).//
+//                setFilterPolicy(new BloomFilter(16, false)).
+//                setCacheIndexAndFilterBlocks(true). //
+//                setBlockCache(new LRUCache(512 * SizeUnit.MB, 8));
 
         final ColumnFamilyOptions options = new ColumnFamilyOptions();
 //        options.setTableFormatConfig(tableConfig);

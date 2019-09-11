@@ -1,5 +1,8 @@
 package com.github.ylgrgyq.reservoir;
 
+import com.github.ylgrgyq.reservoir.AutomaticObjectQueueConsumer.ConsumeObjectHandler;
+import com.github.ylgrgyq.reservoir.AutomaticObjectQueueConsumer.ConsumeObjectListener;
+import com.github.ylgrgyq.reservoir.AutomaticObjectQueueConsumer.HandleFailedStrategy;
 import org.assertj.core.api.Condition;
 import org.junit.After;
 import org.junit.Before;
