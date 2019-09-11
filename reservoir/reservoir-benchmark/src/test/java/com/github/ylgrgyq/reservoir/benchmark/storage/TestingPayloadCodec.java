@@ -6,7 +6,7 @@ import com.github.ylgrgyq.reservoir.SerializationException;
 
 import java.nio.ByteBuffer;
 
-public class TestingPayloadCodec implements Codec<TestingPayload> {
+public class TestingPayloadCodec implements Codec<TestingPayload, byte[]> {
     private static final int MINIMUM_LENGTH = Long.BYTES + Integer.BYTES + 1;
 
 
