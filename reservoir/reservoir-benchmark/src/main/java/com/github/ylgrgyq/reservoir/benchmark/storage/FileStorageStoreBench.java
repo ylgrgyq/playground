@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.reservoir.benchmark.storage;
 
 import com.github.ylgrgyq.reservoir.ObjectQueueStorage;
-import com.github.ylgrgyq.reservoir.storage.FileBasedStorageBuilder;
+import com.github.ylgrgyq.reservoir.storage.FileStorageBuilder;
 
 public final class FileStorageStoreBench extends StorageStoreBenchmark {
     FileStorageStoreBench(int dataSize, int numDataPerBatch, int numBatches) {
@@ -15,7 +15,7 @@ public final class FileStorageStoreBench extends StorageStoreBenchmark {
 
     @Override
     ObjectQueueStorage createStorage(String baseDir) throws Exception {
-        return FileBasedStorageBuilder
+        return FileStorageBuilder
                 .newBuilder(baseDir)
                 .build();
     }

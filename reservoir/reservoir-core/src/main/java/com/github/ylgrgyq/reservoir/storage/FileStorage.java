@@ -77,7 +77,7 @@ public final class FileStorage implements ObjectQueueStorage {
     @Nullable
     private Thread safeCloseThread;
 
-    FileStorage(FileBasedStorageBuilder builder) throws StorageException {
+    FileStorage(FileStorageBuilder builder) throws StorageException {
         requireNonNull(builder, "builder");
         final String storageBaseDir = builder.getStorageBaseDir();
         Path baseDirPath = Paths.get(storageBaseDir);

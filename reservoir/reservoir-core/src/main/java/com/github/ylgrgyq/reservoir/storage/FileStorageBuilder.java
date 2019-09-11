@@ -10,11 +10,11 @@ import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
 
-public class FileBasedStorageBuilder {
-    public static FileBasedStorageBuilder newBuilder(String storageBaseDir) {
+public class FileStorageBuilder {
+    public static FileStorageBuilder newBuilder(String storageBaseDir) {
         requireNonNull(storageBaseDir, "storageBaseDir");
 
-        return new FileBasedStorageBuilder(storageBaseDir);
+        return new FileStorageBuilder(storageBaseDir);
     }
 
     private long readRetryIntervalMillis = 500;
@@ -23,7 +23,7 @@ public class FileBasedStorageBuilder {
     @Nullable
     private ExecutorService flushMemtableExecutorService;
 
-    private FileBasedStorageBuilder(final String storageBaseDir) {
+    private FileStorageBuilder(final String storageBaseDir) {
         this.storageBaseDir = storageBaseDir;
     }
 
@@ -35,7 +35,7 @@ public class FileBasedStorageBuilder {
         return readRetryIntervalMillis;
     }
 
-    public FileBasedStorageBuilder setReadRetryIntervalMillis(long readRetryInterval, TimeUnit unit) {
+    public FileStorageBuilder setReadRetryIntervalMillis(long readRetryInterval, TimeUnit unit) {
         if (readRetryInterval <= 0) {
             throw new IllegalArgumentException("readRetryInterval: " + readRetryInterval + " (expect: > 0)");
         }
@@ -49,7 +49,7 @@ public class FileBasedStorageBuilder {
         return truncateIntervalMillis;
     }
 
-    public FileBasedStorageBuilder setTruncateIntervalMillis(long truncateInterval, TimeUnit unit) {
+    public FileStorageBuilder setTruncateIntervalMillis(long truncateInterval, TimeUnit unit) {
         if (truncateInterval < 0) {
             throw new IllegalArgumentException("truncateInterval: " + truncateInterval + " (expect: >= 0)");
         }
@@ -67,7 +67,7 @@ public class FileBasedStorageBuilder {
         return flushMemtableExecutorService;
     }
 
-    public FileBasedStorageBuilder setFlushMemtableExecutorService(ExecutorService flushMemtableExecutorService) {
+    public FileStorageBuilder setFlushMemtableExecutorService(ExecutorService flushMemtableExecutorService) {
         requireNonNull(flushMemtableExecutorService, "flushMemtableExecutorService");
 
         this.flushMemtableExecutorService = flushMemtableExecutorService;

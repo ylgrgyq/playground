@@ -22,7 +22,7 @@ import static org.awaitility.Awaitility.await;
 
 public class FileStorageTest {
     private File tempFile;
-    private FileBasedStorageBuilder builder;
+    private FileStorageBuilder builder;
 
     @Before
     public void setUp() throws Exception {
@@ -30,7 +30,7 @@ public class FileStorageTest {
                 File.separator + "reservoir_test_" + System.nanoTime();
         tempFile = new File(tempDir);
         FileUtils.forceMkdir(tempFile);
-        builder = FileBasedStorageBuilder.newBuilder(tempFile.getPath());
+        builder = FileStorageBuilder.newBuilder(tempFile.getPath());
     }
 
     @Test
