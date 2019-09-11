@@ -6,7 +6,7 @@ public interface Codec<T> {
      *
      * @param obj an object to serialize
      * @return a bytes array
-     * @throws SerializationException when the object can not serialize to a byte array.
+     * @throws SerializationException when the object failed to serialize to a byte array.
      */
     byte[] serialize(T obj) throws SerializationException;
 
@@ -15,7 +15,7 @@ public interface Codec<T> {
      *
      * @param bytes a bytes array to deserialize
      * @return an object of type T
-     * @throws DeserializationException when the bytes array can not deserialize to the expect object of type T,
+     * @throws DeserializationException when the bytes array failed to deserialize to the expect object of type T,
      *                                  like bytes underflow, etc.
      */
     T deserialize(byte[] bytes) throws DeserializationException;

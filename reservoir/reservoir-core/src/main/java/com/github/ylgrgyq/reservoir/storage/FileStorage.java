@@ -20,8 +20,8 @@ import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
-public final class FileBasedStorage implements ObjectQueueStorage {
-    private static final Logger logger = LoggerFactory.getLogger(FileBasedStorage.class.getName());
+public final class FileStorage implements ObjectQueueStorage {
+    private static final Logger logger = LoggerFactory.getLogger(FileStorage.class.getName());
     private static final ThreadFactory safeCloseThreadFactory = new NamedThreadFactory("safe-close-thread-");
 
     private static class Itr implements Iterator<ObjectWithId> {
@@ -77,7 +77,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
     @Nullable
     private Thread safeCloseThread;
 
-    FileBasedStorage(FileBasedStorageBuilder builder) throws StorageException {
+    FileStorage(FileBasedStorageBuilder builder) throws StorageException {
         requireNonNull(builder, "builder");
         final String storageBaseDir = builder.getStorageBaseDir();
         Path baseDirPath = Paths.get(storageBaseDir);
@@ -347,7 +347,7 @@ public final class FileBasedStorage implements ObjectQueueStorage {
 
         @Override
         public void run() {
-            synchronized (FileBasedStorage.this) {
+            synchronized (FileStorage.this) {
                 try {
                     sstableWriterPool.shutdown();
 

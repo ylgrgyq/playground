@@ -20,7 +20,7 @@ import static com.github.ylgrgyq.reservoir.TestingUtils.numberStringBytes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-public class FileBasedStorageTest {
+public class FileStorageTest {
     private File tempFile;
     private FileBasedStorageBuilder builder;
 
@@ -35,7 +35,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void commitThenGetCommitId() throws Exception {
-        final FileBasedStorage storage = builder.build();
+        final FileStorage storage = builder.build();
         storage.commitId(100);
         assertThat(storage.getLastCommittedId()).isEqualTo(100);
         storage.close();
@@ -43,7 +43,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void consecutiveCommitThenGetCommitIdAfterRecoverUsingSameFile() throws Exception {
-        FileBasedStorage storage = builder.build();
+        FileStorage storage = builder.build();
         final FileNameMeta expectMeta = FileName.getFileNameMetas(tempFile.getPath(),
                 meta -> meta.getType() == FileType.ConsumerCommit).get(0);
 
@@ -60,7 +60,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void blockFetch() throws Exception {
-        final FileBasedStorage storage = builder.build();
+        final FileStorage storage = builder.build();
         final CyclicBarrier barrier = new CyclicBarrier(2);
         // block fetch in another thread
         final CompletableFuture<List<ObjectWithId>> f = CompletableFuture.supplyAsync(() -> {
@@ -84,7 +84,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void blockFetchWithTimeout() throws Exception {
-        final FileBasedStorage storage = builder.build();
+        final FileStorage storage = builder.build();
 
         assertThat(storage.fetch(0, 100, 100, TimeUnit.MILLISECONDS)).hasSize(0);
         storage.close();
@@ -92,7 +92,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void fetchDataFromMemtable() throws Exception {
-        final FileBasedStorage storage = builder.build();
+        final FileStorage storage = builder.build();
         final int expectSize = 64;
 
         final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
@@ -107,7 +107,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void fetchDataFromRecoveredMemtable() throws Exception {
-        FileBasedStorage storage = builder.build();
+        FileStorage storage = builder.build();
         final int expectSize = 64;
 
         final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
@@ -122,7 +122,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void fetchDataFromImmutableMemtable() throws Exception {
-        final FileBasedStorage storage = builder
+        final FileStorage storage = builder
                 // block flush memtable job, so immutable memtable will stay in mem during the test
                 .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS))
                 .build();
@@ -137,7 +137,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void fetchDataOnlyFromImmutableMemtableAndMemtable() throws Exception {
-        final FileBasedStorage storage = builder
+        final FileStorage storage = builder
                 // block flush memtable job, so immutable memtable will stay in mem during the test
                 .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS))
                 .build();
@@ -153,7 +153,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void fetchDataFromRecoveredSstable() throws Exception {
-        FileBasedStorage storage = builder
+        FileStorage storage = builder
                 // block flush memtable job, so immutable memtable will stay in mem during the test
                 .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS))
                 .build();
@@ -173,7 +173,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void fetchDataFromSstableImmutableMemtableAndMemtable() throws Exception {
-        final FileBasedStorage storage = builder
+        final FileStorage storage = builder
                 // allow only one flush task finish immediately
                 .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, 1, TimeUnit.DAYS))
                 .build();
@@ -199,7 +199,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void fetchDataFromMultiSstables() throws Exception {
-        final FileBasedStorage storage = builder
+        final FileStorage storage = builder
                 .setFlushMemtableExecutorService(new ImmediateExecutorService())
                 .build();
 
@@ -218,7 +218,7 @@ public class FileBasedStorageTest {
     @Test
     public void testWriteImmutableTableBlock() throws Exception {
         final DelayedSingleThreadExecutorService executorService = new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS);
-        final FileBasedStorage storage = builder
+        final FileStorage storage = builder
                 .setFlushMemtableExecutorService(executorService)
                 .build();
 
@@ -256,7 +256,7 @@ public class FileBasedStorageTest {
     // add this to pass null to writeMemtable to throw exception
     @SuppressWarnings("ConstantConditions")
     public void testFlushMemtableFailedThenStorageClosed() throws Exception {
-        final FileBasedStorage storage = builder
+        final FileStorage storage = builder
                 .setFlushMemtableExecutorService(new ImmediateExecutorService())
                 .build();
 
@@ -266,7 +266,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void truncate() throws Exception {
-        final FileBasedStorage storage = builder
+        final FileStorage storage = builder
                 .setFlushMemtableExecutorService(new ImmediateExecutorService())
                 .setTruncateIntervalMillis(0, TimeUnit.MILLISECONDS)
                 .build();
@@ -285,7 +285,7 @@ public class FileBasedStorageTest {
 
     @Test
     public void simpleProduceAndConsume() throws Exception {
-        final FileBasedStorage storage = builder.build();
+        final FileStorage storage = builder.build();
         final ObjectQueue<TestingPayload> queue = ObjectQueueBuilder.<TestingPayload>newBuilder()
                 .setStorage(storage)
                 .setCodec(new TestingPayloadCodec())
@@ -310,11 +310,11 @@ public class FileBasedStorageTest {
         return objs;
     }
 
-    private void storeObjectWithIds(FileBasedStorage storage, List<ObjectWithId> batch) throws StorageException {
+    private void storeObjectWithIds(FileStorage storage, List<ObjectWithId> batch) throws StorageException {
         storage.store(batch.stream().map(ObjectWithId::getObjectInBytes).collect(Collectors.toList()));
     }
 
-    private List<ObjectWithId> triggerFlushMemtable(FileBasedStorage storage) throws StorageException {
+    private List<ObjectWithId> triggerFlushMemtable(FileStorage storage) throws StorageException {
         long nextId = storage.getLastProducedId() + 1;
         List<ObjectWithId> triggerDatas = Arrays.asList(
                 new ObjectWithId(nextId, new byte[Constant.kMaxMemtableSize]),

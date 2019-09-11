@@ -74,12 +74,12 @@ public class FileBasedStorageBuilder {
         return this;
     }
 
-    public FileBasedStorage build() throws StorageException {
+    public FileStorage build() throws StorageException {
         if (flushMemtableExecutorService == null) {
             flushMemtableExecutorService = Executors.newSingleThreadScheduledExecutor(
                     new NamedThreadFactory("memtable-writer-"));
         }
-        return new FileBasedStorage(this);
+        return new FileStorage(this);
     }
 
 
