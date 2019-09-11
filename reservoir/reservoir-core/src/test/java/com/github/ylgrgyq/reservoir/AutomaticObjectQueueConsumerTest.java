@@ -31,9 +31,7 @@ public class AutomaticObjectQueueConsumerTest {
         storage = new TestingStorage();
         listener.clear();
         listenerExecutor = Executors.newSingleThreadExecutor();
-        queue = ObjectQueueBuilder.<TestingPayload>newBuilder()
-                .setStorage(storage)
-                .setCodec(new TestingPayloadCodec())
+        queue = ObjectQueueBuilder.newBuilder(storage, new TestingPayloadCodec())
                 .setAutoCommit(false)
                 .buildQueue();
     }

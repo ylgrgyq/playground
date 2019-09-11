@@ -4,7 +4,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-abstract class AbstractTestingStorage  implements ObjectQueueStorage {
+abstract class AbstractTestingStorage  implements ObjectQueueStorage<byte[]> {
     @Override
     public void commitId(long id) throws StorageException {
 
@@ -16,12 +16,12 @@ abstract class AbstractTestingStorage  implements ObjectQueueStorage {
     }
 
     @Override
-    public List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException {
+    public List<ObjectWithId<byte[]>> fetch(long fromId, int limit) throws InterruptedException, StorageException {
         return Collections.emptyList();
     }
 
     @Override
-    public List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
+    public List<ObjectWithId<byte[]>> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
         return Collections.emptyList();
     }
 

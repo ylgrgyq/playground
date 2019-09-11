@@ -18,10 +18,8 @@ import static org.awaitility.Awaitility.await;
 
 public class ManualCommitObjectQueueConsumerTest {
     private final TestingStorage storage = new TestingStorage();
-    private final ObjectQueueBuilder<TestingPayload> builder = ObjectQueueBuilder.<TestingPayload>newBuilder()
-            .setStorage(storage)
-            .setAutoCommit(false)
-            .setCodec(new TestingPayloadCodec());
+    private final ObjectQueueBuilder<TestingPayload, byte[]> builder = ObjectQueueBuilder.newBuilder(storage, new TestingPayloadCodec())
+            .setAutoCommit(false);
 
     @Before
     public void setUp() {
@@ -69,7 +67,7 @@ public class ManualCommitObjectQueueConsumerTest {
 
         assertThatThrownBy(consumer::fetch)
                 .isInstanceOf(DeserializationException.class)
-                .hasMessageContaining("deserialize object with id: 1 failed. Content in Base64 string is: ");
+                .hasMessageContaining("deserialize object with id: 1 failed. Content is: ");
         consumer.close();
     }
 

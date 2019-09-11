@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.reservoir;
 
-public interface Codec<T> {
+public interface Codec<T, S> {
     /**
      * Serialize an object of type T to a bytes array.
      *
@@ -8,7 +8,7 @@ public interface Codec<T> {
      * @return a bytes array
      * @throws SerializationException when the object failed to serialize to a byte array.
      */
-    byte[] serialize(T obj) throws SerializationException;
+    S serialize(T obj) throws SerializationException;
 
     /**
      * Deserialize a bytes array to an object of type T.
@@ -18,5 +18,5 @@ public interface Codec<T> {
      * @throws DeserializationException when the bytes array failed to deserialize to the expect object of type T,
      *                                  like bytes underflow, etc.
      */
-    T deserialize(byte[] bytes) throws DeserializationException;
+    T deserialize(S bytes) throws DeserializationException;
 }

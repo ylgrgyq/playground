@@ -7,14 +7,14 @@ import java.util.concurrent.TimeUnit;
  * A storage used by {@link ObjectQueueConsumer} or {@link ObjectQueueProducer} to
  * store/fetch the serialized objects.
  */
-public interface ObjectQueueStorage extends AutoCloseable {
+public interface ObjectQueueStorage<S> extends AutoCloseable {
     /**
      * Store a list of serialized object to storage.
      *
      * @param batch the list of serialized object.
      * @throws StorageException thrown if any error happens in underlying storage medium
      */
-    void store(List<byte[]> batch) throws StorageException;
+    void store(List<S> batch) throws StorageException;
 
     /**
      * Save commit id of {@link ObjectQueueConsumer} to storage.
@@ -46,7 +46,7 @@ public interface ObjectQueueStorage extends AutoCloseable {
      * @throws InterruptedException thrown when the calling thread was interrupted
      * @throws StorageException     thrown if any error happens in underlying storage medium
      */
-    List<ObjectWithId> fetch(long fromId, int limit) throws InterruptedException, StorageException;
+    List<ObjectWithId<S>> fetch(long fromId, int limit) throws InterruptedException, StorageException;
 
     /**
      * Blocking to fetch a list of serialized objects with their assigned id starting after
@@ -63,5 +63,5 @@ public interface ObjectQueueStorage extends AutoCloseable {
      * @throws InterruptedException thrown when the calling thread was interrupted
      * @throws StorageException     thrown if any error happens in underlying storage medium
      */
-    List<ObjectWithId> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException;
+    List<ObjectWithId<S>> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException;
 }

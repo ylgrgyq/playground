@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 
-final class Memtable implements Iterable<ObjectWithId> {
+final class Memtable implements Iterable<ObjectWithId<byte[]>> {
     private final ConcurrentSkipListMap<Long, byte[]> table;
     private int memSize;
 
@@ -18,9 +18,9 @@ final class Memtable implements Iterable<ObjectWithId> {
         table = new ConcurrentSkipListMap<>();
     }
 
-    void add(ObjectWithId val) {
+    void add(ObjectWithId<byte[]> val) {
         long k = val.getId();
-        byte[] v = val.getObjectInBytes();
+        byte[] v = val.getSerializedObject();
 
         table.put(k, v);
         memSize += Long.BYTES + v.length;
@@ -46,17 +46,17 @@ final class Memtable implements Iterable<ObjectWithId> {
         return table.isEmpty();
     }
 
-    List<ObjectWithId> getEntries(long start, int limit) {
+    List<ObjectWithId<byte[]>> getEntries(long start, int limit) {
         if (start > lastId()) {
             return Collections.emptyList();
         }
 
-        final SeekableIterator<Long, ObjectWithId> iter = iterator();
+        final SeekableIterator<Long, ObjectWithId<byte[]>> iter = iterator();
         iter.seek(start);
 
-        final List<ObjectWithId> ret = new ArrayList<>();
+        final List<ObjectWithId<byte[]>> ret = new ArrayList<>();
         while (iter.hasNext()) {
-            final ObjectWithId v = iter.next();
+            final ObjectWithId<byte[]> v = iter.next();
             if (v.getId() > start && ret.size() < limit) {
                 ret.add(v);
             } else {
@@ -72,11 +72,11 @@ final class Memtable implements Iterable<ObjectWithId> {
     }
 
     @Override
-    public SeekableIterator<Long, ObjectWithId> iterator() {
+    public SeekableIterator<Long, ObjectWithId<byte[]>> iterator() {
         return new Itr(table.clone());
     }
 
-    private static class Itr implements SeekableIterator<Long, ObjectWithId> {
+    private static class Itr implements SeekableIterator<Long, ObjectWithId<byte[]>> {
         private final ConcurrentNavigableMap<Long, byte[]> innerMap;
         @Nullable
         private Map.Entry<Long, byte[]> offset;
@@ -87,7 +87,7 @@ final class Memtable implements Iterable<ObjectWithId> {
         }
 
         @Override
-        public SeekableIterator<Long, ObjectWithId> seek(Long key) {
+        public SeekableIterator<Long, ObjectWithId<byte[]>> seek(Long key) {
             offset = innerMap.higherEntry(key);
             return this;
         }
@@ -98,12 +98,12 @@ final class Memtable implements Iterable<ObjectWithId> {
         }
 
         @Override
-        public ObjectWithId next() {
+        public ObjectWithId<byte[]> next() {
             assert offset != null;
             long id = offset.getKey();
             byte[] v = offset.getValue();
             offset = innerMap.higherEntry(id);
-            return new ObjectWithId(id, v);
+            return new ObjectWithId<>(id, v);
         }
     }
 }

@@ -15,10 +15,9 @@ import static org.awaitility.Awaitility.await;
 
 public class AutoCommitObjectQueueConsumerTest {
     private final TestingStorage storage = new TestingStorage();
-    private final ObjectQueueBuilder<TestingPayload> builder = ObjectQueueBuilder.<TestingPayload>newBuilder()
-            .setStorage(storage)
-            .setAutoCommit(true)
-            .setCodec(new TestingPayloadCodec());
+    private final ObjectQueueBuilder<TestingPayload, byte[]> builder =
+            ObjectQueueBuilder.newBuilder(storage, new TestingPayloadCodec())
+                    .setAutoCommit(true);
 
     @Before
     public void setUp() {
@@ -61,15 +60,13 @@ public class AutoCommitObjectQueueConsumerTest {
 
         assertThatThrownBy(consumer::fetch)
                 .isInstanceOf(DeserializationException.class)
-                .hasMessageContaining("deserialize object with id: 1 failed. Content in Base64 string is: ");
+                .hasMessageContaining("deserialize object with id: 1 failed. Content is: ");
         consumer.close();
     }
 
     @Test
     public void timeoutOnFetch() throws Exception {
-        ObjectQueueConsumer<TestingPayload> consumer = ObjectQueueBuilder.<TestingPayload>newBuilder()
-                .setStorage(storage)
-                .setCodec(new TestingPayloadCodec())
+        ObjectQueueConsumer<TestingPayload> consumer = ObjectQueueBuilder.newBuilder(storage, new TestingPayloadCodec())
                 .buildConsumer();
 
         assertThat(consumer.fetch(100, TimeUnit.MILLISECONDS)).isNull();

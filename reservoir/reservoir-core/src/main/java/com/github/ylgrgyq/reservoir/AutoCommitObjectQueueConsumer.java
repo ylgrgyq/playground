@@ -10,17 +10,17 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import static java.util.Objects.requireNonNull;
 
-final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
-    private final ObjectQueueStorage storage;
+final class AutoCommitObjectQueueConsumer<E, S> implements ObjectQueueConsumer<E> {
+    private final ObjectQueueStorage<S> storage;
     private final BlockingQueue<E> queue;
     private final int batchSize;
     private final ReentrantLock lock;
-    private final Codec<E> deserializer;
+    private final Codec<E, S> deserializer;
     private long lastCommittedId;
 
     private volatile boolean closed;
 
-    AutoCommitObjectQueueConsumer(ObjectQueueBuilder<E> builder) throws StorageException {
+    AutoCommitObjectQueueConsumer(ObjectQueueBuilder<E, S> builder) throws StorageException {
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
@@ -90,7 +90,7 @@ final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
             }
 
             long lastId = lastCommittedId;
-            final List<? extends ObjectWithId> payloads;
+            final List<? extends ObjectWithId<S>> payloads;
             if (timeout == 0) {
                 payloads = storage.fetch(lastId, batchSize);
             } else {
@@ -98,14 +98,16 @@ final class AutoCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E> {
             }
 
             if (!payloads.isEmpty()) {
-                for (ObjectWithId p : payloads) {
-                    final byte[] pInBytes = p.getObjectInBytes();
+                for (ObjectWithId<S> p : payloads) {
+                    final S serializeP = p.getSerializedObject();
                     try {
-                        final E pObj = deserializer.deserialize(pInBytes);
+                        final E pObj = deserializer.deserialize(serializeP);
                         queue.put(pObj);
                     } catch (Exception ex) {
-                        String msg = "deserialize object with id: " + p.getId() +
-                                " failed. Content in Base64 string is: " + Base64.getEncoder().encodeToString(pInBytes);
+                        String msg = "deserialize object with id: " + p.getId() + " failed. Content is: " +
+                                (serializeP instanceof byte[] ?
+                                        Base64.getEncoder().encodeToString((byte[]) serializeP) + " (Base64)" :
+                                        serializeP);
                         throw new DeserializationException(msg, ex);
                     }
 

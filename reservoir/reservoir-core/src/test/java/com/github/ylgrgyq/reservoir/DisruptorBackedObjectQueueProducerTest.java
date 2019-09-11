@@ -18,9 +18,7 @@ import static org.awaitility.Awaitility.await;
 public class DisruptorBackedObjectQueueProducerTest {
     private final TestingStorage storage = new TestingStorage();
     private final TestingPayloadCodec codec = new TestingPayloadCodec();
-    private final ObjectQueueBuilder<TestingPayload> builder = ObjectQueueBuilder.<TestingPayload>newBuilder()
-            .setStorage(storage)
-            .setCodec(codec);
+    private final ObjectQueueBuilder<TestingPayload, byte[]> builder = ObjectQueueBuilder.newBuilder(storage, codec);
 
     @Before
     public void setUp() {
@@ -46,11 +44,11 @@ public class DisruptorBackedObjectQueueProducerTest {
 
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
 
-        final List<ObjectWithId> payloads = storage.getProdcedPayloads();
+        final List<ObjectWithId<byte[]>> payloads = storage.getProdcedPayloads();
         assertThat(producedPayload).isEqualTo(
                 payloads.stream().map(payload -> {
                             try {
-                                return codec.deserialize(payload.getObjectInBytes());
+                                return codec.deserialize(payload.getSerializedObject());
                             } catch (DeserializationException ex) {
                                 throw new RuntimeException(ex);
                             }
@@ -74,11 +72,11 @@ public class DisruptorBackedObjectQueueProducerTest {
         await().until(() -> CompletableFutures.allAsList(futures).isDone());
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
 
-        final List<ObjectWithId> payloads = storage.getProdcedPayloads();
+        final List<ObjectWithId<byte[]>> payloads = storage.getProdcedPayloads();
         assertThat(producedPayloads).isEqualTo(
                 payloads.stream().map(payload -> {
                             try {
-                                return codec.deserialize(payload.getObjectInBytes());
+                                return codec.deserialize(payload.getSerializedObject());
                             } catch (DeserializationException ex) {
                                 throw new RuntimeException(ex);
                             }

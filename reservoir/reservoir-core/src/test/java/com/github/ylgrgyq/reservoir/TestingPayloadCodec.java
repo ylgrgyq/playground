@@ -2,7 +2,7 @@ package com.github.ylgrgyq.reservoir;
 
 import java.nio.ByteBuffer;
 
-public class TestingPayloadCodec implements Codec<TestingPayload> {
+public class TestingPayloadCodec implements Codec<TestingPayload, byte[]> {
     private static final int MINIMUM_LENGTH = Integer.BYTES + 1;
 
     @Override
