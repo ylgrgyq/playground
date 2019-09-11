@@ -96,15 +96,14 @@ public final class ObjectQueueBuilder<E> {
 
     public ObjectQueueProducer<E> buildProducer() throws StorageException {
         requireNonNull(storage, "storage");
-        requireNonNull(codec, "serializer");
-        requireNonNull(executorService, "executorService");
+        requireNonNull(codec, "codec");
 
         return new DisruptorBackedObjectQueueProducer<>(this);
     }
 
     public ObjectQueueConsumer<E> buildConsumer() throws StorageException {
         requireNonNull(storage, "storage");
-        requireNonNull(codec, "deserializer");
+        requireNonNull(codec, "codec");
 
         if (autoCommit) {
             return new AutoCommitObjectQueueConsumer<>(this);

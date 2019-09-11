@@ -93,15 +93,6 @@ final class ManualCommitObjectQueueConsumer<E> implements ObjectQueueConsumer<E>
         }
     }
 
-    /**
-     * Blocking to fetch objects from internal storage.
-     *
-     * @param timeout the maximum time to wait. 0 is to wait infinitely
-     * @param unit    the unit of the wait time
-     * @return true when there's some objects in buffer queue, false for timeout or error occurred
-     * @throws InterruptedException when interrupted or this consumer is closed
-     * @throws StorageException     when some bad things happened in the internal storage
-     */
     private boolean blockFetchFromStorage(long timeout, TimeUnit unit) throws InterruptedException, StorageException {
         lock.lock();
         try {
