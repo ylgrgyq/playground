@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
 
 public class DisruptorBackedObjectQueueProducerTest {
-    private final TestingStorage storage = new TestingStorage();
+    private final TestingStorage<byte[]> storage = new TestingStorage<>();
     private final TestingPayloadCodec codec = new TestingPayloadCodec();
     private final ObjectQueueBuilder<TestingPayload, byte[]> builder = ObjectQueueBuilder.newBuilder(storage, codec);
 
@@ -88,7 +88,7 @@ public class DisruptorBackedObjectQueueProducerTest {
     public void flushAllProducedObjectOnClose() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder
                 .setConsumerFetchBatchSize(5)
-                .setStorage(new AbstractTestingStorage() {
+                .setStorage(new AbstractTestingStorage<byte[]>() {
                     @Override
                     public void store(List<byte[]> batch) throws StorageException {
                         try {
@@ -126,7 +126,7 @@ public class DisruptorBackedObjectQueueProducerTest {
     @Test
     public void produceWhenSerializeElementFailed() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder
-                .setCodec(new BadTestingPayloadCodec())
+                .setCodec(new BadTestingPayloadCodec<>())
                 .buildProducer();
 
         assertThatThrownBy(() -> producer.produce(new TestingPayload()).join())
@@ -136,7 +136,7 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void storageThrowsStorageException() throws Exception {
-        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
+        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage<byte[]>() {
             @Override
             public void store(List<byte[]> batch) throws StorageException {
                 throw new StorageException("deliberate store failed");
@@ -151,7 +151,7 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void storageThrowsOtherException() throws Exception {
-        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
+        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage<byte[]>() {
             @Override
             public void store(List<byte[]> batch) {
                 throw new RuntimeException("deliberate store failed");

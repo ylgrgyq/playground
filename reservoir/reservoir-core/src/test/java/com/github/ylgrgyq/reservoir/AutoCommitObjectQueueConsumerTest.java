@@ -14,9 +14,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 public class AutoCommitObjectQueueConsumerTest {
-    private final TestingStorage storage = new TestingStorage();
-    private final ObjectQueueBuilder<TestingPayload, byte[]> builder =
-            ObjectQueueBuilder.newBuilder(storage, new TestingPayloadCodec())
+    private final TestingStorage<TestingPayload> storage = new TestingStorage<>();
+    private final ObjectQueueBuilder<TestingPayload, TestingPayload> builder =
+            ObjectQueueBuilder.newBuilder(storage)
                     .setAutoCommit(true);
 
     @Before
@@ -29,7 +29,7 @@ public class AutoCommitObjectQueueConsumerTest {
         final TestingPayload first = new TestingPayload("first");
         final TestingPayload second = new TestingPayload("second");
 
-        storage.store(Arrays.asList(first.serialize(), second.serialize()));
+        storage.store(Arrays.asList(first, second));
 
         final ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
 
@@ -52,11 +52,11 @@ public class AutoCommitObjectQueueConsumerTest {
     @Test
     public void deserializeObjectFailed() throws Exception {
         ObjectQueueConsumer<TestingPayload> consumer = builder
-                .setCodec(new BadTestingPayloadCodec())
+                .setCodec(new BadTestingPayloadCodec<>())
                 .buildConsumer();
 
         TestingPayload first = new TestingPayload("first");
-        storage.store(Collections.singletonList(first.serialize()));
+        storage.store(Collections.singletonList(first));
 
         assertThatThrownBy(consumer::fetch)
                 .isInstanceOf(DeserializationException.class)
@@ -66,7 +66,7 @@ public class AutoCommitObjectQueueConsumerTest {
 
     @Test
     public void timeoutOnFetch() throws Exception {
-        ObjectQueueConsumer<TestingPayload> consumer = ObjectQueueBuilder.newBuilder(storage, new TestingPayloadCodec())
+        ObjectQueueConsumer<TestingPayload> consumer = ObjectQueueBuilder.newBuilder(storage)
                 .buildConsumer();
 
         assertThat(consumer.fetch(100, TimeUnit.MILLISECONDS)).isNull();
@@ -87,7 +87,7 @@ public class AutoCommitObjectQueueConsumerTest {
             }
         });
         barrier.await();
-        storage.store(Collections.singletonList(first.serialize()));
+        storage.store(Collections.singletonList(first));
 
         await().until(f::isDone);
         assertThat(f).isCompletedWithValue(first);

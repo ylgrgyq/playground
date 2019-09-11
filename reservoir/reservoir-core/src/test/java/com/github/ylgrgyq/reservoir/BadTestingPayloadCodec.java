@@ -1,13 +1,13 @@
 package com.github.ylgrgyq.reservoir;
 
-public class BadTestingPayloadCodec implements Codec<TestingPayload, byte[]> {
+public class BadTestingPayloadCodec<S> implements Codec<TestingPayload, S> {
     @Override
-    public TestingPayload deserialize(byte[] serializedObj) throws DeserializationException {
+    public TestingPayload deserialize(S serializedObj) throws DeserializationException {
         throw new DeserializationException("deserialization failed");
     }
 
     @Override
-    public byte[] serialize(TestingPayload obj) throws SerializationException {
+    public S serialize(TestingPayload obj) throws SerializationException {
         throw new SerializationException("serialization failed");
     }
 }
