@@ -2,7 +2,7 @@ package com.github.ylgrgyq.reservoir;
 
 public class BadTestingPayloadCodec implements Codec<TestingPayload, byte[]> {
     @Override
-    public TestingPayload deserialize(byte[] bytes) throws DeserializationException {
+    public TestingPayload deserialize(byte[] serializedObj) throws DeserializationException {
         throw new DeserializationException("deserialization failed");
     }
 

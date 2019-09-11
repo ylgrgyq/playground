@@ -8,6 +8,17 @@ public final class ObjectWithId<S> {
     private final long id;
     private final S serializedObject;
 
+    /**
+     * Create a new instance of ObjectWithId.
+     * For performance's sake, we do not clone the input {@code serializedObject},
+     * so please mind not to modify the {@code serializedObject} after it has been
+     * passed to this constructor when implementing {@link ObjectQueueStorage}.
+     *
+     * @param id               the ID of this {@code serializedObject} assigned by
+     *                         {@link ObjectQueueStorage}
+     * @param serializedObject the object in serialized form stored in
+     *                         {@link ObjectQueueStorage}
+     */
     public ObjectWithId(long id, S serializedObject) {
         Objects.requireNonNull(serializedObject, "serializedObject");
 

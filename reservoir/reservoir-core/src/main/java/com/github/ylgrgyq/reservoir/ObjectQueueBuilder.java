@@ -9,6 +9,12 @@ import static java.util.Objects.requireNonNull;
 public final class ObjectQueueBuilder<E, S> {
     private static final ThreadFactory threadFactory = new NamedThreadFactory("object-queue-executor-");
 
+    public static <E> ObjectQueueBuilder<E, E> newBuilder(ObjectQueueStorage<E> storage) {
+        requireNonNull(storage, "storage");
+
+        return new ObjectQueueBuilder<>(storage, new IdentityCodec<>());
+    }
+
     public static <E, S> ObjectQueueBuilder<E, S> newBuilder(ObjectQueueStorage<S> storage, Codec<E, S> codec) {
         requireNonNull(storage, "storage");
         requireNonNull(codec, "codec");
@@ -115,5 +121,17 @@ public final class ObjectQueueBuilder<E, S> {
 
     private boolean isAutoCommit() {
         return autoCommit;
+    }
+
+    private static class IdentityCodec<E> implements Codec<E, E> {
+        @Override
+        public E serialize(E obj) {
+            return obj;
+        }
+
+        @Override
+        public E deserialize(E serializedObj) {
+            return serializedObj;
+        }
     }
 }
