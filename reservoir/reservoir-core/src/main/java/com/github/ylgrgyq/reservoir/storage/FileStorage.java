@@ -212,7 +212,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
     synchronized long getLastProducedId() {
         if (!mm.isEmpty()) {
             return mm.lastId();
-        } else if (imm != null && !imm.isEmpty()){
+        } else if (imm != null && !imm.isEmpty()) {
             return imm.lastId();
         } else {
             return manifest.getLastId();
@@ -634,6 +634,13 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
             dataLogWriter.close();
         }
         dataLogWriter = logWriter;
+
+        final LogWriter consumerWriter = createConsumerCommitLogWriter();
+        if (consumerCommitLogWriter != null) {
+            consumerCommitLogWriter.close();
+        }
+        consumerCommitLogWriter = consumerWriter;
+        
         imm = mm;
         mm = new Memtable();
         logger.debug("Trigger compaction, new log file number={}", dataLogFileNumber);
