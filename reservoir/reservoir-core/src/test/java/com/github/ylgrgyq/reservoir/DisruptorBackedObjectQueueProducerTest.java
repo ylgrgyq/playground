@@ -88,7 +88,7 @@ public class DisruptorBackedObjectQueueProducerTest {
     public void flushAllProducedObjectOnClose() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder
                 .setConsumerFetchBatchSize(5)
-                .setStorage(new AbstractTestingStorage<byte[]>() {
+                .replaceStorage(new AbstractTestingStorage<byte[]>() {
                     @Override
                     public void store(List<byte[]> batch) throws StorageException {
                         try {
@@ -126,7 +126,7 @@ public class DisruptorBackedObjectQueueProducerTest {
     @Test
     public void produceWhenSerializeElementFailed() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder
-                .setCodec(new BadTestingPayloadCodec<>())
+                .replaceCodec(new BadTestingPayloadCodec<>())
                 .buildProducer();
 
         assertThatThrownBy(() -> producer.produce(new TestingPayload()).join())
@@ -136,7 +136,7 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void storageThrowsStorageException() throws Exception {
-        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage<byte[]>() {
+        ObjectQueueProducer<TestingPayload> producer = builder.replaceStorage(new AbstractTestingStorage<byte[]>() {
             @Override
             public void store(List<byte[]> batch) throws StorageException {
                 throw new StorageException("deliberate store failed");
@@ -151,7 +151,7 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void storageThrowsOtherException() throws Exception {
-        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage<byte[]>() {
+        ObjectQueueProducer<TestingPayload> producer = builder.replaceStorage(new AbstractTestingStorage<byte[]>() {
             @Override
             public void store(List<byte[]> batch) {
                 throw new RuntimeException("deliberate store failed");

@@ -32,7 +32,7 @@ public class AutomaticObjectQueueConsumerTest {
         listener.clear();
         listenerExecutor = Executors.newSingleThreadExecutor();
         queue = ObjectQueueBuilder.newBuilder(storage, new TestingPayloadCodec())
-                .setAutoCommit(false)
+                .setConsumerAutoCommit(false)
                 .buildQueue();
     }
 

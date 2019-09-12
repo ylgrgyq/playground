@@ -17,7 +17,7 @@ public class AutoCommitObjectQueueConsumerTest {
     private final TestingStorage<TestingPayload> storage = new TestingStorage<>();
     private final ObjectQueueBuilder<TestingPayload, TestingPayload> builder =
             ObjectQueueBuilder.newBuilder(storage)
-                    .setAutoCommit(true);
+                    .setConsumerAutoCommit(true);
 
     @Before
     public void setUp() {
@@ -52,7 +52,7 @@ public class AutoCommitObjectQueueConsumerTest {
     @Test
     public void deserializeObjectFailed() throws Exception {
         ObjectQueueConsumer<TestingPayload> consumer = builder
-                .setCodec(new BadTestingPayloadCodec<>())
+                .replaceCodec(new BadTestingPayloadCodec<>())
                 .buildConsumer();
 
         TestingPayload first = new TestingPayload("first");

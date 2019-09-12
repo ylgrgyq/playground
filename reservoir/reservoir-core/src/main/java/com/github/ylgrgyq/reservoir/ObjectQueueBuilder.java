@@ -36,20 +36,19 @@ public final class ObjectQueueBuilder<E, S> {
     }
 
 
-    public ObjectQueueBuilder<E, S> setStorage(ObjectQueueStorage<S> storage) {
+    public ObjectQueueBuilder<E, S> replaceStorage(ObjectQueueStorage<S> storage) {
         requireNonNull(storage, "storage");
         this.storage = storage;
         return this;
     }
 
-
-    public ObjectQueueBuilder<E, S> setCodec(Codec<E, S> codec) {
+    public ObjectQueueBuilder<E, S> replaceCodec(Codec<E, S> codec) {
         requireNonNull(codec, "codec");
         this.codec = codec;
         return this;
     }
 
-    public ObjectQueueBuilder<E, S> setAutoCommit(boolean autoCommit) {
+    public ObjectQueueBuilder<E, S> setConsumerAutoCommit(boolean autoCommit) {
         this.autoCommit = autoCommit;
         return this;
     }

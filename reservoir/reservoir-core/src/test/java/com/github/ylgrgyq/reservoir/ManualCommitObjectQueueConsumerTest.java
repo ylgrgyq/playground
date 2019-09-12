@@ -3,8 +3,6 @@ package com.github.ylgrgyq.reservoir;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.NoSuchElementException;
@@ -19,7 +17,7 @@ import static org.awaitility.Awaitility.await;
 public class ManualCommitObjectQueueConsumerTest {
     private final TestingStorage storage = new TestingStorage();
     private final ObjectQueueBuilder<TestingPayload, byte[]> builder = ObjectQueueBuilder.newBuilder(storage, new TestingPayloadCodec())
-            .setAutoCommit(false);
+            .setConsumerAutoCommit(false);
 
     @Before
     public void setUp() {
@@ -59,7 +57,7 @@ public class ManualCommitObjectQueueConsumerTest {
     @Test
     public void deserializeObjectFailed() throws Exception {
         final ObjectQueueConsumer<TestingPayload> consumer = builder
-                .setCodec(new BadTestingPayloadCodec())
+                .replaceCodec(new BadTestingPayloadCodec())
                 .buildConsumer();
 
         TestingPayload first = new TestingPayload("first");

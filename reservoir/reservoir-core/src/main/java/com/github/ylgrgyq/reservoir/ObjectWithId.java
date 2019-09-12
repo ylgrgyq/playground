@@ -49,7 +49,7 @@ public final class ObjectWithId<S> {
 
     @Override
     public int hashCode() {
-        S obj = getSerializedObject();
+        final S obj = getSerializedObject();
         if (obj instanceof byte[]) {
             int result = Objects.hash(getId());
             result = 31 * result + Arrays.hashCode((byte[]) obj);
