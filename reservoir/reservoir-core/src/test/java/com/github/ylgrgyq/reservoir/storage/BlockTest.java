@@ -79,7 +79,7 @@ public class BlockTest {
     public void testWriteReadBlock() throws Exception {
         final List<SerializedObjectWithId> expectDatas = new ArrayList<>();
         for (long i = 0; i < 10000; i++) {
-            expectDatas.add(new SerializedObjectWithId(i, TestingUtils.numberStringBytes(i)));
+            expectDatas.add(new SerializedObjectWithId<>(i, TestingUtils.numberStringBytes(i)));
             addData(i, numberString(i));
         }
 

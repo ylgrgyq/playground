@@ -23,7 +23,7 @@ public class MemtableTest {
     @Test
     public void testIsEmpty() {
         assertThat(mm.isEmpty()).isEqualTo(true);
-        mm.add(new SerializedObjectWithId(100, new byte[]{1, 2, 3}));
+        mm.add(new SerializedObjectWithId<>(100, new byte[]{1, 2, 3}));
         assertThat(mm.isEmpty()).isEqualTo(false);
     }
 
@@ -33,7 +33,7 @@ public class MemtableTest {
         assertThat(mm.lastId()).isEqualTo(-1);
 
         for (int i = 1; i < 10000; i++) {
-            mm.add(new SerializedObjectWithId(i, new byte[]{1, 2, 3}));
+            mm.add(new SerializedObjectWithId<>(i, new byte[]{1, 2, 3}));
             assertThat(mm.firstId()).isEqualTo(1);
             assertThat(mm.lastId()).isEqualTo(i);
         }
@@ -45,7 +45,7 @@ public class MemtableTest {
 
         final byte[] data = "Hello".getBytes(StandardCharsets.UTF_8);
         for (int i = 1; i < 10000; i++) {
-            mm.add(new SerializedObjectWithId(i, data));
+            mm.add(new SerializedObjectWithId<>(i, data));
             assertThat(mm.getMemoryUsedInBytes()).isEqualTo(i * (Long.BYTES + data.length));
         }
     }
@@ -58,7 +58,7 @@ public class MemtableTest {
     @Test
     public void testGetFromSingleElementMemtable() {
         final long id = 100;
-        final SerializedObjectWithId val = new SerializedObjectWithId(100, new byte[]{1, 2, 3});
+        final SerializedObjectWithId<byte[]> val = new SerializedObjectWithId<>(100, new byte[]{1, 2, 3});
         mm.add(val);
         assertThat(mm.getEntries(Long.MIN_VALUE, 100)).hasSize(1).containsExactly(val);
         assertThat(mm.getEntries(id, 100)).isEmpty();
@@ -133,7 +133,7 @@ public class MemtableTest {
     private List<SerializedObjectWithId> addElementsToMemtable(int size) {
         final List<SerializedObjectWithId> objs = new ArrayList<>();
         for (int i = 1; i <= size; i++) {
-            SerializedObjectWithId obj = new SerializedObjectWithId(i, TestingUtils.numberStringBytes(i));
+            final SerializedObjectWithId<byte[]> obj = new SerializedObjectWithId<>(i, TestingUtils.numberStringBytes(i));
             objs.add(obj);
             mm.add(obj);
         }
