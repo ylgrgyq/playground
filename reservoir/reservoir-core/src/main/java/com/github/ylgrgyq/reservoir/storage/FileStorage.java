@@ -24,18 +24,18 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
     private static final Logger logger = LoggerFactory.getLogger(FileStorage.class.getName());
     private static final ThreadFactory safeCloseThreadFactory = new NamedThreadFactory("safe-close-thread-");
 
-    private static class Itr implements Iterator<ObjectWithId<byte[]>> {
-        private final List<SeekableIterator<Long, ObjectWithId<byte[]>>> iterators;
+    private static class Itr implements Iterator<SerializedObjectWithId<byte[]>> {
+        private final List<SeekableIterator<Long, SerializedObjectWithId<byte[]>>> iterators;
         private int lastItrIndex;
 
-        Itr(List<SeekableIterator<Long, ObjectWithId<byte[]>>> iterators) {
+        Itr(List<SeekableIterator<Long, SerializedObjectWithId<byte[]>>> iterators) {
             this.iterators = iterators;
         }
 
         @Override
         public boolean hasNext() {
             for (int i = lastItrIndex; i < iterators.size(); i++) {
-                SeekableIterator<Long, ObjectWithId<byte[]>> itr = iterators.get(i);
+                SeekableIterator<Long, SerializedObjectWithId<byte[]>> itr = iterators.get(i);
                 if (itr.hasNext()) {
                     lastItrIndex = i;
                     return true;
@@ -47,7 +47,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         }
 
         @Override
-        public ObjectWithId<byte[]> next() {
+        public SerializedObjectWithId<byte[]> next() {
             assert lastItrIndex >= 0 && lastItrIndex < iterators.size();
             return iterators.get(lastItrIndex).next();
         }
@@ -164,12 +164,12 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
     }
 
     @Override
-    public List<ObjectWithId<byte[]>> fetch(long fromId, int limit) throws InterruptedException, StorageException {
+    public List<SerializedObjectWithId<byte[]>> fetch(long fromId, int limit) throws InterruptedException, StorageException {
         if (closed()) {
             throw new IllegalStateException("storage is closed");
         }
 
-        List<ObjectWithId<byte[]>> entries;
+        List<SerializedObjectWithId<byte[]>> entries;
         while (true) {
             entries = doFetch(fromId, limit);
 
@@ -184,13 +184,13 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
     }
 
     @Override
-    public List<ObjectWithId<byte[]>> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
+    public List<SerializedObjectWithId<byte[]>> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
         if (closed()) {
             throw new IllegalStateException("storage is closed");
         }
 
         final long end = System.nanoTime() + unit.toNanos(timeout);
-        List<ObjectWithId<byte[]>> entries;
+        List<SerializedObjectWithId<byte[]>> entries;
         while (true) {
             entries = doFetch(fromId, limit);
 
@@ -234,7 +234,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         long id = getLastProducedId();
         try {
             for (byte[] bs : batch) {
-                final ObjectWithId<byte[]> e = new ObjectWithId<>(++id, bs);
+                final SerializedObjectWithId<byte[]> e = new SerializedObjectWithId<>(++id, bs);
                 if (makeRoomForEntry(false)) {
                     assert dataLogWriter != null;
                     dataLogWriter.append(encodeObjectWithId(e));
@@ -452,7 +452,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
             while (true) {
                 List<byte[]> logOpt = reader.readLog();
                 if (!logOpt.isEmpty()) {
-                    final ObjectWithId e = decodeObjectWithId(logOpt);
+                    final SerializedObjectWithId e = decodeObjectWithId(logOpt);
                     if (recoveredMm == null) {
                         recoveredMm = new Memtable();
                     }
@@ -540,7 +540,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         return false;
     }
 
-    private byte[] encodeObjectWithId(ObjectWithId<byte[]> obj) {
+    private byte[] encodeObjectWithId(SerializedObjectWithId<byte[]> obj) {
         final ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES + Integer.BYTES + obj.getSerializedObject().length);
         buffer.putLong(obj.getId());
         buffer.putInt(obj.getSerializedObject().length);
@@ -549,14 +549,14 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         return buffer.array();
     }
 
-    private ObjectWithId<byte[]> decodeObjectWithId(List<byte[]> bytes) {
+    private SerializedObjectWithId<byte[]> decodeObjectWithId(List<byte[]> bytes) {
         final ByteBuffer buffer = ByteBuffer.wrap(compact(bytes));
         final long id = buffer.getLong();
         final int length = buffer.getInt();
         final byte[] bs = new byte[length];
         buffer.get(bs);
 
-        return new ObjectWithId<>(id, bs);
+        return new SerializedObjectWithId<>(id, bs);
     }
 
     private byte[] compact(List<byte[]> output) {
@@ -568,7 +568,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         return buffer.array();
     }
 
-    private synchronized List<ObjectWithId<byte[]>> doFetch(long fromId, int limit) throws StorageException {
+    private synchronized List<SerializedObjectWithId<byte[]>> doFetch(long fromId, int limit) throws StorageException {
         Itr itr;
 
         if (!mm.isEmpty() && fromId >= mm.firstId()) {
@@ -577,8 +577,8 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
 
         try {
             if (imm != null && fromId >= imm.firstId()) {
-                List<SeekableIterator<Long, ObjectWithId<byte[]>>> itrs = Arrays.asList(imm.iterator(), mm.iterator());
-                for (SeekableIterator<Long, ObjectWithId<byte[]>> it : itrs) {
+                List<SeekableIterator<Long, SerializedObjectWithId<byte[]>>> itrs = Arrays.asList(imm.iterator(), mm.iterator());
+                for (SeekableIterator<Long, SerializedObjectWithId<byte[]>> it : itrs) {
                     it.seek(fromId);
                 }
 
@@ -587,9 +587,9 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
                 itr = internalIterator(fromId);
             }
 
-            List<ObjectWithId<byte[]>> ret = new ArrayList<>();
+            List<SerializedObjectWithId<byte[]>> ret = new ArrayList<>();
             while (itr.hasNext()) {
-                ObjectWithId<byte[]> e = itr.next();
+                SerializedObjectWithId<byte[]> e = itr.next();
                 if (ret.size() >= limit) {
                     break;
                 }
@@ -677,7 +677,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         try (FileChannel ch = FileChannel.open(tableFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
             final TableBuilder tableBuilder = new TableBuilder(ch);
 
-            for (ObjectWithId<byte[]> entry : mm) {
+            for (SerializedObjectWithId<byte[]> entry : mm) {
                 final byte[] data = entry.getSerializedObject();
                 tableBuilder.add(entry.getId(), data);
             }
@@ -701,12 +701,12 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
     }
 
     private Itr internalIterator(long start) throws StorageException {
-        List<SeekableIterator<Long, ObjectWithId<byte[]>>> itrs = getSSTableIterators(start);
+        List<SeekableIterator<Long, SerializedObjectWithId<byte[]>>> itrs = getSSTableIterators(start);
         if (imm != null) {
             itrs.add(imm.iterator().seek(start));
         }
         itrs.add(mm.iterator().seek(start));
-        for (SeekableIterator<Long, ObjectWithId<byte[]>> itr : itrs) {
+        for (SeekableIterator<Long, SerializedObjectWithId<byte[]>> itr : itrs) {
             itr.seek(start);
             if (itr.hasNext()) {
                 break;
@@ -716,10 +716,10 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         return new Itr(itrs);
     }
 
-    private List<SeekableIterator<Long, ObjectWithId<byte[]>>> getSSTableIterators(long start) throws StorageException {
+    private List<SeekableIterator<Long, SerializedObjectWithId<byte[]>>> getSSTableIterators(long start) throws StorageException {
         try {
             List<SSTableFileMetaInfo> metas = manifest.searchMetas(start);
-            List<SeekableIterator<Long, ObjectWithId<byte[]>>> ret = new ArrayList<>(metas.size());
+            List<SeekableIterator<Long, SerializedObjectWithId<byte[]>>> ret = new ArrayList<>(metas.size());
             for (SSTableFileMetaInfo meta : metas) {
                 ret.add(tableCache.iterator(meta.getFileNumber(), meta.getFileSize()));
             }

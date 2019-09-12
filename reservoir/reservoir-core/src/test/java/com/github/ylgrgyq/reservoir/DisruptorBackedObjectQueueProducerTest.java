@@ -44,7 +44,7 @@ public class DisruptorBackedObjectQueueProducerTest {
 
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
 
-        final List<ObjectWithId<byte[]>> payloads = storage.getProdcedPayloads();
+        final List<SerializedObjectWithId<byte[]>> payloads = storage.getProdcedPayloads();
         assertThat(producedPayload).isEqualTo(
                 payloads.stream().map(payload -> {
                             try {
@@ -72,7 +72,7 @@ public class DisruptorBackedObjectQueueProducerTest {
         await().until(() -> CompletableFutures.allAsList(futures).isDone());
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
 
-        final List<ObjectWithId<byte[]>> payloads = storage.getProdcedPayloads();
+        final List<SerializedObjectWithId<byte[]>> payloads = storage.getProdcedPayloads();
         assertThat(producedPayloads).isEqualTo(
                 payloads.stream().map(payload -> {
                             try {

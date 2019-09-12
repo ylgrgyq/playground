@@ -4,12 +4,12 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.Objects;
 
-public final class ObjectWithId<S> {
+public final class SerializedObjectWithId<S> {
     private final long id;
     private final S serializedObject;
 
     /**
-     * Create a new instance of ObjectWithId.
+     * Create a new instance of SerializedObjectWithId.
      * For performance's sake, we do not clone the input {@code serializedObject},
      * so please mind not to modify the {@code serializedObject} after it has been
      * passed to this constructor when implementing {@link ObjectQueueStorage}.
@@ -19,7 +19,7 @@ public final class ObjectWithId<S> {
      * @param serializedObject the object in serialized form stored in
      *                         {@link ObjectQueueStorage}
      */
-    public ObjectWithId(long id, S serializedObject) {
+    public SerializedObjectWithId(long id, S serializedObject) {
         Objects.requireNonNull(serializedObject, "serializedObject");
 
         this.id = id;
@@ -38,7 +38,7 @@ public final class ObjectWithId<S> {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        final ObjectWithId<?> that = (ObjectWithId<?>) o;
+        final SerializedObjectWithId<?> that = (SerializedObjectWithId<?>) o;
         return getId() == that.getId() &&
                 getSerializedObject().getClass() == that.getSerializedObject().getClass() &&
                 (getSerializedObject() instanceof byte[] ?
@@ -61,7 +61,7 @@ public final class ObjectWithId<S> {
 
     @Override
     public String toString() {
-        return "ObjectWithId{" +
+        return "SerializedObjectWithId{" +
                 "id=" + id +
                 ", serializedObject=" + (serializedObject instanceof byte[] ?
                 Base64.getEncoder().encodeToString((byte[]) serializedObject) :

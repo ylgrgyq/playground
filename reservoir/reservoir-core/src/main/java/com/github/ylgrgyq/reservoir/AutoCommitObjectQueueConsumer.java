@@ -90,7 +90,7 @@ final class AutoCommitObjectQueueConsumer<E, S> implements ObjectQueueConsumer<E
             }
 
             long lastId = lastCommittedId;
-            final List<? extends ObjectWithId<S>> payloads;
+            final List<? extends SerializedObjectWithId<S>> payloads;
             if (timeout == 0) {
                 payloads = storage.fetch(lastId, batchSize);
             } else {
@@ -98,7 +98,7 @@ final class AutoCommitObjectQueueConsumer<E, S> implements ObjectQueueConsumer<E
             }
 
             if (!payloads.isEmpty()) {
-                for (ObjectWithId<S> p : payloads) {
+                for (SerializedObjectWithId<S> p : payloads) {
                     final S serializeP = p.getSerializedObject();
                     try {
                         final E pObj = deserializer.deserialize(serializeP);

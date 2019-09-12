@@ -1,6 +1,6 @@
 package com.github.ylgrgyq.reservoir.storage;
 
-import com.github.ylgrgyq.reservoir.ObjectWithId;
+import com.github.ylgrgyq.reservoir.SerializedObjectWithId;
 import com.github.ylgrgyq.reservoir.TestingUtils;
 import org.junit.Before;
 import org.junit.Test;
@@ -23,7 +23,7 @@ public class MemtableTest {
     @Test
     public void testIsEmpty() {
         assertThat(mm.isEmpty()).isEqualTo(true);
-        mm.add(new ObjectWithId(100, new byte[]{1, 2, 3}));
+        mm.add(new SerializedObjectWithId(100, new byte[]{1, 2, 3}));
         assertThat(mm.isEmpty()).isEqualTo(false);
     }
 
@@ -33,7 +33,7 @@ public class MemtableTest {
         assertThat(mm.lastId()).isEqualTo(-1);
 
         for (int i = 1; i < 10000; i++) {
-            mm.add(new ObjectWithId(i, new byte[]{1, 2, 3}));
+            mm.add(new SerializedObjectWithId(i, new byte[]{1, 2, 3}));
             assertThat(mm.firstId()).isEqualTo(1);
             assertThat(mm.lastId()).isEqualTo(i);
         }
@@ -45,7 +45,7 @@ public class MemtableTest {
 
         final byte[] data = "Hello".getBytes(StandardCharsets.UTF_8);
         for (int i = 1; i < 10000; i++) {
-            mm.add(new ObjectWithId(i, data));
+            mm.add(new SerializedObjectWithId(i, data));
             assertThat(mm.getMemoryUsedInBytes()).isEqualTo(i * (Long.BYTES + data.length));
         }
     }
@@ -58,7 +58,7 @@ public class MemtableTest {
     @Test
     public void testGetFromSingleElementMemtable() {
         final long id = 100;
-        final ObjectWithId val = new ObjectWithId(100, new byte[]{1, 2, 3});
+        final SerializedObjectWithId val = new SerializedObjectWithId(100, new byte[]{1, 2, 3});
         mm.add(val);
         assertThat(mm.getEntries(Long.MIN_VALUE, 100)).hasSize(1).containsExactly(val);
         assertThat(mm.getEntries(id, 100)).isEmpty();
@@ -66,7 +66,7 @@ public class MemtableTest {
 
     @Test
     public void testGetBeforeStartElement() {
-        final List<ObjectWithId> savedElements = addElementsToMemtable(10000);
+        final List<SerializedObjectWithId> savedElements = addElementsToMemtable(10000);
 
         assertThat(mm.getEntries(Long.MIN_VALUE, 100))
                 .hasSize(100)
@@ -75,12 +75,12 @@ public class MemtableTest {
 
     @Test
     public void testGetFromStartToEnd() {
-        final List<ObjectWithId> savedElements = addElementsToMemtable(10000);
+        final List<SerializedObjectWithId> savedElements = addElementsToMemtable(10000);
         final long startId = savedElements.get(0).getId();
         final int bound = 10;
 
         for (long i = startId; i < savedElements.size() - bound; i += bound) {
-            final List<ObjectWithId> expect = savedElements.subList((int) (i - startId + 1), (int) (i - startId + bound + 1));
+            final List<SerializedObjectWithId> expect = savedElements.subList((int) (i - startId + 1), (int) (i - startId + bound + 1));
             assertThat(mm.getEntries(i, bound))
                     .hasSize(bound)
                     .isEqualTo(expect);
@@ -89,10 +89,10 @@ public class MemtableTest {
 
     @Test
     public void testLimitGreaterThanSize() {
-        final List<ObjectWithId> savedElements = addElementsToMemtable(100);
+        final List<SerializedObjectWithId> savedElements = addElementsToMemtable(100);
 
         for (long i = 1; i < savedElements.size(); ++i) {
-            final List<ObjectWithId> expect = savedElements.subList((int) i, savedElements.size());
+            final List<SerializedObjectWithId> expect = savedElements.subList((int) i, savedElements.size());
             assertThat(mm.getEntries(i, 100))
                     .isEqualTo(expect);
         }
@@ -105,17 +105,17 @@ public class MemtableTest {
 
     @Test
     public void testIterateBeforeStart() {
-        final List<ObjectWithId> savedElements = addElementsToMemtable(10000);
+        final List<SerializedObjectWithId> savedElements = addElementsToMemtable(10000);
         assertThat(mm.iterator()).toIterable().isEqualTo(savedElements);
         assertThat(mm.iterator().seek(Long.MIN_VALUE)).toIterable().isEqualTo(savedElements);
     }
 
     @Test
     public void testIterateFromMiddle() {
-        final List<ObjectWithId> savedElements = addElementsToMemtable(100);
+        final List<SerializedObjectWithId> savedElements = addElementsToMemtable(100);
 
         for (long i = 1; i < savedElements.size(); ++i) {
-            final List<ObjectWithId> expect = savedElements.subList((int) i, savedElements.size());
+            final List<SerializedObjectWithId> expect = savedElements.subList((int) i, savedElements.size());
             assertThat(mm.iterator().seek(i))
                     .toIterable()
                     .isEqualTo(expect);
@@ -124,16 +124,16 @@ public class MemtableTest {
 
     @Test
     public void testIterateFromEnd() {
-        final List<ObjectWithId> savedElements = addElementsToMemtable(10);
+        final List<SerializedObjectWithId> savedElements = addElementsToMemtable(10);
         final long lastId = savedElements.get(savedElements.size() - 1).getId();
         assertThat(mm.iterator().seek(lastId))
                 .isExhausted();
     }
 
-    private List<ObjectWithId> addElementsToMemtable(int size) {
-        final List<ObjectWithId> objs = new ArrayList<>();
+    private List<SerializedObjectWithId> addElementsToMemtable(int size) {
+        final List<SerializedObjectWithId> objs = new ArrayList<>();
         for (int i = 1; i <= size; i++) {
-            ObjectWithId obj = new ObjectWithId(i, TestingUtils.numberStringBytes(i));
+            SerializedObjectWithId obj = new SerializedObjectWithId(i, TestingUtils.numberStringBytes(i));
             objs.add(obj);
             mm.add(obj);
         }

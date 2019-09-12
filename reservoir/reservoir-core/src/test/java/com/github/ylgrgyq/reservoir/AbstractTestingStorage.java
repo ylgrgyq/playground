@@ -16,12 +16,12 @@ abstract class AbstractTestingStorage<S> implements ObjectQueueStorage<S> {
     }
 
     @Override
-    public List<ObjectWithId<S>> fetch(long fromId, int limit) throws InterruptedException, StorageException {
+    public List<SerializedObjectWithId<S>> fetch(long fromId, int limit) throws InterruptedException, StorageException {
         return Collections.emptyList();
     }
 
     @Override
-    public List<ObjectWithId<S>> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
+    public List<SerializedObjectWithId<S>> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException {
         return Collections.emptyList();
     }
 

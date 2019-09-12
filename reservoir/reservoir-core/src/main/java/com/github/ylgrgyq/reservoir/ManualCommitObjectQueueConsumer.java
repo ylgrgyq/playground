@@ -105,14 +105,14 @@ final class ManualCommitObjectQueueConsumer<E, S> implements ObjectQueueConsumer
             }
 
             final long lastId = lastCommittedId;
-            final List<? extends ObjectWithId<S>> payloads;
+            final List<? extends SerializedObjectWithId<S>> payloads;
             if (timeout == 0) {
                 payloads = storage.fetch(lastId, batchSize);
             } else {
                 payloads = storage.fetch(lastId, batchSize, timeout, unit);
             }
 
-            for (ObjectWithId<S> p : payloads) {
+            for (SerializedObjectWithId<S> p : payloads) {
                 final S serializeP = p.getSerializedObject();
                 try {
                     final E pObj = deserializer.deserialize(serializeP);

@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class TestingStorage<S> extends AbstractTestingStorage<S>{
-    private final ArrayList<ObjectWithId<S>> producedPayloads;
+    private final ArrayList<SerializedObjectWithId<S>> producedPayloads;
     private long lastProducedId;
     private long lastCommittedId;
     private boolean closed;
@@ -16,7 +16,7 @@ public class TestingStorage<S> extends AbstractTestingStorage<S>{
         this.lastCommittedId = -1;
     }
 
-    synchronized List<ObjectWithId<S>> getProdcedPayloads() {
+    synchronized List<SerializedObjectWithId<S>> getProdcedPayloads() {
         return new ArrayList<>(producedPayloads);
     }
 
@@ -31,14 +31,14 @@ public class TestingStorage<S> extends AbstractTestingStorage<S>{
     }
 
     @Override
-    public synchronized List<ObjectWithId<S>> fetch(long fromId, int limit) throws InterruptedException {
-        ArrayList<ObjectWithId<S>> ret = new ArrayList<>();
+    public synchronized List<SerializedObjectWithId<S>> fetch(long fromId, int limit) throws InterruptedException {
+        ArrayList<SerializedObjectWithId<S>> ret = new ArrayList<>();
         while (true) {
             while (producedPayloads.isEmpty()) {
                 wait();
             }
 
-            ObjectWithId<S> firstPayload = producedPayloads.get(0);
+            SerializedObjectWithId<S> firstPayload = producedPayloads.get(0);
             int start = (int) (fromId - firstPayload.getId()) + 1;
             start = Math.max(0, start);
             int end = Math.min(start + limit, producedPayloads.size());
@@ -57,9 +57,9 @@ public class TestingStorage<S> extends AbstractTestingStorage<S>{
     }
 
     @Override
-    public synchronized List<ObjectWithId<S>> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException {
+    public synchronized List<SerializedObjectWithId<S>> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException {
         final long endNanos = System.nanoTime() + unit.toNanos(timeout);
-        final ArrayList<ObjectWithId<S>> ret = new ArrayList<>();
+        final ArrayList<SerializedObjectWithId<S>> ret = new ArrayList<>();
         while (true) {
             while (producedPayloads.isEmpty()) {
                 long millisRemain = TimeUnit.NANOSECONDS.toMillis(endNanos - System.nanoTime());
@@ -70,7 +70,7 @@ public class TestingStorage<S> extends AbstractTestingStorage<S>{
                 wait(millisRemain);
             }
 
-            ObjectWithId<S> firstPayload = producedPayloads.get(0);
+            SerializedObjectWithId<S> firstPayload = producedPayloads.get(0);
             int start = (int) (fromId - firstPayload.getId()) + 1;
             start = Math.max(0, start);
             int end = Math.min(start + limit, producedPayloads.size());
@@ -97,7 +97,7 @@ public class TestingStorage<S> extends AbstractTestingStorage<S>{
     public synchronized void store(List<S> batch) {
         long id = lastProducedId;
         for (S data : batch) {
-            doAdd(new ObjectWithId<S>(++id, data));
+            doAdd(new SerializedObjectWithId<S>(++id, data));
         }
         notify();
     }
@@ -117,7 +117,7 @@ public class TestingStorage<S> extends AbstractTestingStorage<S>{
         lastCommittedId = -1;
     }
 
-    private void doAdd(ObjectWithId<S> obj) {
+    private void doAdd(SerializedObjectWithId<S> obj) {
         producedPayloads.add(obj);
         assert lastProducedId != obj.getId() :
                 "lastProducedId: " + lastProducedId + " payloadId:" + obj.getId();

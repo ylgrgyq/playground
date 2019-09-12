@@ -2,7 +2,7 @@ package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.ylgrgyq.reservoir.ObjectWithId;
+import com.github.ylgrgyq.reservoir.SerializedObjectWithId;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -10,7 +10,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.zip.CRC32;
 
-final class Table implements Iterable<ObjectWithId<byte[]>> {
+final class Table implements Iterable<SerializedObjectWithId<byte[]>> {
     static Table open(FileChannel fileChannel, long fileSize) throws IOException {
         final long footerOffset = fileSize - Footer.tableFooterSize;
         final ByteBuffer footerBuffer = ByteBuffer.allocate(Footer.tableFooterSize);
@@ -61,14 +61,14 @@ final class Table implements Iterable<ObjectWithId<byte[]>> {
     }
 
     @Override
-    public SeekableIterator<Long, ObjectWithId<byte[]>> iterator() {
+    public SeekableIterator<Long, SerializedObjectWithId<byte[]>> iterator() {
         return new Itr(indexBlock);
     }
 
-    private class Itr implements SeekableIterator<Long, ObjectWithId<byte[]>> {
-        private final SeekableIterator<Long, ObjectWithId<byte[]>> indexBlockIter;
+    private class Itr implements SeekableIterator<Long, SerializedObjectWithId<byte[]>> {
+        private final SeekableIterator<Long, SerializedObjectWithId<byte[]>> indexBlockIter;
         @Nullable
-        private SeekableIterator<Long, ObjectWithId<byte[]>> innerBlockIter;
+        private SeekableIterator<Long, SerializedObjectWithId<byte[]>> innerBlockIter;
 
         Itr(Block indexBlock) {
             this.indexBlockIter = indexBlock.iterator();
@@ -98,15 +98,15 @@ final class Table implements Iterable<ObjectWithId<byte[]>> {
         }
 
         @Override
-        public ObjectWithId<byte[]> next() {
+        public SerializedObjectWithId<byte[]> next() {
             assert innerBlockIter != null;
             assert innerBlockIter.hasNext();
             return innerBlockIter.next();
         }
 
-        private SeekableIterator<Long, ObjectWithId<byte[]>> createInnerBlockIter() {
+        private SeekableIterator<Long, SerializedObjectWithId<byte[]>> createInnerBlockIter() {
             try {
-                final ObjectWithId<byte[]> kv = indexBlockIter.next();
+                final SerializedObjectWithId<byte[]> kv = indexBlockIter.next();
                 final BlockIndexHandle handle = BlockIndexHandle.decode(kv.getSerializedObject());
                 final Block block = getBlock(handle);
                 return block.iterator();

@@ -1,7 +1,7 @@
 package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.FileUtils;
-import com.github.ylgrgyq.reservoir.ObjectWithId;
+import com.github.ylgrgyq.reservoir.SerializedObjectWithId;
 import com.github.ylgrgyq.reservoir.TestingUtils;
 import com.github.ylgrgyq.reservoir.storage.BlockBuilder.WriteBlockResult;
 import org.junit.Before;
@@ -77,9 +77,9 @@ public class BlockTest {
 
     @Test
     public void testWriteReadBlock() throws Exception {
-        final List<ObjectWithId> expectDatas = new ArrayList<>();
+        final List<SerializedObjectWithId> expectDatas = new ArrayList<>();
         for (long i = 0; i < 10000; i++) {
-            expectDatas.add(new ObjectWithId(i, TestingUtils.numberStringBytes(i)));
+            expectDatas.add(new SerializedObjectWithId(i, TestingUtils.numberStringBytes(i)));
             addData(i, numberString(i));
         }
 
@@ -94,20 +94,20 @@ public class BlockTest {
 
     @Test
     public void testSeek() throws Exception {
-        final List<ObjectWithId<byte[]>> addedData = new ArrayList<>();
+        final List<SerializedObjectWithId<byte[]>> addedData = new ArrayList<>();
         for (long i = 0; i < 1000; i++) {
-            addedData.add(new ObjectWithId<>(i, TestingUtils.numberStringBytes(i)));
+            addedData.add(new SerializedObjectWithId<>(i, TestingUtils.numberStringBytes(i)));
             addData(i, numberString(i));
         }
 
         final WriteBlockResult result = builder.writeBlock(testingFileChannel);
         final ByteBuffer actualBlockData = ByteBuffer.allocate(result.getWrittenBlockSize());
         testingFileChannel.read(actualBlockData, 0);
-        final SeekableIterator<Long, ObjectWithId<byte[]>> actualBlockIterator = new Block(actualBlockData).iterator();
+        final SeekableIterator<Long, SerializedObjectWithId<byte[]>> actualBlockIterator = new Block(actualBlockData).iterator();
 
         for (long i = -100; i < 2000; i++) {
             actualBlockIterator.seek(i);
-            final List<ObjectWithId<byte[]>> expectDatas = addedData.subList(
+            final List<SerializedObjectWithId<byte[]>> expectDatas = addedData.subList(
                     (int) Math.min(Math.max(0, i + 1), addedData.size()),
                     addedData.size());
             assertThat(actualBlockIterator)

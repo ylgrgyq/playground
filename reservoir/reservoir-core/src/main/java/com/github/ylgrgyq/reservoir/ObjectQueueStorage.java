@@ -41,12 +41,12 @@ public interface ObjectQueueStorage<S> extends AutoCloseable {
      *
      * @param fromId the id from which to fetch, exclusive.
      * @param limit  the maximum size of the returned list.
-     * @return A list of serialized objects with their assigned id. Every {@link ObjectWithId}
+     * @return A list of serialized objects with their assigned id. Every {@link SerializedObjectWithId}
      * in this list should have an id greater than {@code fromId}
      * @throws InterruptedException thrown when the calling thread was interrupted
      * @throws StorageException     thrown if any error happens in underlying storage medium
      */
-    List<ObjectWithId<S>> fetch(long fromId, int limit) throws InterruptedException, StorageException;
+    List<SerializedObjectWithId<S>> fetch(long fromId, int limit) throws InterruptedException, StorageException;
 
     /**
      * Blocking to fetch a list of serialized objects with their assigned id starting after
@@ -58,10 +58,10 @@ public interface ObjectQueueStorage<S> extends AutoCloseable {
      * @param limit   the maximum size of the returned list.
      * @param timeout the maximum blocking time to fetch objects
      * @param unit    the unit of time for {@code timeout} parameter
-     * @return A list of serialized objects with their assigned id. Every {@link ObjectWithId}
+     * @return A list of serialized objects with their assigned id. Every {@link SerializedObjectWithId}
      * in this list should have an id greater than {@code fromId}
      * @throws InterruptedException thrown when the calling thread was interrupted
      * @throws StorageException     thrown if any error happens in underlying storage medium
      */
-    List<ObjectWithId<S>> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException;
+    List<SerializedObjectWithId<S>> fetch(long fromId, int limit, long timeout, TimeUnit unit) throws InterruptedException, StorageException;
 }
