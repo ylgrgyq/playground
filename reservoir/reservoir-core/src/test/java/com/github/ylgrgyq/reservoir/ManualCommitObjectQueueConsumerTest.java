@@ -15,8 +15,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 public class ManualCommitObjectQueueConsumerTest {
-    private final TestingStorage storage = new TestingStorage();
-    private final ObjectQueueBuilder<TestingPayload, byte[]> builder = ObjectQueueBuilder.newBuilder(storage, new TestingPayloadCodec())
+    private final TestingStorage<TestingPayload> storage = new TestingStorage<>();
+    private final ObjectQueueBuilder<TestingPayload, TestingPayload> builder = ObjectQueueBuilder.newBuilder(storage)
             .setConsumerAutoCommit(false);
 
     @Before
@@ -29,7 +29,7 @@ public class ManualCommitObjectQueueConsumerTest {
         final TestingPayload first = new TestingPayload("first");
         final TestingPayload second = new TestingPayload("second");
 
-        storage.store(Arrays.asList(first.serialize(), second.serialize()));
+        storage.store(Arrays.asList(first, second));
 
         final ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
 
@@ -57,11 +57,11 @@ public class ManualCommitObjectQueueConsumerTest {
     @Test
     public void deserializeObjectFailed() throws Exception {
         final ObjectQueueConsumer<TestingPayload> consumer = builder
-                .replaceCodec(new BadTestingPayloadCodec())
+                .replaceCodec(new BadTestingPayloadCodec<>())
                 .buildConsumer();
 
         TestingPayload first = new TestingPayload("first");
-        storage.store(Collections.singletonList(first.serialize()));
+        storage.store(Collections.singletonList(first));
 
         assertThatThrownBy(consumer::fetch)
                 .isInstanceOf(DeserializationException.class)
@@ -91,7 +91,7 @@ public class ManualCommitObjectQueueConsumerTest {
             }
         });
         barrier.await();
-        storage.store(Collections.singletonList(first.serialize()));
+        storage.store(Collections.singletonList(first));
 
         await().until(f::isDone);
         assertThat(f).isCompletedWithValue(first);
