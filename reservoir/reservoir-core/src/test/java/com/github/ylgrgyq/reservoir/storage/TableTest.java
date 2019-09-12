@@ -1,15 +1,13 @@
 package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.FileUtils;
-import com.github.ylgrgyq.reservoir.ObjectWithId;
+import com.github.ylgrgyq.reservoir.SerializedObjectWithId;
 import com.github.ylgrgyq.reservoir.TestingUtils;
-import com.github.ylgrgyq.reservoir.storage.BlockBuilder.WriteBlockResult;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -21,7 +19,6 @@ import static com.github.ylgrgyq.reservoir.TestingUtils.makeString;
 import static com.github.ylgrgyq.reservoir.TestingUtils.numberString;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.filter;
-import static org.junit.Assert.*;
 
 public class TableTest {
     private TableBuilder builder;
@@ -52,9 +49,9 @@ public class TableTest {
 
     @Test
     public void testWriteReadManySmallData() throws Exception {
-        final List<ObjectWithId> expectDatas = new ArrayList<>();
+        final List<SerializedObjectWithId> expectDatas = new ArrayList<>();
         for (long i = 0; i < 10000; i++) {
-            expectDatas.add(new ObjectWithId(i, TestingUtils.numberStringBytes(i)));
+            expectDatas.add(new SerializedObjectWithId(i, TestingUtils.numberStringBytes(i)));
             addData(i, numberString(i));
         }
 
@@ -67,7 +64,7 @@ public class TableTest {
 
     @Test
     public void testWriteReadManyBigData() throws Exception {
-        final List<ObjectWithId> expectDatas = new ArrayList<>();
+        final List<SerializedObjectWithId> expectDatas = new ArrayList<>();
         for (long i = 0; i < 1000; i++) {
             expectDatas.add(makeObjectWithId(i, makeString("Hello", Constant.kMaxDataBlockSize)));
             addData(i, makeString("Hello", Constant.kMaxDataBlockSize));
@@ -80,8 +77,8 @@ public class TableTest {
                 .isEqualTo(expectDatas);
     }
 
-    private ObjectWithId makeObjectWithId(long id, String data) {
-        return new ObjectWithId(id, data.getBytes(StandardCharsets.UTF_8));
+    private SerializedObjectWithId makeObjectWithId(long id, String data) {
+        return new SerializedObjectWithId(id, data.getBytes(StandardCharsets.UTF_8));
     }
 
     private void addData(long id, String data) throws IOException {

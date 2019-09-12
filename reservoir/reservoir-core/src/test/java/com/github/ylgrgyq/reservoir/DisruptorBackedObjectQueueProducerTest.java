@@ -16,11 +16,8 @@ import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
 
 public class DisruptorBackedObjectQueueProducerTest {
-    private final TestingStorage storage = new TestingStorage();
-    private final TestingPayloadCodec codec = new TestingPayloadCodec();
-    private final ObjectQueueBuilder<TestingPayload> builder = ObjectQueueBuilder.<TestingPayload>newBuilder()
-            .setStorage(storage)
-            .setCodec(codec);
+    private final TestingStorage<TestingPayload> storage = new TestingStorage<>();
+    private final ObjectQueueBuilder<TestingPayload, TestingPayload> builder = ObjectQueueBuilder.newBuilder(storage);
 
     @Before
     public void setUp() {
@@ -46,16 +43,12 @@ public class DisruptorBackedObjectQueueProducerTest {
 
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
 
-        final List<ObjectWithId> payloads = storage.getProdcedPayloads();
-        assertThat(producedPayload).isEqualTo(
-                payloads.stream().map(payload -> {
-                            try {
-                                return codec.deserialize(payload.getObjectInBytes());
-                            } catch (DeserializationException ex) {
-                                throw new RuntimeException(ex);
-                            }
-                        }
-                ).collect(Collectors.toList()));
+        final List<TestingPayload> payloads = storage
+                .getProdcedPayloads()
+                .stream()
+                .map(SerializedObjectWithId::getSerializedObject)
+                .collect(Collectors.toList());
+        assertThat(producedPayload).isEqualTo(payloads);
     }
 
     @Test
@@ -74,25 +67,20 @@ public class DisruptorBackedObjectQueueProducerTest {
         await().until(() -> CompletableFutures.allAsList(futures).isDone());
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
 
-        final List<ObjectWithId> payloads = storage.getProdcedPayloads();
-        assertThat(producedPayloads).isEqualTo(
-                payloads.stream().map(payload -> {
-                            try {
-                                return codec.deserialize(payload.getObjectInBytes());
-                            } catch (DeserializationException ex) {
-                                throw new RuntimeException(ex);
-                            }
-                        }
-                ).collect(Collectors.toList()));
+        final List<TestingPayload> payloads = storage.getProdcedPayloads()
+                .stream()
+                .map(SerializedObjectWithId::getSerializedObject)
+                .collect(Collectors.toList());
+        assertThat(producedPayloads).isEqualTo(payloads);
     }
 
     @Test
     public void flushAllProducedObjectOnClose() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder
                 .setConsumerFetchBatchSize(5)
-                .setStorage(new AbstractTestingStorage() {
+                .replaceStorage(new AbstractTestingStorage<TestingPayload>() {
                     @Override
-                    public void store(List<byte[]> batch) throws StorageException {
+                    public void store(List<TestingPayload> batch) throws StorageException {
                         try {
                             Thread.sleep(200);
                         } catch (Exception ex) {
@@ -128,7 +116,7 @@ public class DisruptorBackedObjectQueueProducerTest {
     @Test
     public void produceWhenSerializeElementFailed() throws Exception {
         final ObjectQueueProducer<TestingPayload> producer = builder
-                .setCodec(new BadTestingPayloadCodec())
+                .replaceCodec(new BadTestingPayloadCodec<>())
                 .buildProducer();
 
         assertThatThrownBy(() -> producer.produce(new TestingPayload()).join())
@@ -138,9 +126,9 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void storageThrowsStorageException() throws Exception {
-        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
+        ObjectQueueProducer<TestingPayload> producer = builder.replaceStorage(new AbstractTestingStorage<TestingPayload>() {
             @Override
-            public void store(List<byte[]> batch) throws StorageException {
+            public void store(List<TestingPayload> batch) throws StorageException {
                 throw new StorageException("deliberate store failed");
             }
         }).buildProducer();
@@ -153,9 +141,9 @@ public class DisruptorBackedObjectQueueProducerTest {
 
     @Test
     public void storageThrowsOtherException() throws Exception {
-        ObjectQueueProducer<TestingPayload> producer = builder.setStorage(new AbstractTestingStorage() {
+        ObjectQueueProducer<TestingPayload> producer = builder.replaceStorage(new AbstractTestingStorage<TestingPayload>() {
             @Override
-            public void store(List<byte[]> batch) {
+            public void store(List<TestingPayload> batch) {
                 throw new RuntimeException("deliberate store failed");
             }
         }).buildProducer();

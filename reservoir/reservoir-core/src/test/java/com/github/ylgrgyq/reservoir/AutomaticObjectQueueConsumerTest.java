@@ -13,7 +13,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 import static com.github.ylgrgyq.reservoir.TestingUtils.numberStringBytes;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,19 +21,17 @@ import static org.awaitility.Awaitility.await;
 public class AutomaticObjectQueueConsumerTest {
     private final Condition<Throwable> runtimeException = new Condition<>(e -> e instanceof RuntimeException, "RuntimeException");
     private final TestingConsumeObjectListener<TestingPayload> listener = new TestingConsumeObjectListener<>();
-    private TestingStorage storage;
+    private TestingStorage<TestingPayload> storage;
     private Executor listenerExecutor;
     private ObjectQueue<TestingPayload> queue;
 
     @Before
     public void setUp() throws Exception {
-        storage = new TestingStorage();
+        storage = new TestingStorage<>();
         listener.clear();
         listenerExecutor = Executors.newSingleThreadExecutor();
-        queue = ObjectQueueBuilder.<TestingPayload>newBuilder()
-                .setStorage(storage)
-                .setCodec(new TestingPayloadCodec())
-                .setAutoCommit(false)
+        queue = ObjectQueueBuilder.newBuilder(storage)
+                .setConsumerAutoCommit(false)
                 .buildQueue();
     }
 
@@ -191,7 +188,7 @@ public class AutomaticObjectQueueConsumerTest {
             storedPayload.add(payload);
         }
 
-        storage.store(storedPayload.stream().map(TestingPayload::serialize).collect(Collectors.toList()));
+        storage.store(storedPayload);
         return storedPayload;
     }
 

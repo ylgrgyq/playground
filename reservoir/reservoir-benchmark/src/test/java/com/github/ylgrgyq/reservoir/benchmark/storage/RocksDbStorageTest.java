@@ -3,7 +3,7 @@ package com.github.ylgrgyq.reservoir.benchmark.storage;
 import com.github.ylgrgyq.reservoir.FileUtils;
 import com.github.ylgrgyq.reservoir.ObjectQueue;
 import com.github.ylgrgyq.reservoir.ObjectQueueBuilder;
-import com.github.ylgrgyq.reservoir.ObjectWithId;
+import com.github.ylgrgyq.reservoir.SerializedObjectWithId;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -42,15 +42,15 @@ public class RocksDbStorageTest {
     public void simpleStore() throws Exception {
         RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true);
         final int expectSize = 64;
-        List<ObjectWithId> objs = new ArrayList<>();
+        List<SerializedObjectWithId<byte[]>> objs = new ArrayList<>();
         for (int i = 1; i < expectSize + 1; i++) {
-            ObjectWithId obj = new ObjectWithId(i, ("" + i).getBytes(StandardCharsets.UTF_8));
+            SerializedObjectWithId<byte[]> obj = new SerializedObjectWithId<>(i, ("" + i).getBytes(StandardCharsets.UTF_8));
             objs.add(obj);
         }
         storeObjectWithId(storage, objs);
         assertThat(storage.getLastProducedId()).isEqualTo(expectSize);
         assertThat(objs)
-                .containsExactly((ObjectWithId[]) storage.fetch(0, 100).toArray(new ObjectWithId[expectSize]));
+                .containsExactlyElementsOf(storage.fetch(0, 100));
         storage.close();
     }
 
@@ -58,7 +58,7 @@ public class RocksDbStorageTest {
     public void blockFetch() throws Exception {
         RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true, 50);
         CyclicBarrier barrier = new CyclicBarrier(2);
-        CompletableFuture<List<ObjectWithId>> f = CompletableFuture.supplyAsync(() -> {
+        CompletableFuture<List<SerializedObjectWithId<byte[]>>> f = CompletableFuture.supplyAsync(() -> {
             try {
                 barrier.await();
                 return storage.fetch(0, 100);
@@ -69,15 +69,15 @@ public class RocksDbStorageTest {
 
         barrier.await();
         final int expectSize = 64;
-        List<ObjectWithId> objs = new ArrayList<>();
+        List<SerializedObjectWithId<byte[]>> objs = new ArrayList<>();
         for (int i = 1; i < expectSize + 1; i++) {
-            ObjectWithId obj = new ObjectWithId(i, ("" + i).getBytes(StandardCharsets.UTF_8));
+            SerializedObjectWithId<byte[]> obj = new SerializedObjectWithId<>(i, ("" + i).getBytes(StandardCharsets.UTF_8));
             objs.add(obj);
         }
         storeObjectWithId(storage, objs);
         assertThat(storage.getLastProducedId()).isEqualTo(expectSize);
         assertThat(objs)
-                .containsExactly((ObjectWithId[]) f.get().toArray(new ObjectWithId[expectSize]));
+                .containsExactlyElementsOf(f.get());
         storage.close();
     }
 
@@ -93,15 +93,15 @@ public class RocksDbStorageTest {
     public void truncate() throws Exception {
         RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true, 500, 100);
         final int expectSize = 2000;
-        List<ObjectWithId> objs = new ArrayList<>();
+        List<SerializedObjectWithId<byte[]>> objs = new ArrayList<>();
         for (int i = 1; i < expectSize + 1; i++) {
-            ObjectWithId obj = new ObjectWithId(i, TestingUtils.numberStringBytes(i));
+            SerializedObjectWithId<byte[]> obj = new SerializedObjectWithId<>(i, TestingUtils.numberStringBytes(i));
             objs.add(obj);
         }
         storeObjectWithId(storage, objs);
         storage.commitId(2000);
         await().until(() -> {
-            List<ObjectWithId> actualObjs = storage.fetch(0, 100);
+            List<SerializedObjectWithId<byte[]>> actualObjs = storage.fetch(0, 100);
             return actualObjs.iterator().next().getId() == 1000;
         });
         storage.close();
@@ -110,9 +110,7 @@ public class RocksDbStorageTest {
     @Test
     public void simpleProduceAndConsume() throws Exception {
         final RocksDbStorage storage = new RocksDbStorage(tempFile.getPath(), true);
-        final ObjectQueue<TestingPayload> queue = ObjectQueueBuilder.<TestingPayload>newBuilder()
-                .setStorage(storage)
-                .setCodec(new TestingPayloadCodec())
+        final ObjectQueue<TestingPayload> queue = ObjectQueueBuilder.newBuilder(storage, new TestingPayloadCodec())
                 .buildQueue();
         final TestingPayload payload = new TestingPayload("first");
         queue.produce(payload);
@@ -121,7 +119,7 @@ public class RocksDbStorageTest {
         queue.close();
     }
 
-    private void storeObjectWithId(RocksDbStorage storage, List<ObjectWithId> batch) {
-        storage.store(batch.stream().map(ObjectWithId::getObjectInBytes).collect(Collectors.toList()));
+    private void storeObjectWithId(RocksDbStorage storage, List<SerializedObjectWithId<byte[]>> batch) {
+        storage.store(batch.stream().map(SerializedObjectWithId::getSerializedObject).collect(Collectors.toList()));
     }
 }

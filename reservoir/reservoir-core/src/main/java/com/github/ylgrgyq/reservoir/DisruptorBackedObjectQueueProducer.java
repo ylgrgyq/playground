@@ -17,18 +17,18 @@ import java.util.concurrent.ExecutorService;
 import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFuture;
 import static java.util.Objects.requireNonNull;
 
-final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer<E> {
+final class DisruptorBackedObjectQueueProducer<E, S> implements ObjectQueueProducer<E> {
     private static final Logger logger = LoggerFactory.getLogger(DisruptorBackedObjectQueueProducer.class);
 
-    private final ObjectQueueStorage storage;
-    private final Disruptor<ProducerEvent> disruptor;
-    private final RingBuffer<ProducerEvent> ringBuffer;
-    private final EventTranslatorThreeArg<ProducerEvent, byte[], CompletableFuture<Void>, Boolean> translator;
+    private final ObjectQueueStorage<S> storage;
+    private final Disruptor<ProducerEvent<S>> disruptor;
+    private final RingBuffer<ProducerEvent<S>> ringBuffer;
+    private final EventTranslatorThreeArg<ProducerEvent<S>, S, CompletableFuture<Void>, Boolean> translator;
     private final ExecutorService executor;
-    private final Codec<E> serializer;
+    private final Codec<E, S> serializer;
     private volatile boolean closed;
 
-    public DisruptorBackedObjectQueueProducer(ObjectQueueBuilder<E> builder) {
+    public DisruptorBackedObjectQueueProducer(ObjectQueueBuilder<E, S> builder) {
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
@@ -44,7 +44,7 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
         ));
 
         this.disruptor.start();
-        this.translator = new ProducerTranslator();
+        this.translator = new ProducerTranslator<>();
         this.ringBuffer = disruptor.getRingBuffer();
         this.executor = builder.getExecutorService();
         this.serializer = builder.getCodec();
@@ -60,7 +60,7 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
 
         final CompletableFuture<Void> future = new CompletableFuture<>();
         try {
-            final byte[] payload = serializer.serialize(object);
+            final S payload = serializer.serialize(object);
             ringBuffer.publishEvent(translator, payload, future, Boolean.FALSE);
         } catch (SerializationException ex) {
             future.completeExceptionally(ex);
@@ -101,11 +101,11 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
         return future;
     }
 
-    private final static class ProducerTranslator
-            implements EventTranslatorThreeArg<ProducerEvent, byte[], CompletableFuture<Void>, Boolean> {
+    private final static class ProducerTranslator<S>
+            implements EventTranslatorThreeArg<ProducerEvent<S>, S, CompletableFuture<Void>, Boolean> {
 
         @Override
-        public void translateTo(ProducerEvent event, long sequence, byte[] payload, CompletableFuture<Void> future, Boolean flush) {
+        public void translateTo(ProducerEvent<S> event, long sequence, S payload, CompletableFuture<Void> future, Boolean flush) {
             event.reset();
             event.future = future;
             if (Boolean.TRUE.equals(flush)) {
@@ -118,9 +118,9 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
         }
     }
 
-    private final static class ProducerEvent {
+    private final static class ProducerEvent<S> {
         @Nullable
-        private byte[] payload;
+        private S payload;
         @Nullable
         private CompletableFuture<Void> future;
         private boolean flush;
@@ -134,15 +134,15 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
         @Override
         public String toString() {
             return "ProducerEvent{" +
-                    "payload=" + Base64.getEncoder().encodeToString(payload) +
+                    "payload=" + (payload instanceof byte[] ? Base64.getEncoder().encodeToString((byte[]) payload) : payload) +
                     ", flush=" + flush +
                     '}';
         }
     }
 
-    private final class ProduceHandler implements EventHandler<ProducerEvent> {
+    private final class ProduceHandler implements EventHandler<ProducerEvent<S>> {
         private final int batchSize;
-        private final List<byte[]> batchPayload;
+        private final List<S> batchPayload;
         private final List<CompletableFuture<Void>> batchFutures;
 
         ProduceHandler(int batchSize) {
@@ -152,7 +152,7 @@ final class DisruptorBackedObjectQueueProducer<E> implements ObjectQueueProducer
         }
 
         @Override
-        public void onEvent(ProducerEvent event, long sequence, boolean endOfBatch) {
+        public void onEvent(ProducerEvent<S> event, long sequence, boolean endOfBatch) {
             assert event.future != null;
 
             if (event.flush) {

@@ -1,15 +1,12 @@
 package com.github.ylgrgyq.reservoir.storage;
 
-import com.github.ylgrgyq.reservoir.ObjectWithId;
+import com.github.ylgrgyq.reservoir.SerializedObjectWithId;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.zip.CRC32;
 
-final class Block implements Iterable<ObjectWithId> {
+final class Block implements Iterable<SerializedObjectWithId<byte[]>> {
     private final ByteBuffer content;
     private final List<Integer> checkpoints;
 
@@ -37,7 +34,7 @@ final class Block implements Iterable<ObjectWithId> {
     }
 
     @Override
-    public SeekableIterator<Long, ObjectWithId> iterator() {
+    public SeekableIterator<Long, SerializedObjectWithId<byte[]>> iterator() {
         return new Itr(content);
     }
 
@@ -79,7 +76,7 @@ final class Block implements Iterable<ObjectWithId> {
         return buffer;
     }
 
-    private class Itr implements SeekableIterator<Long, ObjectWithId> {
+    private class Itr implements SeekableIterator<Long, SerializedObjectWithId<byte[]>> {
         private final ByteBuffer content;
         private int offset;
 
@@ -88,7 +85,7 @@ final class Block implements Iterable<ObjectWithId> {
         }
 
         @Override
-        public SeekableIterator<Long, ObjectWithId> seek(Long key) {
+        public SeekableIterator<Long, SerializedObjectWithId<byte[]>> seek(Long key) {
             final int checkpoint = findStartCheckpoint(key);
             offset = checkpoints.get(checkpoint);
             assert offset < content.limit();
@@ -112,7 +109,7 @@ final class Block implements Iterable<ObjectWithId> {
         }
 
         @Override
-        public ObjectWithId next() {
+        public SerializedObjectWithId<byte[]> next() {
             assert offset < content.limit();
 
             content.position(offset);
@@ -123,7 +120,7 @@ final class Block implements Iterable<ObjectWithId> {
 
             offset += len + Long.BYTES + Integer.BYTES;
 
-            return new ObjectWithId(k, val);
+            return new SerializedObjectWithId<>(k, val);
         }
     }
 }

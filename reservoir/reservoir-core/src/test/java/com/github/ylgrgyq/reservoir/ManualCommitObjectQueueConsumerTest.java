@@ -3,8 +3,6 @@ package com.github.ylgrgyq.reservoir;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.NoSuchElementException;
@@ -17,11 +15,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 public class ManualCommitObjectQueueConsumerTest {
-    private final TestingStorage storage = new TestingStorage();
-    private final ObjectQueueBuilder<TestingPayload> builder = ObjectQueueBuilder.<TestingPayload>newBuilder()
-            .setStorage(storage)
-            .setAutoCommit(false)
-            .setCodec(new TestingPayloadCodec());
+    private final TestingStorage<TestingPayload> storage = new TestingStorage<>();
+    private final ObjectQueueBuilder<TestingPayload, TestingPayload> builder = ObjectQueueBuilder.newBuilder(storage)
+            .setConsumerAutoCommit(false);
 
     @Before
     public void setUp() {
@@ -33,7 +29,7 @@ public class ManualCommitObjectQueueConsumerTest {
         final TestingPayload first = new TestingPayload("first");
         final TestingPayload second = new TestingPayload("second");
 
-        storage.store(Arrays.asList(first.serialize(), second.serialize()));
+        storage.store(Arrays.asList(first, second));
 
         final ObjectQueueConsumer<TestingPayload> consumer = builder.buildConsumer();
 
@@ -61,15 +57,15 @@ public class ManualCommitObjectQueueConsumerTest {
     @Test
     public void deserializeObjectFailed() throws Exception {
         final ObjectQueueConsumer<TestingPayload> consumer = builder
-                .setCodec(new BadTestingPayloadCodec())
+                .replaceCodec(new BadTestingPayloadCodec<>())
                 .buildConsumer();
 
         TestingPayload first = new TestingPayload("first");
-        storage.store(Collections.singletonList(first.serialize()));
+        storage.store(Collections.singletonList(first));
 
         assertThatThrownBy(consumer::fetch)
                 .isInstanceOf(DeserializationException.class)
-                .hasMessageContaining("deserialize object with id: 1 failed. Content in Base64 string is: ");
+                .hasMessageContaining("deserialize object with id: 1 failed. Content is: ");
         consumer.close();
     }
 
@@ -95,7 +91,7 @@ public class ManualCommitObjectQueueConsumerTest {
             }
         });
         barrier.await();
-        storage.store(Collections.singletonList(first.serialize()));
+        storage.store(Collections.singletonList(first));
 
         await().until(f::isDone);
         assertThat(f).isCompletedWithValue(first);

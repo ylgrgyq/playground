@@ -63,7 +63,7 @@ public class FileStorageTest {
         final FileStorage storage = builder.build();
         final CyclicBarrier barrier = new CyclicBarrier(2);
         // block fetch in another thread
-        final CompletableFuture<List<ObjectWithId>> f = CompletableFuture.supplyAsync(() -> {
+        final CompletableFuture<List<SerializedObjectWithId<byte[]>>> f = CompletableFuture.supplyAsync(() -> {
             try {
                 barrier.await();
                 return storage.fetch(Integer.MIN_VALUE, 100);
@@ -75,7 +75,7 @@ public class FileStorageTest {
         // waiting fetch thread in position, then feed some data in storage
         barrier.await();
         final int expectSize = 64;
-        final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
+        final List<SerializedObjectWithId<byte[]>> objs = generateSimpleTestingObjectWithIds(expectSize);
         storeObjectWithIds(storage, objs);
         assertThat(storage.getLastProducedId()).isEqualTo(expectSize - 1);
         assertThat(f.get()).containsExactlyElementsOf(objs);
@@ -95,7 +95,7 @@ public class FileStorageTest {
         final FileStorage storage = builder.build();
         final int expectSize = 64;
 
-        final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
+        final List<SerializedObjectWithId<byte[]>> objs = generateSimpleTestingObjectWithIds(expectSize);
         storeObjectWithIds(storage, objs);
         assertThat(storage.getLastProducedId()).isEqualTo(expectSize - 1);
 
@@ -110,7 +110,7 @@ public class FileStorageTest {
         FileStorage storage = builder.build();
         final int expectSize = 64;
 
-        final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
+        final List<SerializedObjectWithId<byte[]>> objs = generateSimpleTestingObjectWithIds(expectSize);
         storeObjectWithIds(storage, objs);
         storage.close();
 
@@ -127,7 +127,7 @@ public class FileStorageTest {
                 .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS))
                 .build();
 
-        final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(64);
+        final List<SerializedObjectWithId<byte[]>> objs = generateSimpleTestingObjectWithIds(64);
         storeObjectWithIds(storage, objs);
 
         triggerFlushMemtable(storage);
@@ -142,7 +142,7 @@ public class FileStorageTest {
                 .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS))
                 .build();
 
-        final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(64);
+        final List<SerializedObjectWithId<byte[]>> objs = generateSimpleTestingObjectWithIds(64);
         storeObjectWithIds(storage, objs);
 
         objs.addAll(triggerFlushMemtable(storage));
@@ -158,7 +158,7 @@ public class FileStorageTest {
                 .setFlushMemtableExecutorService(new DelayedSingleThreadExecutorService(1, TimeUnit.DAYS))
                 .build();
 
-        final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(64);
+        final List<SerializedObjectWithId<byte[]>> objs = generateSimpleTestingObjectWithIds(64);
         storeObjectWithIds(storage, objs);
         triggerFlushMemtable(storage);
         storage.close(true);
@@ -179,12 +179,12 @@ public class FileStorageTest {
                 .build();
 
         // 1. write some data
-        final List<ObjectWithId> expectData = generateSimpleTestingObjectWithIds(64);
+        final List<SerializedObjectWithId<byte[]>> expectData = generateSimpleTestingObjectWithIds(64);
         storeObjectWithIds(storage, expectData);
         // 2. flush for the first time, make every data write before flushed to sstable
         expectData.addAll(triggerFlushMemtable(storage));
         // 3. write some more data
-        final List<ObjectWithId> objInMem = generateSimpleTestingObjectWithIds(storage.getLastProducedId() + 1, 128);
+        final List<SerializedObjectWithId<byte[]>> objInMem = generateSimpleTestingObjectWithIds(storage.getLastProducedId() + 1, 128);
         expectData.addAll(objInMem);
         storeObjectWithIds(storage, objInMem);
         // 4. flush again, but this time the flush task will be blocked so
@@ -203,9 +203,9 @@ public class FileStorageTest {
                 .setFlushMemtableExecutorService(new ImmediateExecutorService())
                 .build();
 
-        final List<ObjectWithId> expectData = new ArrayList<>();
+        final List<SerializedObjectWithId<byte[]>> expectData = new ArrayList<>();
         for (int i = 0; i < 10; ++i) {
-            List<ObjectWithId> batch = generateSimpleTestingObjectWithIds(storage.getLastProducedId() + 1, 64);
+            List<SerializedObjectWithId<byte[]>> batch = generateSimpleTestingObjectWithIds(storage.getLastProducedId() + 1, 64);
             expectData.addAll(batch);
             storeObjectWithIds(storage, batch);
             expectData.addAll(triggerFlushMemtable(storage));
@@ -223,7 +223,7 @@ public class FileStorageTest {
                 .build();
 
         // 1. trigger immutable table flush
-        final List<ObjectWithId> expectData = generateSimpleTestingObjectWithIds(storage.getLastProducedId() + 1, 64);
+        final List<SerializedObjectWithId<byte[]>> expectData = generateSimpleTestingObjectWithIds(storage.getLastProducedId() + 1, 64);
         storeObjectWithIds(storage, expectData);
         expectData.addAll(triggerFlushMemtable(storage));
 
@@ -271,13 +271,13 @@ public class FileStorageTest {
                 .setTruncateIntervalMillis(0, TimeUnit.MILLISECONDS)
                 .build();
         final int expectSize = 65;
-        final List<ObjectWithId> objs = generateSimpleTestingObjectWithIds(expectSize);
+        final List<SerializedObjectWithId<byte[]>> objs = generateSimpleTestingObjectWithIds(expectSize);
         storeObjectWithIds(storage, objs);
         objs.addAll(triggerFlushMemtable(storage));
         storage.commitId(1000);
-        objs.add(new ObjectWithId(1010101, "Trigger truncate".getBytes(StandardCharsets.UTF_8)));
+        objs.add(new SerializedObjectWithId<>(1010101, "Trigger truncate".getBytes(StandardCharsets.UTF_8)));
 
-        final List<ObjectWithId> actualObjs = storage.fetch(0, 100);
+        final List<SerializedObjectWithId<byte[]>> actualObjs = storage.fetch(0, 100);
         assertThat(actualObjs.iterator().next().getId()).isGreaterThan(1);
 
         storage.close();
@@ -286,9 +286,7 @@ public class FileStorageTest {
     @Test
     public void simpleProduceAndConsume() throws Exception {
         final FileStorage storage = builder.build();
-        final ObjectQueue<TestingPayload> queue = ObjectQueueBuilder.<TestingPayload>newBuilder()
-                .setStorage(storage)
-                .setCodec(new TestingPayloadCodec())
+        final ObjectQueue<TestingPayload> queue = ObjectQueueBuilder.newBuilder(storage, new TestingPayloadCodec())
                 .buildQueue();
         final TestingPayload payload = new TestingPayload("first");
         queue.produce(payload);
@@ -297,28 +295,28 @@ public class FileStorageTest {
         queue.close();
     }
 
-    private List<ObjectWithId> generateSimpleTestingObjectWithIds(int expectSize) {
+    private List<SerializedObjectWithId<byte[]>> generateSimpleTestingObjectWithIds(int expectSize) {
         return generateSimpleTestingObjectWithIds(0L, expectSize);
     }
 
-    private List<ObjectWithId> generateSimpleTestingObjectWithIds(long startId, int expectSize) {
-        final List<ObjectWithId> objs = new ArrayList<>();
+    private List<SerializedObjectWithId<byte[]>> generateSimpleTestingObjectWithIds(long startId, int expectSize) {
+        final List<SerializedObjectWithId<byte[]>> objs = new ArrayList<>();
         for (long i = startId; i < startId + expectSize; i++) {
-            final ObjectWithId obj = new ObjectWithId(i, numberStringBytes(i));
+            final SerializedObjectWithId<byte[]> obj = new SerializedObjectWithId<>(i, numberStringBytes(i));
             objs.add(obj);
         }
         return objs;
     }
 
-    private void storeObjectWithIds(FileStorage storage, List<ObjectWithId> batch) throws StorageException {
-        storage.store(batch.stream().map(ObjectWithId::getObjectInBytes).collect(Collectors.toList()));
+    private void storeObjectWithIds(FileStorage storage, List<SerializedObjectWithId<byte[]>> batch) throws StorageException {
+        storage.store(batch.stream().map(SerializedObjectWithId::getSerializedObject).collect(Collectors.toList()));
     }
 
-    private List<ObjectWithId> triggerFlushMemtable(FileStorage storage) throws StorageException {
+    private List<SerializedObjectWithId<byte[]>> triggerFlushMemtable(FileStorage storage) throws StorageException {
         long nextId = storage.getLastProducedId() + 1;
-        List<ObjectWithId> triggerDatas = Arrays.asList(
-                new ObjectWithId(nextId, new byte[Constant.kMaxMemtableSize]),
-                new ObjectWithId(nextId + 1, numberStringBytes(nextId + 1)));
+        List<SerializedObjectWithId<byte[]>> triggerDatas = Arrays.asList(
+                new SerializedObjectWithId<>(nextId, new byte[Constant.kMaxMemtableSize]),
+                new SerializedObjectWithId<>(nextId + 1, numberStringBytes(nextId + 1)));
         storeObjectWithIds(storage, triggerDatas);
         return triggerDatas;
     }

@@ -1,22 +1,33 @@
 package com.github.ylgrgyq.reservoir;
 
-public interface Codec<T> {
+/**
+ * A codec to serialize and deserialize an instance between type T and type S.
+ *
+ * @param <T> the type of an object before serialization
+ * @param <S> the type of an object after serialization. The most common type
+ *            for S is byte[], but we decide not to constrain it to. In some
+ *            scenarios this is more convenience like we can make S equals
+ *            to T to save some codes in testing.
+ */
+public interface Codec<T, S> {
     /**
-     * Serialize an object of type T to a bytes array.
+     * Serialize an object of type T to type S.
      *
      * @param obj an object to serialize
-     * @return a bytes array
-     * @throws SerializationException when the object failed to serialize to a byte array.
+     * @return the serialized object of {@code obj}
+     * @throws SerializationException when the object failed to serialize to type S.
      */
-    byte[] serialize(T obj) throws SerializationException;
+    S serialize(T obj) throws SerializationException;
 
     /**
-     * Deserialize a bytes array to an object of type T.
+     * Deserialize an object of type S to an object of type T.
      *
-     * @param bytes a bytes array to deserialize
-     * @return an object of type T
-     * @throws DeserializationException when the bytes array failed to deserialize to the expect object of type T,
-     *                                  like bytes underflow, etc.
+     * @param serializedObj an object to deserialize
+     * @return the deserialized object of {@code serializedObj}
+     * @throws DeserializationException when {@code serializedObj} failed to deserialize
+     *                                  to the expect object of type T, like when
+     *                                  S is byte[] and the input {@code serializedObj}
+     *                                  is underflow.
      */
-    T deserialize(byte[] bytes) throws DeserializationException;
+    T deserialize(S serializedObj) throws DeserializationException;
 }

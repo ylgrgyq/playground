@@ -2,7 +2,7 @@ package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.ylgrgyq.reservoir.ObjectWithId;
+import com.github.ylgrgyq.reservoir.SerializedObjectWithId;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -39,7 +39,7 @@ final class TableCache {
         return t;
     }
 
-    SeekableIterator<Long, ObjectWithId> iterator(int fileNumber, long fileSize) throws IOException {
+    SeekableIterator<Long, SerializedObjectWithId<byte[]>> iterator(int fileNumber, long fileSize) throws IOException {
         final Table t = findTable(fileNumber, fileSize);
         return t.iterator();
     }

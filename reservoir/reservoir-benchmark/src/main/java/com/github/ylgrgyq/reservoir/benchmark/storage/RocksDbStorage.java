@@ -3,9 +3,8 @@ package com.github.ylgrgyq.reservoir.benchmark.storage;
 import com.github.ylgrgyq.reservoir.Bits;
 import com.github.ylgrgyq.reservoir.NamedThreadFactory;
 import com.github.ylgrgyq.reservoir.ObjectQueueStorage;
-import com.github.ylgrgyq.reservoir.ObjectWithId;
+import com.github.ylgrgyq.reservoir.SerializedObjectWithId;
 import org.rocksdb.*;
-import org.rocksdb.util.SizeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
 
-public final class RocksDbStorage implements ObjectQueueStorage {
+public final class RocksDbStorage implements ObjectQueueStorage<byte[]> {
     private static final Logger logger = LoggerFactory.getLogger(RocksDbStorage.class);
     private static final String DEFAULT_QUEUE_NAME = "reservoir_queue";
     private static final byte[] CONSUMER_COMMIT_ID_META_KEY = "consumer_committed_id".getBytes(StandardCharsets.UTF_8);
@@ -141,12 +140,12 @@ public final class RocksDbStorage implements ObjectQueueStorage {
     }
 
     @Override
-    public List<ObjectWithId> fetch(final long fromId, final int limit) throws InterruptedException {
+    public List<SerializedObjectWithId<byte[]>> fetch(final long fromId, final int limit) throws InterruptedException {
         if (fromId < 0) {
             throw new IllegalArgumentException("fromId: " + fromId + " (expect: >=0)");
         }
 
-        final List<ObjectWithId> entries = new ArrayList<>(limit);
+        final List<SerializedObjectWithId<byte[]>> entries = new ArrayList<>(limit);
         while (true) {
             try (RocksIterator it = db.newIterator(columnFamilyHandle, readOptions)) {
                 for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
@@ -154,7 +153,7 @@ public final class RocksDbStorage implements ObjectQueueStorage {
                     if (id == fromId) {
                         continue;
                     }
-                    final ObjectWithId entry = new ObjectWithId(id, it.value());
+                    final SerializedObjectWithId<byte[]> entry = new SerializedObjectWithId<>(id, it.value());
                     entries.add(entry);
                 }
             }
@@ -170,14 +169,14 @@ public final class RocksDbStorage implements ObjectQueueStorage {
     }
 
     @Override
-    public List<ObjectWithId> fetch(final long fromId, final int limit, final long timeout, final TimeUnit unit)
+    public List<SerializedObjectWithId<byte[]>> fetch(final long fromId, final int limit, final long timeout, final TimeUnit unit)
             throws InterruptedException {
         if (fromId < 0) {
             throw new IllegalArgumentException("fromId: " + fromId + " (expect: >=0)");
         }
 
         final long end = System.nanoTime() + unit.toNanos(timeout);
-        final List<ObjectWithId> entries = new ArrayList<>(limit);
+        final List<SerializedObjectWithId<byte[]>> entries = new ArrayList<>(limit);
         while (true) {
             try (RocksIterator it = db.newIterator(columnFamilyHandle, readOptions)) {
                 for (it.seek(getKeyBytes(fromId)); it.isValid() && entries.size() < limit; it.next()) {
@@ -185,7 +184,7 @@ public final class RocksDbStorage implements ObjectQueueStorage {
                     if (id == fromId) {
                         continue;
                     }
-                    final ObjectWithId entry = new ObjectWithId(id, it.value());
+                    final SerializedObjectWithId<byte[]> entry = new SerializedObjectWithId<>(id, it.value());
                     entries.add(entry);
                 }
             }
