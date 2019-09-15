@@ -62,7 +62,7 @@ final class Manifest {
             record.setNextFileNumber(nextFileNumber);
         }
         manifestRecordWriter.append(record.encode());
-        manifestRecordWriter.flush();
+        manifestRecordWriter.flush(true);
 
         logger.debug("written manifest record {} to manifest file number {}", record, manifestFileNumber);
 

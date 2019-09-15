@@ -26,14 +26,16 @@ final class LogWriter implements Closeable {
         this.checksum = new CRC32();
     }
 
-    void flush() throws IOException {
+    void flush(boolean force) throws IOException {
         workingFileChannel.flush();
-        workingFileChannel.force(true);
+        if (force) {
+            workingFileChannel.force(true);
+        }
     }
 
     @Override
     public void close() throws IOException {
-        flush();
+        flush(true);
         workingFileChannel.close();
     }
 

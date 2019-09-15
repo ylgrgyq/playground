@@ -59,6 +59,8 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
     private final Manifest manifest;
     private final long readRetryIntervalMillis;
     private final FileLock storageLock;
+    private final boolean forceSyncOnFlushConsumerCommitLogWriter;
+    private final boolean forceSyncOnFlushDataLogWriter;
 
     @Nullable
     private LogWriter dataLogWriter;
@@ -94,6 +96,8 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         this.tableCache = new TableCache(baseDir);
         this.manifest = new Manifest(baseDir);
         this.truncateIntervalNanos = TimeUnit.MILLISECONDS.toNanos(builder.getTruncateIntervalMillis());
+        this.forceSyncOnFlushConsumerCommitLogWriter = builder.isForceSyncOnFlushConsumerCommitLogWriter();
+        this.forceSyncOnFlushDataLogWriter = builder.isForceSyncOnFlushDataLogWriter();
         this.closeFuture = null;
 
         boolean initStorageSuccess = false;
@@ -147,6 +151,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
                 final byte[] bs = new byte[8];
                 Bits.putLong(bs, 0, id);
                 consumerCommitLogWriter.append(bs);
+                consumerCommitLogWriter.flush(forceSyncOnFlushConsumerCommitLogWriter);
                 lastCommittedId = id;
 
                 if (System.nanoTime() - lastTryTruncateTime > truncateIntervalNanos) {
@@ -244,7 +249,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
                 }
             }
             assert dataLogWriter != null;
-            dataLogWriter.flush();
+            dataLogWriter.flush(forceSyncOnFlushDataLogWriter);
         } catch (IOException ex) {
             throw new StorageException("append log on file based storage failed", ex);
         }

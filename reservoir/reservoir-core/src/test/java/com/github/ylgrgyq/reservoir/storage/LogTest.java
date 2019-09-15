@@ -290,7 +290,7 @@ public class LogTest {
 
     private void writeLog(String log) throws IOException {
         logWriter.append(log.getBytes(StandardCharsets.UTF_8));
-        logWriter.flush();
+        logWriter.flush(false);
     }
 
     private String readLog() throws IOException, StorageException {

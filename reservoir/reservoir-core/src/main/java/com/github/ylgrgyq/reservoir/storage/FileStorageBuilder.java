@@ -17,9 +17,12 @@ public class FileStorageBuilder {
         return new FileStorageBuilder(storageBaseDir);
     }
 
+    private boolean forceSyncOnFlushConsumerCommitLogWriter = false;
+    private boolean forceSyncOnFlushDataLogWriter = false;
     private long readRetryIntervalMillis = 500;
     private long truncateIntervalMillis = TimeUnit.MINUTES.toMillis(1);
     private final String storageBaseDir;
+
     @Nullable
     private ExecutorService flushMemtableExecutorService;
 
@@ -72,6 +75,22 @@ public class FileStorageBuilder {
 
         this.flushMemtableExecutorService = flushMemtableExecutorService;
         return this;
+    }
+
+    boolean isForceSyncOnFlushConsumerCommitLogWriter() {
+        return forceSyncOnFlushConsumerCommitLogWriter;
+    }
+
+    public void setForceSyncOnFlushConsumerCommitLogWriter(boolean forceSyncOnFlushConsumerCommitLogWriter) {
+        this.forceSyncOnFlushConsumerCommitLogWriter = forceSyncOnFlushConsumerCommitLogWriter;
+    }
+
+    boolean isForceSyncOnFlushDataLogWriter() {
+        return forceSyncOnFlushDataLogWriter;
+    }
+
+    public void setForceSyncOnFlushDataLogWriter(boolean forceSyncOnFlushDataLogWriter) {
+        this.forceSyncOnFlushDataLogWriter = forceSyncOnFlushDataLogWriter;
     }
 
     public FileStorage build() throws StorageException {
