@@ -12,13 +12,13 @@ import java.util.List;
 import java.util.zip.CRC32;
 
 final class LogReader implements Closeable {
-    private final FileChannel workingFileChannel;
+    private final BufferedChannel workingFileChannel;
     private final boolean checkChecksum;
     private final ByteBuffer buffer;
     private boolean eof;
 
-    LogReader(FileChannel workingFileChannel, boolean checkChecksum) {
-        this.workingFileChannel = workingFileChannel;
+    LogReader(FileChannel workingFileChannel, boolean checkChecksum) throws IOException {
+        this.workingFileChannel = new BufferedChannel(workingFileChannel);
         // we don't make the buffer to lazy allocate buffer
         // because we think this way can save a check in read block, and we will always
         // read block immediately after construct a LogReader

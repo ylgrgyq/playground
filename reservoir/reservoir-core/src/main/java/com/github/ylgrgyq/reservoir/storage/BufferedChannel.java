@@ -11,28 +11,30 @@ public class BufferedChannel implements AutoCloseable {
     private final ByteBuffer readBuffer;
     private final ByteBuffer writeBuffer;
     private long readBufferStartPosition;
+    private long writeBufferStartPosition;
 
-    public BufferedChannel(FileChannel fileChannel) {
-        Objects.requireNonNull(fileChannel, "fileChannel");
-
-        this.fileChannel = fileChannel;
-        this.readBuffer = ByteBuffer.allocateDirect(Constant.kMaxDataBlockSize);
-        this.readBuffer.flip();
-        this.writeBuffer = ByteBuffer.allocateDirect(Constant.kMaxDataBlockSize);
-        this.readBufferStartPosition = 0;
+    public BufferedChannel(FileChannel fileChannel) throws IOException {
+        this(fileChannel, Constant.kMaxDataBlockSize, Constant.kMaxDataBlockSize);
     }
 
-    public BufferedChannel(FileChannel fileChannel, int readCapacity, int writeCapacity) {
+    public BufferedChannel(FileChannel fileChannel, int readCapacity, int writeCapacity) throws IOException {
         Objects.requireNonNull(fileChannel, "fileChannel");
 
         this.fileChannel = fileChannel;
-        this.readBuffer = ByteBuffer.allocateDirect(readCapacity);
+        this.readBuffer = ByteBuffer.allocate(readCapacity);
+        this.readBuffer.flip();
         this.writeBuffer = ByteBuffer.allocateDirect(writeCapacity);
+        this.readBufferStartPosition = fileChannel.position();
+        this.writeBufferStartPosition = fileChannel.position();
     }
 
     public synchronized void write(ByteBuffer src) throws IOException {
         while (src.hasRemaining()) {
-            writeBuffer.put(src);
+            ByteBuffer buf = src.slice();
+            buf.limit(Math.min(writeBuffer.remaining(), buf.remaining()));
+            int pos = src.position() + buf.remaining();
+            writeBuffer.put(buf);
+            src.position(pos);
 
             // flush when buffer is full
             if (!writeBuffer.hasRemaining()) {
@@ -77,7 +79,7 @@ public class BufferedChannel implements AutoCloseable {
                 final int bytesSize = Math.min(length, readBuffer.remaining());
 
                 final Buffer buf = readBuffer.slice().limit(bytesSize);
-                dest.put((ByteBuffer)buf);
+                dest.put((ByteBuffer) buf);
                 readBuffer.position(startPosInBuffer + bytesSize);
                 currentPos += bytesSize;
                 length -= bytesSize;
@@ -98,7 +100,7 @@ public class BufferedChannel implements AutoCloseable {
     }
 
     @Override
-    public synchronized void close() throws Exception {
+    public synchronized void close() throws IOException {
         fileChannel.close();
         writeBuffer.clear();
         readBuffer.clear();

@@ -243,6 +243,8 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
                     throw new StorageException("no more room to storage data");
                 }
             }
+            assert dataLogWriter != null;
+            dataLogWriter.flush();
         } catch (IOException ex) {
             throw new StorageException("append log on file based storage failed", ex);
         }
@@ -640,7 +642,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
             consumerCommitLogWriter.close();
         }
         consumerCommitLogWriter = consumerWriter;
-        
+
         imm = mm;
         mm = new Memtable();
         logger.debug("Trigger compaction, new log file number={}", dataLogFileNumber);

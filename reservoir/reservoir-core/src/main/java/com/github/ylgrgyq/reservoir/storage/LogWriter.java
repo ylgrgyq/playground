@@ -7,7 +7,7 @@ import java.nio.channels.FileChannel;
 import java.util.zip.CRC32;
 
 final class LogWriter implements Closeable {
-    private final FileChannel workingFileChannel;
+    private final BufferedChannel workingFileChannel;
     private final ByteBuffer headerBuffer;
     private final ByteBuffer zeros;
     private final CRC32 checksum;
@@ -19,7 +19,7 @@ final class LogWriter implements Closeable {
 
     LogWriter(FileChannel workingFileChannel, long writePosition) throws IOException {
         workingFileChannel.position(writePosition);
-        this.workingFileChannel = workingFileChannel;
+        this.workingFileChannel = new BufferedChannel(workingFileChannel);
         this.headerBuffer = ByteBuffer.allocateDirect(Constant.kLogHeaderSize);
         this.blockOffset = 0;
         this.zeros = ByteBuffer.allocate(Constant.kLogHeaderSize);
@@ -27,11 +27,13 @@ final class LogWriter implements Closeable {
     }
 
     void flush() throws IOException {
+        workingFileChannel.flush();
         workingFileChannel.force(true);
     }
 
     @Override
     public void close() throws IOException {
+        flush();
         workingFileChannel.close();
     }
 
@@ -108,7 +110,7 @@ final class LogWriter implements Closeable {
         header.flip();
 
         // write header and payload
-        final FileChannel ch = workingFileChannel;
+        final BufferedChannel ch = workingFileChannel;
         ch.write(header);
         ch.write(ByteBuffer.wrap(blockPayload));
         blockOffset += blockPayload.length + Constant.kLogHeaderSize;
