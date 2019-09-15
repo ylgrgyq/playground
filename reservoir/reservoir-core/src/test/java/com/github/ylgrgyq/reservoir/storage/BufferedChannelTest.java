@@ -10,6 +10,7 @@ import org.junit.Test;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -17,6 +18,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public class BufferedChannelTest {
     private String tempLogFile;
@@ -45,7 +47,6 @@ public class BufferedChannelTest {
         write("Hello");
         write("World");
         write("!");
-        channel.flush();
 
         assertThat(readString(5)).isEqualTo("Hello");
         assertThat(readString(5)).isEqualTo("World");
@@ -54,10 +55,45 @@ public class BufferedChannelTest {
         assertThat(readString(1)).isEqualTo("EOF");
     }
 
+    @Test
+    public void testWriteReadManyData() throws Exception {
+        for (int i = 0; i < 10000; i++) {
+            write(TestingUtils.numberString(i));
+        }
 
+        for (int i = 0; i < 10000; i++) {
+            assertThat(readString(TestingUtils.numberString(i).getBytes(StandardCharsets.UTF_8).length))
+                    .isEqualTo(TestingUtils.numberString(i));
+        }
+
+        assertThat(readString(1)).isEqualTo("EOF");
+    }
+
+    @Test
+    public void testWriteBiggerThanWriteBuffer() throws Exception {
+        String expect = TestingUtils.makeString("Hello", 2 * Constant.kMaxDataBlockSize);
+        write(expect);
+
+        assertThat(readString((int)fileChannel.size())).isEqualTo(expect);
+    }
+
+    @Test
+    public void testReadAfterClose() throws Exception {
+        write("Hello");
+        channel.close();
+        assertThatThrownBy(() -> readString(100)).isInstanceOf(ClosedChannelException.class);
+    }
+
+    @Test
+    public void testWriteAfterClose() throws Exception {
+        write("Hello");
+        channel.close();
+        assertThatThrownBy(() -> write("Hello")).isInstanceOf(ClosedChannelException.class);
+    }
 
     private void write(String log) throws IOException {
         channel.write(ByteBuffer.wrap(log.getBytes(StandardCharsets.UTF_8)));
+        channel.flush();
     }
 
     private String readString(int bytesToRead) throws IOException, StorageException {

@@ -29,7 +29,7 @@ final class LogWriter implements Closeable {
     void flush(boolean force) throws IOException {
         workingFileChannel.flush();
         if (force) {
-            workingFileChannel.force(true);
+            workingFileChannel.force();
         }
     }
 

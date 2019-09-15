@@ -6,18 +6,18 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Objects;
 
-public class BufferedChannel implements AutoCloseable {
+class BufferedChannel implements AutoCloseable {
     private final FileChannel fileChannel;
     private final ByteBuffer readBuffer;
     private final ByteBuffer writeBuffer;
     private long readBufferStartPosition;
     private long writeBufferStartPosition;
 
-    public BufferedChannel(FileChannel fileChannel) throws IOException {
+    BufferedChannel(FileChannel fileChannel) throws IOException {
         this(fileChannel, Constant.kMaxDataBlockSize, Constant.kMaxDataBlockSize);
     }
 
-    public BufferedChannel(FileChannel fileChannel, int readCapacity, int writeCapacity) throws IOException {
+    BufferedChannel(FileChannel fileChannel, int readCapacity, int writeCapacity) throws IOException {
         Objects.requireNonNull(fileChannel, "fileChannel");
 
         this.fileChannel = fileChannel;
@@ -28,11 +28,11 @@ public class BufferedChannel implements AutoCloseable {
         this.writeBufferStartPosition = fileChannel.position();
     }
 
-    public synchronized void write(ByteBuffer src) throws IOException {
+    synchronized void write(ByteBuffer src) throws IOException {
         while (src.hasRemaining()) {
-            ByteBuffer buf = src.slice();
+            final ByteBuffer buf = src.slice();
             buf.limit(Math.min(writeBuffer.remaining(), buf.remaining()));
-            int pos = src.position() + buf.remaining();
+            final int pos = src.position() + buf.remaining();
             writeBuffer.put(buf);
             src.position(pos);
 
@@ -43,7 +43,7 @@ public class BufferedChannel implements AutoCloseable {
         }
     }
 
-    public synchronized void flush() throws IOException {
+    synchronized void flush() throws IOException {
         writeBuffer.flip();
         do {
             fileChannel.write(writeBuffer);
@@ -52,19 +52,19 @@ public class BufferedChannel implements AutoCloseable {
         writeBuffer.clear();
     }
 
-    public void force(boolean forceMetadata) throws IOException {
-        fileChannel.force(forceMetadata);
+    void force() throws IOException {
+        fileChannel.force(true);
     }
 
-    public int read(ByteBuffer dest) throws IOException {
+    int read(ByteBuffer dest) throws IOException {
         return read(dest, readBufferStartPosition + readBuffer.position());
     }
 
-    public int read(ByteBuffer dest, long pos) throws IOException {
+    int read(ByteBuffer dest, long pos) throws IOException {
         return read(dest, pos, dest.limit());
     }
 
-    public synchronized int read(ByteBuffer dest, long pos, int length) throws IOException {
+    synchronized int read(ByteBuffer dest, long pos, int length) throws IOException {
         long currentPos = pos;
         final long eof = fileChannel.size();
         if (currentPos >= eof) {
@@ -89,7 +89,7 @@ public class BufferedChannel implements AutoCloseable {
                 readBufferStartPosition = currentPos;
                 readBuffer.clear();
                 if ((fileChannel.read(readBuffer, currentPos)) <= 0) {
-                    throw new IOException("read from file returned non-positive value. Short read");
+                    throw new IOException("EOF before read enough bytes");
                 }
 
                 readBuffer.flip();
@@ -103,6 +103,8 @@ public class BufferedChannel implements AutoCloseable {
     public synchronized void close() throws IOException {
         fileChannel.close();
         writeBuffer.clear();
+        writeBuffer.flip();
         readBuffer.clear();
+        readBuffer.flip();
     }
 }
