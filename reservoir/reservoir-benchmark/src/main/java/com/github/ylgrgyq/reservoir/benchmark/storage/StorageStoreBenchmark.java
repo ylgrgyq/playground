@@ -18,7 +18,7 @@ abstract class StorageStoreBenchmark implements BenchmarkTest {
     private final List<List<byte[]>> testingData;
     private final String baseDir;
     @Nullable
-    private ObjectQueueStorage storage;
+    private ObjectQueueStorage<byte[]> storage;
     @Nullable
     private Timer timer;
 
@@ -78,5 +78,5 @@ abstract class StorageStoreBenchmark implements BenchmarkTest {
 
     abstract String getTestDescription();
 
-    abstract ObjectQueueStorage createStorage(String baseDir) throws Exception;
+    abstract ObjectQueueStorage<byte[]> createStorage(String baseDir) throws Exception;
 }

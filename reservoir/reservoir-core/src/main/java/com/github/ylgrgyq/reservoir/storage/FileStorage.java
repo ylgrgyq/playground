@@ -459,7 +459,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
             while (true) {
                 List<byte[]> logOpt = reader.readLog();
                 if (!logOpt.isEmpty()) {
-                    final SerializedObjectWithId e = decodeObjectWithId(logOpt);
+                    final SerializedObjectWithId<byte[]> e = decodeObjectWithId(logOpt);
                     if (recoveredMm == null) {
                         recoveredMm = new Memtable();
                     }

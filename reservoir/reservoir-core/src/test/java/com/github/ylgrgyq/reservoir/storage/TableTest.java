@@ -18,7 +18,6 @@ import java.util.List;
 import static com.github.ylgrgyq.reservoir.TestingUtils.makeString;
 import static com.github.ylgrgyq.reservoir.TestingUtils.numberString;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.filter;
 
 public class TableTest {
     private TableBuilder builder;
@@ -49,9 +48,9 @@ public class TableTest {
 
     @Test
     public void testWriteReadManySmallData() throws Exception {
-        final List<SerializedObjectWithId> expectDatas = new ArrayList<>();
+        final List<SerializedObjectWithId<byte[]>> expectDatas = new ArrayList<>();
         for (long i = 0; i < 10000; i++) {
-            expectDatas.add(new SerializedObjectWithId(i, TestingUtils.numberStringBytes(i)));
+            expectDatas.add(new SerializedObjectWithId<>(i, TestingUtils.numberStringBytes(i)));
             addData(i, numberString(i));
         }
 
@@ -64,7 +63,7 @@ public class TableTest {
 
     @Test
     public void testWriteReadManyBigData() throws Exception {
-        final List<SerializedObjectWithId> expectDatas = new ArrayList<>();
+        final List<SerializedObjectWithId<byte[]>> expectDatas = new ArrayList<>();
         for (long i = 0; i < 1000; i++) {
             expectDatas.add(makeObjectWithId(i, makeString("Hello", Constant.kMaxDataBlockSize)));
             addData(i, makeString("Hello", Constant.kMaxDataBlockSize));
@@ -77,8 +76,8 @@ public class TableTest {
                 .isEqualTo(expectDatas);
     }
 
-    private SerializedObjectWithId makeObjectWithId(long id, String data) {
-        return new SerializedObjectWithId(id, data.getBytes(StandardCharsets.UTF_8));
+    private SerializedObjectWithId<byte[]> makeObjectWithId(long id, String data) {
+        return new SerializedObjectWithId<>(id, data.getBytes(StandardCharsets.UTF_8));
     }
 
     private void addData(long id, String data) throws IOException {

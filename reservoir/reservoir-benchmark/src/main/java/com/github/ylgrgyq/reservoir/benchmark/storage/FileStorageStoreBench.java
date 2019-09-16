@@ -14,7 +14,7 @@ public final class FileStorageStoreBench extends StorageStoreBenchmark {
     }
 
     @Override
-    ObjectQueueStorage createStorage(String baseDir) throws Exception {
+    ObjectQueueStorage<byte[]> createStorage(String baseDir) throws Exception {
         return FileStorageBuilder
                 .newBuilder(baseDir)
                 .build();
