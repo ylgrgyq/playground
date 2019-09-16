@@ -116,7 +116,8 @@ final class ManualCommitObjectQueueConsumer<E, S> implements ObjectQueueConsumer
                 final S serializeP = p.getSerializedObject();
                 try {
                     final E pObj = deserializer.deserialize(serializeP);
-                    queue.put(new DeserializedObjectWithId<>(p.getId(), pObj));
+                    boolean offerSuccess = queue.offer(new DeserializedObjectWithId<>(p.getId(), pObj));
+                    assert offerSuccess;
                 } catch (Exception ex) {
                     String msg = "deserialize object with id: " + p.getId() + " failed. Content is: " +
                             (serializeP instanceof byte[] ?

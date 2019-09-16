@@ -102,7 +102,8 @@ final class AutoCommitObjectQueueConsumer<E, S> implements ObjectQueueConsumer<E
                     final S serializeP = p.getSerializedObject();
                     try {
                         final E pObj = deserializer.deserialize(serializeP);
-                        queue.put(pObj);
+                        boolean offerSuccess = queue.offer(pObj);
+                        assert offerSuccess;
                     } catch (Exception ex) {
                         String msg = "deserialize object with id: " + p.getId() + " failed. Content is: " +
                                 (serializeP instanceof byte[] ?
