@@ -24,6 +24,9 @@
  */
 package com.github.ylgrgyq.reservoir;
 
+/**
+ * Internal use only, may change in the future.
+ */
 public final class Bits {
     public static int getInt(byte[] b, int off) {
         return (b[off + 3] & 0xFF) + ((b[off + 2] & 0xFF) << 8) + ((b[off + 1] & 0xFF) << 16) + (b[off] << 24);

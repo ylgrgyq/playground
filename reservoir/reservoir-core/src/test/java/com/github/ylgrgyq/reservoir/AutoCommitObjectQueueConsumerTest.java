@@ -17,7 +17,7 @@ public class AutoCommitObjectQueueConsumerTest {
     private final TestingStorage<TestingPayload> storage = new TestingStorage<>();
     private final ObjectQueueBuilder<TestingPayload, TestingPayload> builder =
             ObjectQueueBuilder.newBuilder(storage)
-                    .setConsumerAutoCommit(true);
+                    .autoCommitAfterFetch(true);
 
     @Before
     public void setUp() {

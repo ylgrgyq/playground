@@ -1,5 +1,9 @@
 package com.github.ylgrgyq.reservoir;
 
+/**
+ * A {@link DeserializationException} encapsulates the error occurred when deserialize
+ * an object by calling {@link Codec#deserialize(Object)}.
+ */
 public final class DeserializationException extends StorageException {
     public DeserializationException() {
         super();

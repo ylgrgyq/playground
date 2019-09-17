@@ -1,5 +1,9 @@
 package com.github.ylgrgyq.reservoir;
 
+/**
+ * A {@link SerializationException} encapsulates the error occurred when serialize
+ * an object by calling {@link Codec#serialize(Object)}.
+ */
 public final class SerializationException extends StorageException {
     public SerializationException() {
         super();

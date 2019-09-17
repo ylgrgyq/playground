@@ -20,6 +20,12 @@ import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
+/**
+ * An {@link ObjectQueueStorage} implementation based on local file system.
+ * <p>
+ * Provide at least once commitment on {@link #commitId(long)}. So after a recovery an
+ * already committed object may be fetched again.
+ */
 public final class FileStorage implements ObjectQueueStorage<byte[]> {
     private static final Logger logger = LoggerFactory.getLogger(FileStorage.class.getName());
     private static final ThreadFactory safeCloseThreadFactory = new NamedThreadFactory("safe-close-thread-");

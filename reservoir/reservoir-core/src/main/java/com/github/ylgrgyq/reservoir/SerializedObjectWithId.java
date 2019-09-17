@@ -26,10 +26,20 @@ public final class SerializedObjectWithId<S> {
         this.serializedObject = serializedObject;
     }
 
+    /**
+     * Get the assigned id for this object
+     *
+     * @return id of this object
+     */
     public long getId() {
         return id;
     }
 
+    /**
+     * Get the serialized object.
+     *
+     * @return the serialized object
+     */
     public S getSerializedObject() {
         return serializedObject;
     }

@@ -31,7 +31,7 @@ public class AutomaticObjectQueueConsumerTest {
         listener.clear();
         listenerExecutor = Executors.newSingleThreadExecutor();
         queue = ObjectQueueBuilder.newBuilder(storage)
-                .setConsumerAutoCommit(false)
+                .autoCommitAfterFetch(false)
                 .buildQueue();
     }
 

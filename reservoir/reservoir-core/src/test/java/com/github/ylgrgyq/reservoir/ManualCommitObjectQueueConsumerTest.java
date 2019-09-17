@@ -17,7 +17,7 @@ import static org.awaitility.Awaitility.await;
 public class ManualCommitObjectQueueConsumerTest {
     private final TestingStorage<TestingPayload> storage = new TestingStorage<>();
     private final ObjectQueueBuilder<TestingPayload, TestingPayload> builder = ObjectQueueBuilder.newBuilder(storage)
-            .setConsumerAutoCommit(false);
+            .autoCommitAfterFetch(false);
 
     @Before
     public void setUp() {

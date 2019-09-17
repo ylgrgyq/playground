@@ -6,9 +6,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 
 /**
- * copied from Apache commons-io v2.6
+ * Copied from Apache commons-io v2.6.
+ * Internal use only, may change in the future.
  */
-public class FileUtils {
+public final class FileUtils {
     /**
      * Makes a directory, including any necessary but nonexistent parent
      * directories. If a file already exists with specified name but it is

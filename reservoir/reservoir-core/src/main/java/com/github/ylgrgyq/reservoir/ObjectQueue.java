@@ -6,6 +6,11 @@ import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
 
+/**
+ * A {@link ObjectQueue} implements {@link ObjectQueueConsumer} and {@link ObjectQueueProducer}.
+ *
+ * @param <E> the type of the element in {@link ObjectQueue}
+ */
 public class ObjectQueue<E> implements ObjectQueueConsumer<E>, ObjectQueueProducer<E> {
     private final ObjectQueueProducer<E> producerDelegate;
     private final ObjectQueueConsumer<E> consumerDelegate;

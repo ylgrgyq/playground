@@ -2,13 +2,14 @@ package com.github.ylgrgyq.reservoir;
 
 import java.util.concurrent.CompletableFuture;
 
-public interface ObjectQueueProducer<E> extends AutoCloseable{
+public interface ObjectQueueProducer<E> extends AutoCloseable {
     /**
-     * Produce an object to the queue. This method may block when the downstream storage is too slow and
-     * the internal buffer is running out.
+     * Inserts the specified object into this queue, waiting if necessary
+     * when the downstream storage is too slow or running out of space.
      *
-     * @param object The object to put into the queue
-     * @return a future which will be completed when the object is safely saved or encounter some exceptions
+     * @param object The object to insert
+     * @return a future which will be completed when the object is safely
+     *         inserted or some exceptions encountered
      */
     CompletableFuture<Void> produce(E object);
 

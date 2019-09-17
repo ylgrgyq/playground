@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
-public final class LogExceptionHandler<T> implements ExceptionHandler<T> {
+final class LogExceptionHandler<T> implements ExceptionHandler<T> {
     private static final Logger logger = LoggerFactory.getLogger(LogExceptionHandler.class);
 
     public interface OnEventException<T> {
@@ -18,11 +18,11 @@ public final class LogExceptionHandler<T> implements ExceptionHandler<T> {
     @Nullable
     private final OnEventException<T> onEventException;
 
-    public LogExceptionHandler(String name) {
+    LogExceptionHandler(String name) {
         this(name, null);
     }
 
-    public LogExceptionHandler(String name, @Nullable OnEventException<T> onEventException) {
+    LogExceptionHandler(String name, @Nullable OnEventException<T> onEventException) {
         this.name = name;
         this.onEventException = onEventException;
     }

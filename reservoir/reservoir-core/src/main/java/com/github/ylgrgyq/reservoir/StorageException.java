@@ -1,5 +1,9 @@
 package com.github.ylgrgyq.reservoir;
 
+/**
+ * A {@link StorageException} encapsulates the error of an operation within {@link ObjectQueueStorage}.
+ * This exception type is used to describe an internal error in {@link ObjectQueueStorage}.
+ */
 public class StorageException extends Exception {
     public StorageException() {
         super();
