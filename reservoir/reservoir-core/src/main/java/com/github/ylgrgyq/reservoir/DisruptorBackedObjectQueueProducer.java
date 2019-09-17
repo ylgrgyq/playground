@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
-import static com.spotify.futures.CompletableFutures.exceptionallyCompletedFuture;
 import static java.util.Objects.requireNonNull;
 
 final class DisruptorBackedObjectQueueProducer<E, S> implements ObjectQueueProducer<E> {
@@ -98,6 +97,12 @@ final class DisruptorBackedObjectQueueProducer<E, S> implements ObjectQueueProdu
         final CompletableFuture<Void> future = new CompletableFuture<>();
 
         ringBuffer.publishEvent(translator, null, future, Boolean.TRUE);
+        return future;
+    }
+
+    private static <T> CompletableFuture<T> exceptionallyCompletedFuture(Throwable throwable) {
+        final CompletableFuture<T> future = new CompletableFuture<>();
+        future.completeExceptionally(throwable);
         return future;
     }
 

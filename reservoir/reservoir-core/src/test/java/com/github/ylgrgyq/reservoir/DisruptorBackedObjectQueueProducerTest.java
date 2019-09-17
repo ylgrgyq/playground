@@ -1,6 +1,5 @@
 package com.github.ylgrgyq.reservoir;
 
-import com.spotify.futures.CompletableFutures;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -9,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 import static com.github.ylgrgyq.reservoir.TestingUtils.numberStringBytes;
@@ -64,7 +64,7 @@ public class DisruptorBackedObjectQueueProducerTest {
             producedPayloads.add(payload);
         }
 
-        await().until(() -> CompletableFutures.allAsList(futures).isDone());
+        await().until(() -> allAsList(futures).isDone());
         assertThat(futures).allSatisfy(CompletableFuture::isDone);
 
         final List<TestingPayload> payloads = storage.getProdcedPayloads()
@@ -152,5 +152,25 @@ public class DisruptorBackedObjectQueueProducerTest {
         CompletableFuture<Void> f = producer.produce(payload);
         await().until(f::isDone);
         assertThat(f).hasFailedWithThrowableThat().hasMessageContaining("store failed").isInstanceOf(RuntimeException.class);
+    }
+
+    public static <T> CompletableFuture<List<T>> allAsList(
+            List<? extends CompletionStage<? extends T>> stages) {
+        // We use traditional for-loops instead of streams here for performance reasons,
+        // see AllAsListBenchmark
+
+        @SuppressWarnings("unchecked") // generic array creation
+        final CompletableFuture<? extends T>[] all = new CompletableFuture[stages.size()];
+        for (int i = 0; i < stages.size(); i++) {
+            all[i] = stages.get(i).toCompletableFuture();
+        }
+        return CompletableFuture.allOf(all)
+                .thenApply(ignored -> {
+                    final List<T> result = new ArrayList<>(all.length);
+                    for (int i = 0; i < all.length; i++) {
+                        result.add(all[i].join());
+                    }
+                    return result;
+                });
     }
 }
