@@ -1,7 +1,6 @@
 package com.github.ylgrgyq.reservoir.storage;
 
 import com.github.ylgrgyq.reservoir.NamedThreadFactory;
-import com.github.ylgrgyq.reservoir.ObjectQueueStorage;
 import com.github.ylgrgyq.reservoir.StorageException;
 
 import javax.annotation.Nullable;
@@ -33,7 +32,6 @@ public class FileStorageBuilder {
 
     private boolean forceSyncOnFlushConsumerCommitLogWriter = false;
     private boolean forceSyncOnFlushDataLogWriter = false;
-    private long readRetryIntervalMillis = 500;
     private long truncateIntervalMillis = TimeUnit.MINUTES.toMillis(1);
     private final String storageBaseDir;
 
@@ -42,21 +40,6 @@ public class FileStorageBuilder {
 
     private FileStorageBuilder(final String storageBaseDir) {
         this.storageBaseDir = storageBaseDir;
-    }
-
-    /**
-     * @param readRetryInterval
-     * @param unit
-     * @return
-     */
-    public FileStorageBuilder setReadRetryIntervalMillis(long readRetryInterval, TimeUnit unit) {
-        if (readRetryInterval <= 0) {
-            throw new IllegalArgumentException("readRetryInterval: " + readRetryInterval + " (expect: > 0)");
-        }
-        requireNonNull(unit, "unit");
-
-        readRetryIntervalMillis = unit.toMillis(readRetryInterval);
-        return this;
     }
 
     /**
@@ -136,10 +119,6 @@ public class FileStorageBuilder {
 
     String getStorageBaseDir() {
         return storageBaseDir;
-    }
-
-    long getReadRetryIntervalMillis() {
-        return readRetryIntervalMillis;
     }
 
     long getTruncateIntervalMillis() {

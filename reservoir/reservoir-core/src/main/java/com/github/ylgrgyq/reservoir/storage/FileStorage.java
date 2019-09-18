@@ -16,6 +16,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
@@ -63,10 +66,12 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
     private final String baseDir;
     private final TableCache tableCache;
     private final Manifest manifest;
-    private final long readRetryIntervalMillis;
     private final FileLock storageLock;
     private final boolean forceSyncOnFlushConsumerCommitLogWriter;
     private final boolean forceSyncOnFlushDataLogWriter;
+    private final Lock lock;
+    private final Condition storageNotEmpty;
+    private final Condition noPendingImmFlushing;
 
     @Nullable
     private LogWriter dataLogWriter;
@@ -95,7 +100,6 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         }
 
         this.sstableWriterPool = builder.getFlushMemtableExecutorService();
-        this.readRetryIntervalMillis = builder.getReadRetryIntervalMillis();
         this.mm = new Memtable();
         this.baseDir = storageBaseDir;
         this.lastCommittedId = Long.MIN_VALUE;
@@ -105,6 +109,9 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         this.forceSyncOnFlushConsumerCommitLogWriter = builder.isForceSyncOnFlushConsumerCommitLogWriter();
         this.forceSyncOnFlushDataLogWriter = builder.isForceSyncOnFlushDataLogWriter();
         this.closeFuture = null;
+        this.lock = new ReentrantLock();
+        this.storageNotEmpty = lock.newCondition();
+        this.noPendingImmFlushing = lock.newCondition();
 
         boolean initStorageSuccess = false;
         try {
@@ -146,11 +153,12 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
     }
 
     @Override
-    public synchronized void commitId(long id) throws StorageException {
+    public void commitId(long id) throws StorageException {
         if (closed()) {
             throw new IllegalStateException("storage is closed");
         }
 
+        lock.lock();
         try {
             if (id > lastCommittedId) {
                 assert consumerCommitLogWriter != null;
@@ -166,12 +174,19 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
             }
         } catch (IOException ex) {
             throw new StorageException(ex);
+        } finally {
+            lock.unlock();
         }
     }
 
     @Override
-    public synchronized long getLastCommittedId() {
-        return lastCommittedId;
+    public long getLastCommittedId() {
+        lock.lock();
+        try {
+            return lastCommittedId;
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
@@ -181,14 +196,19 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         }
 
         List<SerializedObjectWithId<byte[]>> entries;
-        while (true) {
-            entries = doFetch(fromId, limit);
+        lock.lockInterruptibly();
+        try {
+            while (true) {
+                entries = doFetch(fromId, limit);
 
-            if (!entries.isEmpty()) {
-                break;
+                if (!entries.isEmpty()) {
+                    break;
+                }
+
+                storageNotEmpty.await();
             }
-
-            Thread.sleep(readRetryIntervalMillis);
+        } finally {
+            lock.unlock();
         }
 
         return Collections.unmodifiableList(entries);
@@ -202,36 +222,35 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
 
         final long end = System.nanoTime() + unit.toNanos(timeout);
         List<SerializedObjectWithId<byte[]>> entries;
-        while (true) {
-            entries = doFetch(fromId, limit);
+        lock.lockInterruptibly();
+        try {
+            while (true) {
+                entries = doFetch(fromId, limit);
 
-            if (!entries.isEmpty()) {
-                break;
+                if (!entries.isEmpty()) {
+                    break;
+                }
+
+                final long remain = TimeUnit.NANOSECONDS.toMillis(end - System.nanoTime());
+                if (remain <= 0) {
+                    break;
+                }
+
+                if (storageNotEmpty.await(remain, TimeUnit.MILLISECONDS)) {
+                    // we don't need to fetch storage again because no storage-not-empty signal received
+                    // and we have wait enough time for element to store
+                    break;
+                }
             }
-
-            final long remain = TimeUnit.NANOSECONDS.toMillis(end - System.nanoTime());
-            if (remain <= 0) {
-                break;
-            }
-
-            Thread.sleep(Math.min(remain, readRetryIntervalMillis));
+        } finally {
+            lock.unlock();
         }
 
         return Collections.unmodifiableList(entries);
     }
 
-    synchronized long getLastProducedId() {
-        if (!mm.isEmpty()) {
-            return mm.lastId();
-        } else if (imm != null && !imm.isEmpty()) {
-            return imm.lastId();
-        } else {
-            return manifest.getLastId();
-        }
-    }
-
     @Override
-    public synchronized void store(List<byte[]> batch) throws StorageException {
+    public void store(List<byte[]> batch) throws StorageException {
         requireNonNull(batch, "batch");
         if (closed()) {
             throw new IllegalStateException("storage is closed");
@@ -242,8 +261,10 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
             return;
         }
 
-        long id = getLastProducedId();
+        lock.lock();
         try {
+            long id = getLastProducedId();
+
             for (byte[] bs : batch) {
                 final SerializedObjectWithId<byte[]> e = new SerializedObjectWithId<>(++id, bs);
                 if (makeRoomForEntry(false)) {
@@ -256,20 +277,24 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
             }
             assert dataLogWriter != null;
             dataLogWriter.flush(forceSyncOnFlushDataLogWriter);
+            storageNotEmpty.signal();
         } catch (IOException ex) {
             throw new StorageException("append log on file based storage failed", ex);
+        } finally {
+            lock.unlock();
         }
     }
 
     @Override
-    public void close() {
+    public void close() throws Exception {
         close(false);
     }
 
-    void close(boolean force) {
+    void close(boolean force) throws Exception {
         CompletableFuture<Void> f = closeFuture;
         if (f == null) {
-            synchronized (this) {
+            lock.lockInterruptibly();
+            try {
                 f = closeFuture;
                 if (f == null) {
                     f = new CompletableFuture<>();
@@ -289,6 +314,8 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
                         task.run();
                     }
                 }
+            } finally {
+                lock.unlock();
             }
         }
 
@@ -301,11 +328,29 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
     }
 
     /**
+     * Use package access level only for testing.
+     * Please note that usually it must be protected with lock.
+     *
+     * @return the last produced id
+     */
+    @VisibleForTesting
+    long getLastProducedId() {
+        if (!mm.isEmpty()) {
+            return mm.lastId();
+        } else if (imm != null && !imm.isEmpty()) {
+            return imm.lastId();
+        } else {
+            return manifest.getLastId();
+        }
+    }
+
+    /**
      * It's difficult to test this method throw some exception then stop the storage. So we set it's access level to package
      * to make test easier.
      *
      * @param immutableMemtable the immutable memtable to flush
      */
+    @VisibleForTesting
     void writeMemtable(Memtable immutableMemtable) {
         logger.debug("start write mem table in background");
         boolean writeMemtableSuccess = false;
@@ -338,7 +383,8 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         } catch (Throwable t) {
             logger.error("write memtable in background failed", t);
         } finally {
-            synchronized (this) {
+            lock.lock();
+            try {
                 if (!writeMemtableSuccess) {
                     safeClose();
                 } else {
@@ -346,7 +392,9 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
                     imm = null;
                 }
 
-                notifyAll();
+                noPendingImmFlushing.signal();
+            } finally {
+                lock.unlock();
             }
         }
     }
@@ -360,7 +408,8 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
 
         @Override
         public void run() {
-            synchronized (FileStorage.this) {
+            lock.lock();
+            try {
                 try {
                     sstableWriterPool.shutdown();
 
@@ -382,6 +431,8 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
                 } catch (Exception ex) {
                     closeFuture.completeExceptionally(ex);
                 }
+            } finally {
+                lock.unlock();
             }
         }
     }
@@ -425,7 +476,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         }
     }
 
-    private synchronized void recoverStorage(Path currentFilePath, ManifestRecord record) throws IOException, StorageException {
+    private void recoverStorage(Path currentFilePath, ManifestRecord record) throws IOException, StorageException {
         assert Files.exists(currentFilePath);
         final String currentManifestFileName = new String(Files.readAllBytes(currentFilePath), StandardCharsets.UTF_8);
         if (currentManifestFileName.isEmpty()) {
@@ -502,7 +553,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         }
     }
 
-    private synchronized void recoverLastConsumerCommittedId() throws IOException, StorageException {
+    private void recoverLastConsumerCommittedId() throws IOException, StorageException {
         final int fileNumber = manifest.getConsumerCommittedIdLogFileNumber();
         final List<FileName.FileNameMeta> consumerLogFileMetas =
                 FileName.getFileNameMetas(baseDir, fileMeta -> fileMeta.getType() == FileType.ConsumerCommit
@@ -516,7 +567,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         }
     }
 
-    private synchronized boolean recoverLastConsumerCommittedIdFromLogFile(int fileNumber) throws IOException, StorageException {
+    private boolean recoverLastConsumerCommittedIdFromLogFile(int fileNumber) throws IOException, StorageException {
         final Path logFilePath = Paths.get(baseDir, FileName.getConsumerCommittedIdFileName(fileNumber));
         if (!Files.exists(logFilePath)) {
             logger.warn("Log file {} was deleted. We can't recover consumer committed id from it.", logFilePath);
@@ -581,7 +632,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         return buffer.array();
     }
 
-    private synchronized List<SerializedObjectWithId<byte[]>> doFetch(long fromId, int limit) throws StorageException {
+    private List<SerializedObjectWithId<byte[]>> doFetch(long fromId, int limit) throws StorageException {
         Itr itr;
 
         if (!mm.isEmpty() && fromId >= mm.firstId()) {
@@ -590,7 +641,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
 
         try {
             if (imm != null && fromId >= imm.firstId()) {
-                List<SeekableIterator<Long, SerializedObjectWithId<byte[]>>> itrs = Arrays.asList(imm.iterator(), mm.iterator());
+                final List<SeekableIterator<Long, SerializedObjectWithId<byte[]>>> itrs = Arrays.asList(imm.iterator(), mm.iterator());
                 for (SeekableIterator<Long, SerializedObjectWithId<byte[]>> it : itrs) {
                     it.seek(fromId);
                 }
@@ -600,7 +651,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
                 itr = internalIterator(fromId);
             }
 
-            List<SerializedObjectWithId<byte[]>> ret = new ArrayList<>();
+            final List<SerializedObjectWithId<byte[]>> ret = new ArrayList<>();
             while (itr.hasNext()) {
                 SerializedObjectWithId<byte[]> e = itr.next();
                 if (ret.size() >= limit) {
@@ -616,7 +667,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         }
     }
 
-    private synchronized boolean makeRoomForEntry(boolean force) throws IOException, StorageException {
+    private boolean makeRoomForEntry(boolean force) throws IOException, StorageException {
         try {
             boolean forceRun = force;
             while (true) {
@@ -626,7 +677,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
 
                 if (forceRun || mm.getMemoryUsedInBytes() > Constant.kMaxMemtableSize) {
                     if (imm != null) {
-                        this.wait();
+                        noPendingImmFlushing.await();
                         continue;
                     }
 
@@ -750,7 +801,7 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         }
     }
 
-    private synchronized void tryTruncate() {
+    private void tryTruncate() {
         try {
             final long lastCommittedId = getLastCommittedId();
             final long truncateId = Math.max(0, lastCommittedId);
@@ -761,20 +812,25 @@ public final class FileStorage implements ObjectQueueStorage<byte[]> {
         }
     }
 
-    private synchronized void safeClose() {
-        if (safeCloseThread == null) {
-            final Thread t = safeCloseThreadFactory.newThread(() -> {
-                try {
-                    close();
-                } catch (Exception ex) {
-                    logger.error("Close storage under directory: {} failed", baseDir, ex);
-                }
-            });
+    private void safeClose() {
+        lock.lock();
+        try {
+            if (safeCloseThread == null) {
+                final Thread t = safeCloseThreadFactory.newThread(() -> {
+                    try {
+                        close();
+                    } catch (Exception ex) {
+                        logger.error("Close storage under directory: {} failed", baseDir, ex);
+                    }
+                });
 
-            t.setDaemon(true);
-            t.start();
+                t.setDaemon(true);
+                t.start();
 
-            safeCloseThread = t;
+                safeCloseThread = t;
+            }
+        } finally {
+            lock.unlock();
         }
     }
 

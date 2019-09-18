@@ -56,7 +56,7 @@ class BufferedChannel implements AutoCloseable {
         fileChannel.force(true);
     }
 
-    int read(ByteBuffer dest) throws IOException {
+    synchronized int read(ByteBuffer dest) throws IOException {
         return read(dest, readBufferStartPosition + readBuffer.position());
     }
 
