@@ -13,11 +13,13 @@ import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadFactory;
 
 import static java.util.Objects.requireNonNull;
 
 final class DisruptorBackedObjectQueueProducer<E, S> implements ObjectQueueProducer<E> {
     private static final Logger logger = LoggerFactory.getLogger(DisruptorBackedObjectQueueProducer.class);
+    private static final ThreadFactory producerWorkerFactory = new NamedThreadFactory("reservoir-producer-worker-");
 
     private final ObjectQueueStorage<S> storage;
     private final Disruptor<ProducerEvent<S>> disruptor;
@@ -31,8 +33,7 @@ final class DisruptorBackedObjectQueueProducer<E, S> implements ObjectQueueProdu
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
-        this.disruptor = new Disruptor<>(ProducerEvent::new, builder.getProducerRingBufferSize(),
-                new NamedThreadFactory("producer-worker-"));
+        this.disruptor = new Disruptor<>(ProducerEvent::new, builder.getProducerRingBufferSize(), producerWorkerFactory);
         this.disruptor.handleEventsWith(new ProduceHandler(builder.getConsumerFetchBatchSize()));
         this.disruptor.setDefaultExceptionHandler(new LogExceptionHandler<>("object-queue-producer",
                 (event, ex) -> {
