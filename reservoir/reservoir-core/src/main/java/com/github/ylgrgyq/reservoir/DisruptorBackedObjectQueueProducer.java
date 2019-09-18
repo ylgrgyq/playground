@@ -30,7 +30,7 @@ final class DisruptorBackedObjectQueueProducer<E, S> implements ObjectQueueProdu
     private final Codec<E, S> serializer;
     private volatile boolean closed;
 
-    public DisruptorBackedObjectQueueProducer(ObjectQueueBuilder<E, S> builder) {
+    DisruptorBackedObjectQueueProducer(ObjectQueueBuilder<E, S> builder) {
         requireNonNull(builder, "builder");
 
         this.storage = builder.getStorage();
