@@ -19,13 +19,14 @@ import static java.util.Objects.requireNonNull;
 
 final class DisruptorBackedObjectQueueProducer<E, S> implements ObjectQueueProducer<E> {
     private static final Logger logger = LoggerFactory.getLogger(DisruptorBackedObjectQueueProducer.class);
-    private static final ThreadFactory producerWorkerFactory = new NamedThreadFactory("reservoir-producer-worker-");
+    private static final ThreadFactory producerWorkerFactory = new NamedThreadFactory("reservoir-object-queue-producer-worker-");
 
     private final ObjectQueueStorage<S> storage;
     private final Disruptor<ProducerEvent<S>> disruptor;
     private final RingBuffer<ProducerEvent<S>> ringBuffer;
     private final EventTranslatorThreeArg<ProducerEvent<S>, S, CompletableFuture<Void>, Boolean> translator;
     private final ExecutorService executor;
+    private final boolean shutdownExecutor;
     private final Codec<E, S> serializer;
     private volatile boolean closed;
 
@@ -46,7 +47,8 @@ final class DisruptorBackedObjectQueueProducer<E, S> implements ObjectQueueProdu
         this.disruptor.start();
         this.translator = new ProducerTranslator<>();
         this.ringBuffer = disruptor.getRingBuffer();
-        this.executor = builder.getExecutorService();
+        this.executor = builder.getProducerExecutorService();
+        this.shutdownExecutor = builder.isShutdownProducerExecutorService();
         this.serializer = builder.getCodec();
     }
 
@@ -90,7 +92,9 @@ final class DisruptorBackedObjectQueueProducer<E, S> implements ObjectQueueProdu
         future.join();
 
         disruptor.shutdown();
-        executor.shutdown();
+        if (shutdownExecutor) {
+            executor.shutdown();
+        }
         storage.close();
     }
 

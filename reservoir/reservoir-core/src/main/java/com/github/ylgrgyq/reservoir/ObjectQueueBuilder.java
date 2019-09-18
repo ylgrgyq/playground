@@ -18,7 +18,7 @@ import static java.util.Objects.requireNonNull;
  *            using type {@code S} to store element.
  */
 public final class ObjectQueueBuilder<E, S> {
-    private static final ThreadFactory threadFactory = new NamedThreadFactory("object-queue-executor-");
+    private static final ThreadFactory threadFactory = new NamedThreadFactory("reservoir-object-queue-executor-");
 
     /**
      * Create a new {@link ObjectQueueBuilder} with a specific {@link ObjectQueueStorage}.
@@ -47,7 +47,8 @@ public final class ObjectQueueBuilder<E, S> {
         return new ObjectQueueBuilder<>(storage, codec);
     }
 
-    private ExecutorService executorService = Executors.newSingleThreadExecutor(threadFactory);
+    private ExecutorService producerExecutorService = Executors.newSingleThreadExecutor(threadFactory);
+    private boolean shutdownProducerExecutorService = true;
     private int producerRingBufferSize = 512;
     private int consumerFetchBatchSize = 128;
     private boolean autoCommit = true;
@@ -144,13 +145,17 @@ public final class ObjectQueueBuilder<E, S> {
      * Used only by {@link ObjectQueueProducer}.
      * Set an executor service which is used to complete the
      * {@link java.util.concurrent.CompletableFuture} returned by
-     * {@link ObjectQueueProducer#produce(Object)}
+     * {@link ObjectQueueProducer#produce(Object)}.
+     * <p>
+     * Please remember to shutdown the input {@code producerExecutorService} when no one use it.
+     *
      * @param executorService an instance of {@link ExecutorService}
      */
-    public void setExecutorService(ExecutorService executorService) {
-        requireNonNull(executorService, "executorService");
+    public void setProducerExecutorService(ExecutorService executorService) {
+        requireNonNull(executorService, "producerExecutorService");
 
-        this.executorService = executorService;
+        this.producerExecutorService = executorService;
+        this.shutdownProducerExecutorService = false;
     }
 
     /**
@@ -196,8 +201,12 @@ public final class ObjectQueueBuilder<E, S> {
         return producerRingBufferSize;
     }
 
-    ExecutorService getExecutorService() {
-        return executorService;
+    ExecutorService getProducerExecutorService() {
+        return producerExecutorService;
+    }
+
+    boolean isShutdownProducerExecutorService() {
+        return shutdownProducerExecutorService;
     }
 
     ObjectQueueStorage<S> getStorage() {
