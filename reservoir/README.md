@@ -3,16 +3,16 @@
 [![Clojars Project](https://img.shields.io/clojars/v/com.github.ylgrgyq/reservoir.svg)](https://clojars.org/com.github.ylgrgyq/reservoir)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-Reservoir is a collection of queue-related classes which is used to store/retrieve elements to/from external storage  like file, redis etc. Currently, we only provide the local file based storage, but leave convient interfaces to adapt to other kind of storages.
+Reservoir is a collection of queue-related classes which is used to store/retrieve elements to/from external storage  like file, redis etc. Currently, we only provided the local file based storage, but leave convient interfaces to adapt to other kind of storages.
 
 ## Features
 
 * Data are arbitrary byte arrays or any serializable Java object.
-* Data is persistented on local file system when write complet.
+* Data is persisted on local file system when write complete.
 * With write-ahead-log, underlying file can survive on system crash and any unfinished write on crashing will be aborted after recovery. 
-* Good performance.  You can benchmark on your own machine with the provided benchmark command line tool.
-* Highly extensible to adpat to other storage system except the local file system. Actually we already implement a storage on Redis. We will release it when it is ready.
-* Provide a convient tool to process element from the queue.
+* Good performance. You can benchmark on your own machine with the provided benchmark command line tool.
+* Highly extensible to adpat to other storage system in addition to the local file system. Actually we already implement a storage on Redis. We will release it when it is ready.
+* Provide a convient tool which encapsulates common pattern to process elements from a queue.
 
 ## Usage examples
 
