@@ -1,9 +1,11 @@
 package com.github.ylgrgyq.reservoir;
 
+import com.github.ylgrgyq.reservoir.AutomaticObjectQueueConsumer.ConsumeObjectHandler;
+import com.github.ylgrgyq.reservoir.AutomaticObjectQueueConsumer.HandleFailedStrategy;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class TestingPayload implements Verifiable {
     private static TestingPayloadCodec codec = new TestingPayloadCodec();
