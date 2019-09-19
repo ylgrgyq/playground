@@ -32,7 +32,7 @@ Add some data to the end of the queue.`ObjectQueue` with `FileStorage` accepts a
 CompletableFuture<Void> future = queue.produce("Hello".getBytes(StandardCharsets.UTF_8));
 ```
 
-When the returned future is complete, the added data is saved on local file safely. 
+When the returned future is completed, the added data has been saved on local file safely. 
 
 Retrieve data at the head of the queue.
 
@@ -40,18 +40,19 @@ Retrieve data at the head of the queue.
 byte[] data = queue.fetch();
 ```
 
-After fetch the data from the queue, we should commit this data and remove this data from queue. 
+After fetch the data from the queue, we should commit this data and remove this data from the queue. 
 
 ```java
 queue.commit();
 ```
 
-While `ObjectQueue` works with `byte[]`, it also works with arbitrary Java objects with a similar API. A persistent `ObjectQueue` requires a  [Codec](https://github.com/square/tape#converter)  to encode and decode objects.
+While `ObjectQueue` works with `byte[]`, it also works with arbitrary Java objects with a similar API. `ObjectQueue` requires a  [Codec](https://github.com/square/tape#converter)  to encode and decode objects.
 
 ```java
-// Use string codec to encode/decode String object 
+// Let us assume that there's a string codec which can encode/decode String objects
 ObjectQueue<String> queue = ObjectQueueBuilder.newBuilder(fileStorage, stringCodec).buildQueue();
-// produce a String object into queue, not byte[]
+
+// produce a String object into the queue, not byte[]
 queue.produce("Hello");
 String data = queue.fetch();
 queue.commit();
@@ -65,7 +66,9 @@ queue.close();
 
 ### Codec
 
-A `Codec` encodes objects to bytes and decodes objects from bytes.
+A `Codec` encodes or decodes objects of a type to another type which adapt to the storage provided to `ObjectQueue`.
+For the provided `FileStorage`, it can only accept `byte[]` as the serialized object type. So for the `Codec` along with
+`FileStorage`, it encodes objects to bytes and decodes objects from bytes.
 
 ```java
 class StringCodec implements Codec<String, byte[]> {
@@ -83,7 +86,7 @@ class StringCodec implements Codec<String, byte[]> {
 
 ### Automatic queue consumer
 
-It is a common pattern to consume an object from a queue then do some stuff with it. If everything goes well, when we are done with this object, we commit it from the queue and continue to fetch, process the next object on the queue. So we provide `AutomaticObjectQueueConsumer` as a tool  to do these things.
+It is a common pattern to consume an object from a queue then do some stuff with it. If everything goes well, when we are done with this object, we commit it from the queue and continue to fetch, process the next object on the queue. So we provide `AutomaticObjectQueueConsumer` as a tool to encapsulate these things.
 
 At first we need to define a task which implement `Verifiable` for `AutomaticObjectQueueConsumer` to process. With `Verifiable`, when a task consumed from `ObjectQueue`, `AutomaticObjectQueueConsumer` can check if this task is still valid. If not, it can skip this task directly.
 
@@ -113,7 +116,7 @@ class Bob implements ConsumeObjectHandler<HavingDinner> {
     public HandleFailedStrategy onHandleObjectFailed(Dinner myDinner, Throwable throwable) {
         log.warn("Bob failed to enjoy his dinner: {}", myDinner, throwable);
 
-        // Bob can ignore this dinner or return RETRY to give this dinner another chance to enjoy it again
+        // Bob can ignore this dinner or return RETRY to give this dinner another chance
         // or return SHUTDOWN to smash the table furiously and don't have any dinner anymore
         return HandleFailedStrategy.IGNORE;
     }
@@ -129,7 +132,7 @@ AutomaticObjectQueueConsumer consuemr = new AutomaticObjectQueueConsumer(queue, 
 
 Then, when any `Dinner` produced to the queue, `Bob` will consume it. You can also provide `ConsumeObjectListener` to `AutomaticObjectQueueConsumer` to monitor the process of `Bob` having his `Dinner`.
 
-When you are done with `AutomaticObjectQueueConsumer`, you need to close it. It will close the `ObjectQueue` within it too.
+When you are done with `AutomaticObjectQueueConsumer`, you need to close it. It will close the `ObjectQueue` within too.
 
 ```java
 consumer.close();
