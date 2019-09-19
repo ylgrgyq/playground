@@ -9,7 +9,7 @@ Reservoir is a collection of queue-related classes which is used to store/retrie
 
 * Data are arbitrary byte arrays or any serializable Java object.
 * Data is persisted on local file system when write complete.
-* With write-ahead-log, underlying file can survive on system crash and any unfinished write on crashing will be aborted after recovery. 
+* With write-ahead-log, underlying file can survive from system crash. Any unfinished write on crashing will be aborted after recovery.
 * Good performance. You can benchmark on your own machine with the provided benchmark command line tool.
 * Highly extensible to adpat to other storage system in addition to the local file system. Actually we already implement a storage on Redis. We will release it when it is ready.
 * Provide a convient tool which encapsulates common pattern to process elements from a queue.
@@ -32,7 +32,7 @@ Add some data to the end of the queue.`ObjectQueue` with `FileStorage` accepts a
 CompletableFuture<Void> future = queue.produce("Hello".getBytes(StandardCharsets.UTF_8));
 ```
 
-When the returned future is completed, the added data has been saved on local file safely. 
+When the returned future is completed, the added data has been saved on local file safely.
 
 Retrieve data at the head of the queue.
 
@@ -40,7 +40,7 @@ Retrieve data at the head of the queue.
 byte[] data = queue.fetch();
 ```
 
-After fetch the data from the queue, we should commit this data and remove this data from the queue. 
+After fetch the data from the queue, we should commit this data and remove this data from the queue.
 
 ```java
 queue.commit();
@@ -67,7 +67,7 @@ queue.close();
 ### Codec
 
 A `Codec` encodes or decodes objects of a type to another type which adapt to the storage provided to `ObjectQueue`.
-For the provided `FileStorage`, it can only accept `byte[]` as the serialized object type. So for the `Codec` along with
+For `FileStorage`, it can only accept `byte[]` as the serialized object type. So for the `Codec` used along with
 `FileStorage`, it encodes objects to bytes and decodes objects from bytes.
 
 ```java

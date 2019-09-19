@@ -7,7 +7,7 @@
     <groupId>com.github.ylgrgyq</groupId>
     <artifactId>reservoir</artifactId>
     <packaging>pom</packaging>
-    <version>1.2-SNAPSHOT</version>
+    <version>1.2</version>
     <modules>
         <module>reservoir-core</module>
         <module>reservoir-benchmark</module>
