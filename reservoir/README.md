@@ -20,7 +20,7 @@ Reservoir is a collection of queue-related classes which is used to store/retrie
 
 Create a `ObjectQueue` instance.
 
-```
+```java
 String fileStoragePath = // ..... like /tmp/reservoir
 ObjectQueueStorage<byte[]> storage = FileStorageBuilder.newBuilder(tempDir).build();
 ObjectQueue<byte[]> queue = ObjectQueueBuilder.newBuilder(storage).buildQueue();
@@ -28,7 +28,7 @@ ObjectQueue<byte[]> queue = ObjectQueueBuilder.newBuilder(storage).buildQueue();
 
 Add some data to the end of the queue.`ObjectQueue` with `FileStorage` accepts a `byte[]` of arbitrary length.
 
-```
+```java
 CompletableFuture<Void> future = queue.produce("Hello".getBytes(StandardCharsets.UTF_8));
 ```
 
@@ -36,19 +36,19 @@ When the returned future is complete, the added data is saved on local file safe
 
 Retrieve data at the head of the queue.
 
-```
+```java
 byte[] data = queue.fetch();
 ```
 
 After fetch the data from the queue, we should commit this data and remove this data from queue. 
 
-```
+```java
 queue.commit();
 ```
 
 While `ObjectQueue` works with `byte[]`, it also works with arbitrary Java objects with a similar API. A persistent `ObjectQueue` requires a  [Codec](https://github.com/square/tape#converter)  to encode and decode objects.
 
-```
+```java
 // Use string codec to encode/decode String object 
 ObjectQueue<String> queue = ObjectQueueBuilder.newBuilder(fileStorage, stringCodec).buildQueue();
 // produce a String object into queue, not byte[]
@@ -59,14 +59,15 @@ queue.commit();
 
 When you are done with `ObjectQueue`, you need to close it.
 
-```
+```java
 queue.close();
 ```
 
 ### Codec
 
 A `Codec` encodes objects to bytes and decodes objects from bytes.
-```
+
+```java
 class StringCodec implements Codec<String, byte[]> {
     @Override
     public byte[] serialize(String obj) throws SerializationException {
@@ -85,7 +86,8 @@ class StringCodec implements Codec<String, byte[]> {
 It is a common pattern to consume an object from a queue then do some stuff with it. If everything goes well, when we are done with this object, we commit it from the queue and continue to fetch, process the next object on the queue. So we provide `AutomaticObjectQueueConsumer` as a tool  to do these things.
 
 At first we need to define a task which implement `Verifiable` for `AutomaticObjectQueueConsumer` to process. With `Verifiable`, when a task consumed from `ObjectQueue`, `AutomaticObjectQueueConsumer` can check if this task is still valid. If not, it can skip this task directly.
-```
+
+```java
 class Dinner implements Verifiable {
     @Override
     public boolean isValid() {
@@ -100,7 +102,7 @@ class Dinner implements Verifiable {
 
 Then we need to define a handler to process the task defined above. 
 
-```
+```java
 class Bob implements ConsumeObjectHandler<HavingDinner> {
     @Override
     public void onHandleObject(Dinner myDinner) throws Exception {
@@ -120,7 +122,7 @@ class Bob implements ConsumeObjectHandler<HavingDinner> {
 
 Finally, we need to create `ObjectQueue` and pass it with `ConsumeObjectHandler` to `AutomaticObjectQueueConsumer`.
 
-```
+```java
 ObjectQueue<HavingDinner> queue = // .... create queue like before
 AutomaticObjectQueueConsumer consuemr = new AutomaticObjectQueueConsumer(queue, new Bob());
 ```
@@ -128,7 +130,8 @@ AutomaticObjectQueueConsumer consuemr = new AutomaticObjectQueueConsumer(queue, 
 Then, when any `Dinner` produced to the queue, `Bob` will consume it. You can also provide `ConsumeObjectListener` to `AutomaticObjectQueueConsumer` to monitor the process of `Bob` having his `Dinner`.
 
 When you are done with `AutomaticObjectQueueConsumer`, you need to close it. It will close the `ObjectQueue` within it too.
-```
+
+```java
 consumer.close();
 ```
 
