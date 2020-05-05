@@ -1,0 +1,8 @@
+[package]
+name = "hello_cargo"
+version = "0.1.0"
+authors = ["ylgrgyq <alven.gr@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+rand = "0.7.2"
