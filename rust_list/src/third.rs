@@ -61,7 +61,7 @@ impl<T> Drop for List<T> {
     fn drop(&mut self) {
         let mut cur_link = self.head.take();
 
-        while let Some(mut node) = cur_link {
+        while let Some(node) = cur_link {
             if let Ok(mut node) = Rc::try_unwrap(node) {
                 cur_link = node.next.take()
             } else {
