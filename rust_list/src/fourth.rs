@@ -18,6 +18,8 @@ struct Node<T> {
     next: Link<T>,
 }
 
+struct IntoIter<T>(List<T>);
+
 impl<T> Node<T> {
     fn new(item: T) -> Node<T> {
         Node { item, prev: None, next: None }
@@ -66,6 +68,7 @@ impl<T> List<T> {
     fn peek_front(&self) -> Option<Ref<T>> {
         self.head.as_ref().map(|head| {
             let ref_node = head.borrow();
+            // 将 Ref<Node<T>> 转换为 Ref<T>
             Ref::map(ref_node, |node| {
                 &node.item
             })
@@ -149,11 +152,23 @@ impl<T> List<T> {
             })
         })
     }
+
+    fn into_iter(self) -> IntoIter<T> {
+        IntoIter(self)
+    }
 }
 
 impl<T> Drop for List<T> {
     fn drop(&mut self) {
         while self.pop_front().is_some() {}
+    }
+}
+
+impl<T> Iterator for IntoIter<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.pop_front()
     }
 }
 
@@ -263,5 +278,19 @@ mod test {
         list.push_back(100);
         *list.peek_back_mut().unwrap().deref_mut() = 200;
         assert_eq!(&*list.peek_back_mut().unwrap(), &200);
+    }
+
+    #[test]
+    fn into_iter() {
+        let mut list = List::new();
+        list.push_back(100);
+        list.push_back(200);
+        list.push_back(300);
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next(), Some(100));
+        assert_eq!(iter.next(), Some(200));
+        assert_eq!(iter.next(), Some(300));
+        assert_eq!(iter.next(), None);
     }
 }
