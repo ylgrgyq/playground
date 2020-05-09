@@ -1,4 +1,4 @@
-use std::cell::{RefCell, Ref};
+use std::cell::{RefCell, Ref, RefMut};
 use std::rc::Rc;
 
 /// 一个 Node 可能会被前后 Node 指向，还可能被 head 或 tail 指向，所以只有一个 owner 不行，得用 Rc
@@ -72,6 +72,15 @@ impl<T> List<T> {
         })
     }
 
+    fn peek_front_mut(&self) -> Option<RefMut<T>> {
+        self.head.as_ref().map(|head| {
+            let ref_node = head.borrow_mut();
+            RefMut::map(ref_node, |node| {
+                &mut node.item
+            })
+        })
+    }
+
 //    fn peek_front2(&self) -> Option<&T> {
 //        self.head.as_ref().map(|head| {
 //            // 这么写是不行的，因为 borrow 得到的 Ref 生命周期只能在当前这个括号内
@@ -83,13 +92,63 @@ impl<T> List<T> {
 //        })
 //    }
 
-//    fn peek_front_node(&self) -> Option<Ref<Node<T>>> {
+    //    fn peek_front_node(&self) -> Option<Ref<Node<T>>> {
 //        self.head.as_ref().map(|head| {
 //            // 这种写法也行，也是将 borrow() 生成的 Ref 对象作为返回值 move 出去，但是让外界能看到 Node 细节
 //            // 破坏了封装
 //            head.borrow()
 //        })
 //    }
+    fn push_back(&mut self, item: T) {
+        let new_node = Rc::new(RefCell::new(Node::new(item)));
+        match self.tail.take() {
+            Some(old_tail) => {
+                new_node.borrow_mut().prev = Some(Rc::clone(&old_tail));
+                self.tail = Some(Rc::clone(&new_node));
+                // 操作顺序要改变一下，最后把 new_node move 到前一个节点的 next 下
+                // ownership 就是 head 拥有下一个 Node，之后每个 Node 的 next 拥有它下一个节点
+                old_tail.borrow_mut().next = Some(new_node);
+            }
+            None => {
+                self.tail = Some(Rc::clone(&new_node));
+                self.head = Some(new_node);
+            }
+        };
+    }
+
+    fn pop_back(&mut self) -> Option<T> {
+        self.tail.take().map(|old_tail| {
+            match old_tail.borrow_mut().prev.take() {
+                Some(prev_node) => {
+                    prev_node.borrow_mut().next.take();
+                    self.tail = Some(prev_node);
+                }
+                None => {
+                    self.head.take();
+                    self.tail.take();
+                }
+            }
+            Rc::try_unwrap(old_tail).ok().unwrap().into_inner().item
+        })
+    }
+
+    fn peek_back(&self) -> Option<Ref<T>> {
+        self.tail.as_ref().map(|tail_ref| {
+            let node_ref = tail_ref.borrow();
+            Ref::map(node_ref, |old_ref| {
+                &old_ref.item
+            })
+        })
+    }
+
+    fn peek_back_mut(&self) -> Option<RefMut<T>> {
+        self.tail.as_ref().map(|tail_ref| {
+            let node_ref = tail_ref.borrow_mut();
+            RefMut::map(node_ref, |old_ref| {
+                &mut old_ref.item
+            })
+        })
+    }
 }
 
 impl<T> Drop for List<T> {
@@ -101,6 +160,7 @@ impl<T> Drop for List<T> {
 #[cfg(test)]
 mod test {
     use super::List;
+    use std::ops::DerefMut;
 
     #[test]
     fn push_pop_front() {
@@ -112,12 +172,59 @@ mod test {
         assert_eq!(list.pop_front(), Some(300));
         assert_eq!(list.pop_front(), Some(200));
         assert_eq!(list.pop_front(), Some(100));
+        assert_eq!(list.pop_back(), None);
+    }
+
+    #[test]
+    fn push_pop_back() {
+        let mut list = List::new();
+        list.push_back(100);
+        list.push_back(200);
+        list.push_back(300);
+
+        assert_eq!(list.pop_back(), Some(300));
+        assert_eq!(list.pop_back(), Some(200));
+        assert_eq!(list.pop_back(), Some(100));
+        assert_eq!(list.pop_back(), None);
+    }
+
+    #[test]
+    fn push_front_pop_back() {
+        let mut list = List::new();
+        list.push_front(100);
+        list.push_front(200);
+        list.push_front(300);
+
+        assert_eq!(list.pop_back(), Some(100));
+        assert_eq!(list.pop_back(), Some(200));
+        assert_eq!(list.pop_back(), Some(300));
+        assert_eq!(list.pop_back(), None);
+    }
+
+    #[test]
+    fn push_back_pop_front() {
+        let mut list = List::new();
+        list.push_back(100);
+        list.push_back(200);
+        list.push_back(300);
+
+        assert_eq!(list.pop_front(), Some(100));
+        assert_eq!(list.pop_front(), Some(200));
+        assert_eq!(list.pop_front(), Some(300));
     }
 
     #[test]
     fn peek_front_on_empty_list() {
         let list: List<u32> = List::new();
         assert!(list.peek_front().is_none());
+        assert!(list.peek_front_mut().is_none());
+    }
+
+    #[test]
+    fn peek_back_empty_list() {
+        let list: List<u32> = List::new();
+        assert!(list.peek_back().is_none());
+        assert!(list.peek_back_mut().is_none());
     }
 
     #[test]
@@ -129,5 +236,32 @@ mod test {
         assert_eq!(&*list.peek_front().unwrap(), &200);
         list.push_front(300);
         assert_eq!(&*list.peek_front().unwrap(), &300);
+    }
+
+    #[test]
+    fn peek_back() {
+        let mut list: List<u32> = List::new();
+        list.push_back(100);
+        assert_eq!(&*list.peek_back().unwrap(), &100);
+        list.push_back(200);
+        assert_eq!(&*list.peek_back().unwrap(), &200);
+        list.push_back(300);
+        assert_eq!(&*list.peek_back().unwrap(), &300);
+    }
+
+    #[test]
+    fn peek_front_mut() {
+        let mut list: List<u32> = List::new();
+        list.push_front(100);
+        *list.peek_front_mut().unwrap().deref_mut() = 200;
+        assert_eq!(&*list.peek_front_mut().unwrap(), &200);
+    }
+
+    #[test]
+    fn peek_back_mut() {
+        let mut list: List<u32> = List::new();
+        list.push_back(100);
+        *list.peek_back_mut().unwrap().deref_mut() = 200;
+        assert_eq!(&*list.peek_back_mut().unwrap(), &200);
     }
 }
