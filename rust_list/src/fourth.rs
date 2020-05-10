@@ -172,6 +172,13 @@ impl<T> Iterator for IntoIter<T> {
     }
 }
 
+impl<T> DoubleEndedIterator for IntoIter<T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.pop_back()
+    }
+}
+
+
 #[cfg(test)]
 mod test {
     use super::List;
@@ -292,5 +299,19 @@ mod test {
         assert_eq!(iter.next(), Some(200));
         assert_eq!(iter.next(), Some(300));
         assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn into_iter_back() {
+        let mut list = List::new();
+        list.push_back(100);
+        list.push_back(200);
+        list.push_back(300);
+
+        let mut iter = list.into_iter();
+        assert_eq!(iter.next_back(), Some(300));
+        assert_eq!(iter.next_back(), Some(200));
+        assert_eq!(iter.next_back(), Some(100));
+        assert_eq!(iter.next_back(), None);
     }
 }
