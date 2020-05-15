@@ -35,6 +35,9 @@ impl<T> List<T> {
             next: None,
         });
 
+        // raw_ptr 类型为 *mut Node<T>
+        // *new_node 是因为 new_node 是 Box<Node<T>>，加个 * 才能变成 Node<T>
+        // &mut 可以赋值给 &mut 也可以赋值给 *mut，参考：https://stackoverflow.com/questions/31949579/understanding-and-relationship-between-box-ref-and/31953048#31953048
         let raw_ptr: *mut _ = &mut *new_node;
 
         if self.tail.is_null() {
