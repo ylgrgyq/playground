@@ -1,4 +1,4 @@
-use rusqlite::{Connection, NO_PARAMS, params};
+use rusqlite::{Connection, NO_PARAMS, params, ToSql};
 use std::error::Error;
 use crate::{SearchArguments, BearDb};
 use crate::note::{Note};
@@ -27,22 +27,34 @@ fn generate_sql(search_args: &SearchArguments) -> String {
             title_filter)
 }
 
+struct Sql<'a, T: ?Sized> {
+    sql: &'a str,
+    args: T,
+}
+
+fn p<'a>(search_args: &'a SearchArguments) -> Sql<'a, [&'a dyn ToSql; 2]> {
+// let a : [&dyn ToSql; 2] = [&search_args.offset, &search_args.limit];
+    Sql { sql: "asdfsdf", args: [&search_args.offset, &search_args.limit] }
+}
+
 impl BearDb for SqliteBearDb {
     fn search(&self, search_args: &SearchArguments) -> Result<Vec<Note>, Box<dyn Error>> {
+        let mut ret: Vec<Note> = vec![];
         let conn = get_db_connection()?;
         let mut stmt = conn.prepare(generate_sql(search_args).as_str())?;
-        let notes = stmt.query_map(
+
+        stmt.query_map(
             params![search_args.offset, search_args.limit],
             |row| {
                 let title = row.get(0)?;
                 let content = row.get(1)?;
                 Ok(Note::new(title, content))
-            })?;
+            })?.for_each(|note| {
+            if note.is_ok() {
+                ret.push(note.unwrap())
+            }
+        });
 
-        let mut ret: Vec<Note> = vec![];
-        for note in notes {
-            ret.push(note?);
-        }
         Ok(ret)
     }
 }
