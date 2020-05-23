@@ -4,7 +4,9 @@ extern crate strum;
 fn main() {
     match bear_reader::read_bear() {
         Ok(ret) => {
-            println!("Result {:?}", ret);
+            for note in ret {
+                println!("{}", note);
+            }
         },
         Err(error) => {
             eprintln!("Error: {:?}", error);
