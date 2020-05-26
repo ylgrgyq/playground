@@ -1,17 +1,14 @@
 extern crate bear_reader;
-extern crate strum;
 
 fn main() {
+    bear_reader::reset_signal_pipe_handler();
+
     match bear_reader::read_bear() {
         Ok(ret) => {
-            for note in ret {
-                println!("{}", note);
-            }
-        },
+            println!("{}", ret.join("\n\n"));
+        }
         Err(error) => {
             eprintln!("Error: {:?}", error);
         }
     }
-
-    println!("Done")
 }

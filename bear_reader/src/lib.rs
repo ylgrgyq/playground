@@ -7,14 +7,9 @@ use std::cmp::max;
 mod db;
 mod note;
 
-trait BearDb {
-    fn search(&self, search_args: &SearchArguments) -> Result<Vec<note::Note>, Box<dyn Error>>;
-}
-
-fn parse_args() -> clap::ArgMatches<'static> {
+fn args_app() -> clap::App<'static, 'static> {
     clap::App::new(env!("CARGO_PKG_NAME"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
-        .author(env!("CARGO_PKG_AUTHORS"))
         .version(env!("CARGO_PKG_VERSION"))
         .version_short("v")
         .arg({
@@ -23,7 +18,7 @@ fn parse_args() -> clap::ArgMatches<'static> {
                 allowed_fields.push(field.into());
             }
             clap::Arg::with_name("Field")
-                .help("field of note to read")
+                .help("Case insensitive and is required. Used to read whole or only part of a note.\n")
                 .index(1)
                 .case_insensitive(true)
                 .takes_value(true)
@@ -32,50 +27,49 @@ fn parse_args() -> clap::ArgMatches<'static> {
                 .required(true)
         })
         .arg(clap::Arg::with_name("Title")
-                 .help("Title of note to filter")
+                 .help("Title of target notes to filter out.")
                  .short("t")
                  .long("title")
-                 .case_insensitive(true)
+                 .case_insensitive(false)
                  .takes_value(true)
                  .multiple(false),
         )
         .arg(clap::Arg::with_name("Offset")
-                 .help("Offset")
-                 .long("offset")
-                 .validator(|v| {
-                     if v.parse::<u32>().is_ok() {
-                         Ok(())
-                     } else {
-                         Err(String::from("Offset should be an unsigned int"))
-                     }
-                 })
-                 .takes_value(true)
-                 .multiple(false)
-                 .conflicts_with("Title"),
+            .help("Skips the Offset notes before beginning to return the notes. Used to scan lots of notes.")
+            .long("offset")
+            .validator(|v| {
+                if v.parse::<u32>().is_ok() {
+                    Ok(())
+                } else {
+                    Err(format!("Offset should be an integer in [0, {}].", u32::max_value()))
+                }
+            })
+            .takes_value(true)
+            .multiple(false)
+            .default_value("0")
         )
         .arg(clap::Arg::with_name("Limit")
-                 .help("Limit")
-                 .long("limit")
-                 .validator(|v| {
-                     if let Ok(limit) = v.parse::<u32>() {
-                         if limit == 0 {
-                             Err(String::from("Limit should be greater than zero"))
-                         } else {
-                             Ok(())
-                         }
-                     } else {
-                         Err(String::from("Limit should be an unsigned int"))
-                     }
-                 })
-                 .takes_value(true)
-                 .multiple(false)
-                 .conflicts_with("Title"),
+            .help("Constrain the number of notes returned.")
+            .long("limit")
+            .default_value("20")
+            .validator(|v| {
+                if let Ok(limit) = v.parse::<u32>() {
+                    if limit != 0 {
+                        return Ok(());
+                    }
+                }
+                Err(format!("Limit should be an positive integer in (0, {}]", u32::max_value()))
+            })
+            .takes_value(true)
+            .multiple(false)
         )
-        .get_matches()
+        .after_help("EXAMPLE:\n\
+        bear_reader HEADERS -t \"My Fancy Note\"\n\
+        bear_reader Title --offset 20 --limit 100\n")
 }
 
 #[derive(Debug)]
-struct SearchArguments<'a> {
+pub struct SearchArguments<'a> {
     title: Option<&'a str>,
     limit: u32,
     offset: u32,
@@ -108,20 +102,31 @@ fn get_search_field(args: &clap::ArgMatches) -> note::FieldOfNote {
     }
 }
 
-fn get_bear_db() -> Box<dyn BearDb> {
-    #[cfg(target_os = "macos")]
-        let beardb = db::sqlite_db::SqliteBearDb {};
-    Box::new(beardb)
-}
-
 pub fn read_bear() -> Result<Vec<String>, Box<dyn Error>> {
-    let args = parse_args();
+    let args = args_app().get_matches();
     let search_args = SearchArguments::new(&args);
 
-    let notes = get_bear_db().search(&search_args)?;
+    let notes = db::get_bear_db().search(&search_args)?;
     let ret = notes
         .into_iter()
         .map(|note| note.into_field(&get_search_field(&args)))
         .collect();
     Ok(ret)
+}
+
+/// Reset the signal pipe (`SIGPIPE`) handler to the default one provided by the system.
+/// This will end the program on `SIGPIPE` instead of panicking.
+///
+/// This should be called before calling any cli method or printing any output.
+/// See: https://github.com/rust-lang/rust/issues/46016
+pub fn reset_signal_pipe_handler() {
+    #[cfg(target_family = "unix")]
+        {
+            use nix::sys::signal;
+
+            unsafe {
+                signal::signal(signal::Signal::SIGPIPE, signal::SigHandler::SigDfl)
+                    .expect("Reset handler for `SIGPIPE` failed");
+            }
+        }
 }

@@ -1,13 +1,16 @@
-use rusqlite::{Connection, NO_PARAMS, params, ToSql};
+use rusqlite::{Connection, params, ToSql};
 use std::error::Error;
-use crate::{SearchArguments, BearDb};
+use crate::{SearchArguments};
 use crate::note::{Note};
+use crate::db::{BearDb};
+
+const DEFAULT_BEAR_SQLITE_DB_PATH: &str = "Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data/database.sqlite";
 
 pub struct SqliteBearDb {}
 
 fn get_db_path() -> String {
     let home = env!("HOME");
-    let bear_db_path = "Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data/database.sqlite";
+    let bear_db_path = DEFAULT_BEAR_SQLITE_DB_PATH;
 
     format!("{}/{}", home, bear_db_path)
 }
@@ -17,45 +20,40 @@ fn get_db_connection() -> rusqlite::Result<Connection> {
     Connection::open(db_path)
 }
 
-fn generate_sql(search_args: &SearchArguments) -> String {
-    let title_filter = search_args.title.as_ref()
-        .map(|title| format!(" AND `ZTITLE` == '{}'", title))
-        .unwrap_or(String::from(""));
+fn do_search(sql: &str, args: &[&dyn ToSql]) -> Result<Vec<Note>, Box<dyn Error>> {
+    let mut ret: Vec<Note> = vec![];
+    let conn = get_db_connection()?;
+    let mut stmt = conn.prepare(sql)?;
 
-    format!("SELECT ZTITLE, ZTEXT FROM `ZSFNOTE` \
-        WHERE `ZTRASHED` LIKE '0' AND `ZARCHIVED` LIKE '0' {} LIMIT ?1,?2",
-            title_filter)
-}
-
-struct Sql<'a, T: ?Sized> {
-    sql: &'a str,
-    args: T,
-}
-
-fn p<'a>(search_args: &'a SearchArguments) -> Sql<'a, [&'a dyn ToSql; 2]> {
-// let a : [&dyn ToSql; 2] = [&search_args.offset, &search_args.limit];
-    Sql { sql: "asdfsdf", args: [&search_args.offset, &search_args.limit] }
-}
-
-impl BearDb for SqliteBearDb {
-    fn search(&self, search_args: &SearchArguments) -> Result<Vec<Note>, Box<dyn Error>> {
-        let mut ret: Vec<Note> = vec![];
-        let conn = get_db_connection()?;
-        let mut stmt = conn.prepare(generate_sql(search_args).as_str())?;
-
-        stmt.query_map(
-            params![search_args.offset, search_args.limit],
-            |row| {
-                let title = row.get(0)?;
-                let content = row.get(1)?;
-                Ok(Note::new(title, content))
-            })?.for_each(|note| {
+    stmt.query_map(
+        args,
+        |row| {
+            let title = row.get(0)?;
+            let content = row.get(1)?;
+            Ok(Note::new(title, content))
+        })?
+        .for_each(|note| {
             if note.is_ok() {
                 ret.push(note.unwrap())
             }
         });
+    Ok(ret)
+}
 
-        Ok(ret)
+const SEARCH_WITH_TITLE: &str = "SELECT ZTITLE, ZTEXT FROM `ZSFNOTE` \
+         WHERE `ZTRASHED` LIKE '0' AND `ZARCHIVED` LIKE '0' AND `ZTITLE` == ?1 LIMIT ?2,?3";
+const SEARCH_WITHOUT_TITLE: &str = "SELECT ZTITLE, ZTEXT FROM `ZSFNOTE` \
+        WHERE `ZTRASHED` LIKE '0' AND `ZARCHIVED` LIKE '0' LIMIT ?1,?2";
+
+impl BearDb for SqliteBearDb {
+    fn search(&self, search_args: &SearchArguments) -> Result<Vec<Note>, Box<dyn Error>> {
+        if search_args.title.is_some() {
+            do_search(SEARCH_WITH_TITLE,
+                      params![search_args.title.unwrap(), search_args.offset, search_args.limit])
+        } else {
+            do_search(SEARCH_WITHOUT_TITLE,
+                      params![search_args.offset, search_args.limit])
+        }
     }
 }
 
