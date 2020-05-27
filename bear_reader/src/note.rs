@@ -1,43 +1,106 @@
-use strum_macros::{EnumString, EnumIter, IntoStaticStr};
-use regex::Regex;
+use regex::{Regex};
 use lazy_static::lazy_static;
+use std::fmt::{Display, Formatter};
+use std::fmt;
 
-#[derive(Debug, EnumString, EnumIter, IntoStaticStr)]
-pub enum FieldOfNote {
-    WHOLE,
-    TITLE,
-    HEADERS,
+const MAXIMUM_HEADER_LEVEL: usize = 16;
+
+#[derive(Debug, PartialEq)]
+pub struct Header {
+    pub level: usize,
+    pub header: String,
+}
+
+impl Display for Header {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result<> {
+        write!(f, "{} {}", "#".repeat(self.level), self.header.as_str())
+    }
 }
 
 pub struct Note {
+    uuid: String,
     title: String,
-    headers: Vec<String>,
-    whole: String,
+    headers: Vec<Header>,
+    text: String,
+}
+
+fn find_header(line: &str) -> Option<Header> {
+    lazy_static! {
+        static ref MATCHER: Regex = Regex::new(r"(^#+)\s(.*)")
+        .expect("Error initializing regex for note headers");
+    }
+
+    if let Some(caps) = MATCHER.captures(line) {
+        if let Some(captured_level) = caps.get(1) {
+            let level = captured_level.as_str().len();
+            // a line with too many '#' is not a valid header
+            if level > MAXIMUM_HEADER_LEVEL {
+                return None;
+            }
+
+            // a line only has '#' and blank is not a valid header
+            if let Some(captured_header) = caps.get(2) {
+                let header = captured_header.as_str().trim();
+                if !header.is_empty() {
+                    return Some(Header { level, header: String::from(header) });
+                }
+            }
+        } else {
+            panic!("Regex matched a header: '{}' which is not start with '#'.", line);
+        }
+    }
+
+    None
 }
 
 impl Note {
-    pub fn new(title: String, whole: String) -> Note {
-        lazy_static! {
-            static ref MATCHER: Regex = Regex::new("^#+ ").expect("Error initializing regex for note headers");
-        }
+    pub fn new(uuid: String, title: String, text: String) -> Note {
         let mut headers = vec![];
-        for line in whole.lines() {
-            if MATCHER.is_match(line) {
-                headers.push(String::from(line));
+        let mut in_code_block = false;
+        let mut headers_in_code_block = vec![];
+        for line in text.lines() {
+            // skip headers in code block
+            if line.starts_with("```") {
+                if in_code_block {
+                    headers_in_code_block.clear();
+                }
+                in_code_block = !in_code_block;
+                continue;
             }
+
+            find_header(line).map(|header| {
+                let headers_to_push = if in_code_block { &mut headers_in_code_block } else { &mut headers };
+                headers_to_push.push(header);
+            });
         }
 
-        Note { title, whole, headers }
+        // headers in an unfinished code block is valid headers
+        // and should be added to valid header list
+        if in_code_block {
+            headers.append(&mut headers_in_code_block);
+        }
+
+        Note { uuid, title, headers, text }
     }
 
-    pub fn into_field(self, field: &FieldOfNote) -> String {
-        match field {
-            FieldOfNote::TITLE => self.title,
-            FieldOfNote::WHOLE => self.whole,
-            FieldOfNote::HEADERS => {
-                self.headers.join("\n")
-            }
-        }
+    pub fn uuid_ref(&self) -> &String {
+        &self.uuid
+    }
+
+    pub fn title(self) -> String {
+        self.title
+    }
+
+    pub fn headers(self) -> Vec<Header> {
+        self.headers
+    }
+
+    pub fn headers_ref(&self) -> &Vec<Header> {
+        &self.headers
+    }
+
+    pub fn text(self) -> String {
+        self.text
     }
 }
 
@@ -47,71 +110,122 @@ mod tests {
 
     #[test]
     fn new_note_with_empty_header() {
+        let uuid = "UUID 11";
         let title = "Title";
         let content = "Content";
-        let note = Note::new(String::from(title), String::from(content));
+        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
 
+        assert_eq!(uuid, note.uuid);
         assert_eq!(title, note.title);
-        assert_eq!(content, note.whole);
+        assert_eq!(content, note.text);
         assert!(note.headers.is_empty())
     }
 
     #[test]
     fn new_note_with_header() {
+        let uuid = "UUID 11";
         let title = "Title";
         let content = "Content\n\
         # Header Line\n\
         Hello\n\
         \n\
-        ## Second Header  \n\
-        ### Third Header";
-        let note = Note::new(String::from(title), String::from(content));
+        #####\n\
+        ##        \n\
+        ##  Second Header  \n\
+        ### Third Header\n\
+        ";
+        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
 
+        assert_eq!(uuid, note.uuid);
         assert_eq!(title, note.title);
-        assert_eq!(content, note.whole);
-        assert_eq!("# Header Line", note.headers.get(0).unwrap());
-        assert_eq!("## Second Header  ", note.headers.get(1).unwrap());
-        assert_eq!("### Third Header", note.headers.get(2).unwrap());
+        assert_eq!(content, note.text);
+        assert_eq!("Header Line", note.headers.get(0).unwrap().header);
+        assert_eq!(1, note.headers.get(0).unwrap().level);
+        assert_eq!("Second Header", note.headers.get(1).unwrap().header);
+        assert_eq!(2, note.headers.get(1).unwrap().level);
+        assert_eq!("Third Header", note.headers.get(2).unwrap().header);
+        assert_eq!(3, note.headers.get(2).unwrap().level);
+        assert_eq!(3, note.headers.len());
     }
 
     #[test]
-    fn into_title() {
-        let title = "Title";
-        let content = "Content";
-        let note = Note::new(String::from(title), String::from(content));
-
-        assert_eq!(title, note.into_field(&FieldOfNote::TITLE))
-    }
-
-    #[test]
-    fn into_content() {
-        let title = "Title";
-        let content = "Content";
-        let note = Note::new(String::from(title), String::from(content));
-
-        assert_eq!(content, note.into_field(&FieldOfNote::WHOLE))
-    }
-
-    #[test]
-    fn into_empty_headers() {
-        let title = "Title";
-        let content = "Content";
-        let note = Note::new(String::from(title), String::from(content));
-
-        assert!(note.into_field(&FieldOfNote::HEADERS).is_empty())
-    }
-
-    #[test]
-    fn into_headers() {
+    fn no_headers_in_code_block() {
+        let uuid = "UUID 11";
         let title = "Title";
         let content = "Content\n\
         # Header Line\n\
         Hello\n\
         \n\
-        ## Second Header  \n\
-        ### Third Header";
-        let note = Note::new(String::from(title), String::from(content));
+        ```\n\
+        #####\n\
+        ##        \n\
+        ##  Second Header  \n\
+        ### Third Header\n\
+        ```
+        ";
+        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
 
-        assert_eq!("# Header Line\n## Second Header  \n### Third Header", note.into_field(&FieldOfNote::HEADERS));
+        assert_eq!(uuid, note.uuid);
+        assert_eq!(title, note.title);
+        assert_eq!(content, note.text);
+        assert_eq!("Header Line", note.headers.get(0).unwrap().header);
+        assert_eq!(1, note.headers.get(0).unwrap().level);
+        assert_eq!(1, note.headers.len());
+    }
+
+    #[test]
+    fn headers_in_unfinished_code_block() {
+        let uuid = "UUID 11";
+        let title = "Title";
+        let content = "Content\n\
+        # Header Line\n\
+        Hello\n\
+        \n\
+        ```\n\
+        #####\n\
+        ##        \n\
+        ##  Second Header  \n\
+        ### Third Header\n\
+        ";
+        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+
+        assert_eq!(uuid, note.uuid);
+        assert_eq!(title, note.title);
+        assert_eq!(content, note.text);
+        assert_eq!("Header Line", note.headers.get(0).unwrap().header);
+        assert_eq!(1, note.headers.get(0).unwrap().level);
+        assert_eq!("Second Header", note.headers.get(1).unwrap().header);
+        assert_eq!(2, note.headers.get(1).unwrap().level);
+        assert_eq!("Third Header", note.headers.get(2).unwrap().header);
+        assert_eq!(3, note.headers.get(2).unwrap().level);
+        assert_eq!(3, note.headers.len());
+    }
+
+    #[test]
+    fn no_header_found() {
+        let lines = "\
+        \n\
+        Hello \n\
+        #\n\
+        Hello World\n\
+        ####              \n\
+        ";
+
+        for line in lines.lines() {
+            assert!(find_header(line).is_none());
+        }
+    }
+
+    #[test]
+    fn trim_header() {
+        let line = "\
+        ###           Hi, there.  ";
+        assert_eq!(Some(Header { level: 3, header: String::from("Hi, there.") }), find_header(line));
+    }
+
+    #[test]
+    fn too_many_sharp_mark() {
+        let line = "#".repeat(MAXIMUM_HEADER_LEVEL + 1);
+        assert!(find_header(line.as_str()).is_none());
     }
 }

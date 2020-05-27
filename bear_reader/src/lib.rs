@@ -6,6 +6,7 @@ use std::cmp::max;
 
 mod db;
 mod note;
+mod render;
 
 fn args_app() -> clap::App<'static, 'static> {
     clap::App::new(env!("CARGO_PKG_NAME"))
@@ -14,7 +15,7 @@ fn args_app() -> clap::App<'static, 'static> {
         .version_short("v")
         .arg({
             let mut allowed_fields: Vec<&'static str> = vec![];
-            for field in note::FieldOfNote::iter() {
+            for field in render::RenderField::iter() {
                 allowed_fields.push(field.into());
             }
             clap::Arg::with_name("Field")
@@ -90,9 +91,9 @@ impl<'a> SearchArguments<'a> {
     }
 }
 
-fn get_search_field(args: &clap::ArgMatches) -> note::FieldOfNote {
+fn get_render_field(args: &clap::ArgMatches) -> render::RenderField {
     if let Some(field) = args.value_of("Field") {
-        if let Ok(field) = note::FieldOfNote::from_str(field.to_uppercase().as_str()) {
+        if let Ok(field) = render::RenderField::from_str(field.to_uppercase().as_str()) {
             field
         } else {
             panic!("invalid argument for \"Field\": {}", field)
@@ -109,7 +110,7 @@ pub fn read_bear() -> Result<Vec<String>, Box<dyn Error>> {
     let notes = db::get_bear_db().search(&search_args)?;
     let ret = notes
         .into_iter()
-        .map(|note| note.into_field(&get_search_field(&args)))
+        .map(|note| render::render_note(note, &get_render_field(&args)))
         .collect();
     Ok(ret)
 }

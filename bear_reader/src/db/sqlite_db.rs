@@ -28,9 +28,10 @@ fn do_search(sql: &str, args: &[&dyn ToSql]) -> Result<Vec<Note>, Box<dyn Error>
     stmt.query_map(
         args,
         |row| {
-            let title = row.get(0)?;
-            let content = row.get(1)?;
-            Ok(Note::new(title, content))
+            let uuid = row.get(0)?;
+            let title = row.get(1)?;
+            let text = row.get(2)?;
+            Ok(Note::new(uuid, title, text))
         })?
         .for_each(|note| {
             if note.is_ok() {
@@ -40,9 +41,9 @@ fn do_search(sql: &str, args: &[&dyn ToSql]) -> Result<Vec<Note>, Box<dyn Error>
     Ok(ret)
 }
 
-const SEARCH_WITH_TITLE: &str = "SELECT ZTITLE, ZTEXT FROM `ZSFNOTE` \
+const SEARCH_WITH_TITLE: &str = "SELECT ZUNIQUEIDENTIFIER, ZTITLE, ZTEXT FROM `ZSFNOTE` \
          WHERE `ZTRASHED` LIKE '0' AND `ZARCHIVED` LIKE '0' AND `ZTITLE` == ?1 LIMIT ?2,?3";
-const SEARCH_WITHOUT_TITLE: &str = "SELECT ZTITLE, ZTEXT FROM `ZSFNOTE` \
+const SEARCH_WITHOUT_TITLE: &str = "SELECT ZUNIQUEIDENTIFIER, ZTITLE, ZTEXT FROM `ZSFNOTE` \
         WHERE `ZTRASHED` LIKE '0' AND `ZARCHIVED` LIKE '0' LIMIT ?1,?2";
 
 impl BearDb for SqliteBearDb {
