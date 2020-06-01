@@ -1,8 +1,20 @@
 use crate::note::{Note};
-use crate::{SearchArguments};
 use std::error::Error;
 
 mod sqlite_db;
+
+#[derive(Debug)]
+pub struct SearchArguments<'a> {
+    title: Option<&'a str>,
+    limit: u32,
+    offset: u32,
+}
+
+impl<'a> SearchArguments<'a> {
+    pub fn new(title: Option<&'a str>, limit: u32, offset: u32) -> SearchArguments<'a> {
+        SearchArguments { title, limit, offset }
+    }
+}
 
 pub trait BearDb {
     fn search(&self, search_args: &SearchArguments) -> Result<Vec<Note>, Box<dyn Error>>;
