@@ -78,48 +78,98 @@ pub fn render_note(note: Note, render_args: &RenderArguments) -> String {
 mod tests {
     use super::*;
 
-    // #[test]
-    // fn into_title() {
-    //     let uuid = "UUID 11";
-    //     let title = "Title";
-    //     let content = "Content";
-    //     let note = Note::new(String::from(uuid), String::from(title), String::from(content));
-    //
-    //     assert_eq!(title, render_note(note, &RenderField::TITLE))
-    // }
-    //
-    // #[test]
-    // fn into_content() {
-    //     let uuid = "UUID 11";
-    //     let title = "Title";
-    //     let content = "Content";
-    //     let note = Note::new(String::from(uuid), String::from(title), String::from(content));
-    //
-    //     assert_eq!(content, render_note(note, &RenderField::WHOLE))
-    // }
-    //
-    // #[test]
-    // fn into_empty_headers() {
-    //     let uuid = "UUID 11";
-    //     let title = "Title";
-    //     let content = "Content";
-    //     let note = Note::new(String::from(uuid), String::from(title), String::from(content));
-    //
-    //     assert!(render_note(note, &RenderField::HEADERSMARKDOWN).is_empty())
-    // }
-    //
-    // #[test]
-    // fn into_headers() {
-    //     let uuid = "UUID 11";
-    //     let title = "Title";
-    //     let content = "Content\n\
-    //     # Header Line\n\
-    //     Hello\n\
-    //     \n\
-    //     ## Second Header  \n\
-    //     ### Third Header";
-    //     let note = Note::new(String::from(uuid), String::from(title), String::from(content));
-    //
-    //     assert_eq!("# Header Line\n## Second Header  \n### Third Header", render_note(note, &RenderField::HEADERSMARKDOWN));
-    // }
+    #[test]
+    fn into_title() {
+        let uuid = "UUID 11";
+        let title = "Title";
+        let content = "Content";
+        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+
+
+        assert_eq!(title,
+                   render_note(note,
+                               &RenderArguments { render_field: RenderField::TITLE, render_headers_method: None }))
+    }
+
+    #[test]
+    fn into_content() {
+        let uuid = "UUID 11";
+        let title = "Title";
+        let content = "Content";
+        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+
+        assert_eq!(content,
+                   render_note(note, &RenderArguments { render_field: RenderField::WHOLE, render_headers_method: None }))
+    }
+
+    #[test]
+    fn into_empty_headers() {
+        let uuid = "UUID 11";
+        let title = "Title";
+        let content = "Content";
+        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+
+        assert!(render_note(note,
+                            &RenderArguments { render_field: RenderField::HEADERS, render_headers_method: None })
+            .is_empty())
+    }
+
+    #[test]
+    fn into_plain_headers() {
+        let uuid = "UUID 11";
+        let title = "Title";
+        let content = "Content\n\
+        # Header Line\n\
+        Hello\n\
+        \n\
+        ## Second Header  \n\
+        ### Third Header";
+        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+
+        assert_eq!("# Header Line\n## Second Header\n### Third Header",
+                   render_note(note, &RenderArguments { render_field: RenderField::HEADERS, render_headers_method: None }));
+    }
+
+    #[test]
+    fn into_markdown_headers() {
+        let uuid = "UUID 11";
+        let title = "Title";
+        let content = "Content\n\
+        # Header Line\n\
+        Hello\n\
+        \n\
+        ## Second Header  \n\
+        ### Third Header";
+        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+
+        assert_eq!("* [Header Line](#Header%20Line)\n\t* [Second Header](#Second%20Header)\n\t\t* [Third Header](#Third%20Header)",
+                   render_note(note,
+                               &RenderArguments {
+                                   render_field: RenderField::HEADERS,
+                                   render_headers_method: Some(RenderHeaderMethod::MARKDOWN),
+                               }));
+    }
+
+    #[test]
+    fn into_bear_headers() {
+        let uuid = "UUID_11";
+        let title = "Title";
+        let content = "Content\n\
+        # Header Line\n\
+        Hello\n\
+        \n\
+        ## Second Header  \n\
+        ### Third Header";
+        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+
+        assert_eq!("\
+        * [Header Line](bear://x-callback-url/open-note?id=UUID_11&header=Header%20Line)\n\
+        \t* [Second Header](bear://x-callback-url/open-note?id=UUID_11&header=Second%20Header)\n\
+        \t\t* [Third Header](bear://x-callback-url/open-note?id=UUID_11&header=Third%20Header)",
+                   render_note(note,
+                               &RenderArguments {
+                                   render_field: RenderField::HEADERS,
+                                   render_headers_method: Some(RenderHeaderMethod::BEAR),
+                               }));
+    }
 }
