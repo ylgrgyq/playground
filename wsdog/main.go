@@ -6,10 +6,11 @@ import (
 )
 
 type CommandLineArguments struct {
-	ListenPort  uint16  `short:"l" long:"listen" description:"listen on port"`
-	ConnectUrl  string `short:"c" long:"connect" description:"connect to a WebSocket server"`
-	EnableDebug bool   `long:"debug" description:"enable debug log"`
-	ShowPingPong bool `short:"P" long:"show-ping-pong" description:"print a notification when a ping or pong is received"`
+	ListenPort   uint16 `short:"l" long:"listen" description:"listen on port"`
+	ConnectUrl   string `short:"c" long:"connect" description:"connect to a WebSocket server"`
+	EnableDebug  bool   `long:"debug" description:"enable debug log"`
+	EnableSlash  bool   `long:"slash" description:"Enable slash commands for control frames (/ping, /pong, /close [code [, reason]])"`
+	ShowPingPong bool   `short:"P" long:"show-ping-pong" description:"print a notification when a ping or pong is received"`
 }
 
 func parseCommandLineArguments() CommandLineArguments {
@@ -30,7 +31,7 @@ func parseCommandLineArguments() CommandLineArguments {
 		}
 	}
 
-	if cliOpts.ConnectUrl == "" && cliOpts.ListenPort ==0 {
+	if cliOpts.ConnectUrl == "" && cliOpts.ListenPort == 0 {
 		parser.WriteHelp(os.Stderr)
 		os.Exit(1)
 	}

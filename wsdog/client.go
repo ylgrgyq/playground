@@ -7,11 +7,16 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 )
 
 const defaultHandshakeTimeout = 5 * time.Second
 const defaultWriteWaitDuration = 5 * time.Second
+const defaultCloseStatusCode = 1000
+const defaultCloseReason = ""
 
 func parseConnectUrl(urlStr string) *url.URL {
 	connectUrl, err := url.Parse(urlStr)
@@ -87,6 +92,52 @@ func (client *Client) setupReadFromConn() {
 	}()
 }
 
+func (client *Client) doWriteMessage(messageType int, message []byte) {
+
+	if err := client.conn.SetWriteDeadline(time.Now().Add(defaultWriteWaitDuration)); err != nil {
+		panic(err)
+	}
+
+	err := client.conn.WriteMessage(messageType, message)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (client *Client) writeMessage(input string) {
+	if !client.cliOpts.EnableSlash || input[0:1] != "/" {
+		client.doWriteMessage(websocket.TextMessage, []byte(input))
+		return
+	}
+
+	switch cmd := input[1:]; {
+	case cmd == "ping":
+		client.doWriteMessage(websocket.PingMessage, nil)
+	case cmd == "pong":
+		client.doWriteMessage(websocket.PongMessage, nil)
+	case strings.HasPrefix(cmd, "close"):
+		statusCode := defaultCloseStatusCode
+		reason := defaultCloseReason
+		re := regexp.MustCompile("\\s+")
+		toks := re.Split(input, -1)
+		if len(toks) >= 2 {
+			var err error
+			if statusCode, err = strconv.Atoi(toks[1]); err != nil {
+				wsdogLogger.Errorf("invalid close status code: \"%s\"", toks[1])
+			}
+		}
+
+		if len(toks) >= 3 {
+			reason = strings.Join(toks[2:], " ")
+		}
+
+		message := websocket.FormatCloseMessage(statusCode, reason)
+		client.doWriteMessage(websocket.CloseMessage, message)
+	default:
+		client.doWriteMessage(websocket.TextMessage, []byte(input))
+	}
+}
+
 func (client *Client) run() {
 	client.setupReadFromConn()
 
@@ -100,15 +151,8 @@ func (client *Client) run() {
 		select {
 		case <-client.done:
 			return
-		case text := <-consoleReader.outputChan:
-			if err := client.conn.SetWriteDeadline(time.Now().Add(defaultWriteWaitDuration)); err != nil {
-				panic(err)
-			}
-
-			err := client.conn.WriteMessage(websocket.TextMessage, []byte(text))
-			if err != nil {
-				panic(err)
-			}
+		case input := <-consoleReader.outputChan:
+			client.writeMessage(input)
 		case <-interrupt:
 			// Cleanly close the connection by sending a close message and then
 			// waiting (with timeout) for the server to close the connection.

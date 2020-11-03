@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"os"
+	"strings"
 )
 
 type ConsoleInputReader struct {
@@ -32,7 +33,7 @@ func newConsoleInputReader() *ConsoleInputReader {
 				panic(err)
 			}
 
-			outputChan <- text
+			outputChan <- strings.TrimSuffix(text, "\n")
 		}
 	}()
 
