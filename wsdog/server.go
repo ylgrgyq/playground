@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"log"
+	"net"
 	"net/http"
+	"time"
 )
 
 var upgrader = websocket.Upgrader{} // use default options
@@ -15,6 +17,19 @@ func echo(w http.ResponseWriter, r *http.Request) {
 		log.Print("upgrade:", err)
 		return
 	}
+
+	h := func(message string) error {
+		wsdogLogger.Infof("receive ping")
+		err := c.WriteControl(websocket.PongMessage, []byte(message), time.Now().Add(time.Second))
+		if err == websocket.ErrCloseSent {
+			return nil
+		} else if e, ok := err.(net.Error); ok && e.Temporary() {
+			return nil
+		}
+		return err
+	}
+
+	c.SetPingHandler(h)
 	defer c.Close()
 	for {
 		mt, message, err := c.ReadMessage()

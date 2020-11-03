@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/jessevdk/go-flags"
 	"os"
 )
@@ -51,6 +50,4 @@ func main() {
 	} else {
 		runAsServer(cliOpts)
 	}
-
-	fmt.Print("hello")
 }

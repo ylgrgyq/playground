@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/gorilla/websocket"
-	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-const defaultHandshakeTimeout = time.Second * time.Duration(5)
+const defaultHandshakeTimeout = 5 * time.Second
+const defaultWriteWaitDuration = 5 * time.Second
 
 func parseConnectUrl(urlStr string) *url.URL {
 	connectUrl, err := url.Parse(urlStr)
@@ -36,25 +37,41 @@ func newDialer() websocket.Dialer {
 	}
 }
 
-func runAsClient(cliOpts CommandLineArguments) {
-	connectUrl := parseConnectUrl(cliOpts.ConnectUrl)
+type Client struct {
+	conn    *websocket.Conn
+	done    chan struct{}
+	cliOpts CommandLineArguments
+}
 
-	dialer := newDialer()
-	c, _, err := dialer.Dial(connectUrl.String(), nil)
-	if err != nil {
-		wsdogLogger.Fatalf("connect to \"%s\" failed with error: \"%s\"", connectUrl, err)
+func (client *Client) setupPingPongHandler() {
+	if client.cliOpts.ShowPingPong {
+		pingHandler := func(message string) error {
+			wsdogLogger.Infof("< Received ping")
+			err := client.conn.WriteControl(websocket.PongMessage, []byte(message), time.Now().Add(defaultWriteWaitDuration))
+			if err == websocket.ErrCloseSent {
+				return nil
+			} else if e, ok := err.(net.Error); ok && e.Temporary() {
+				return nil
+			}
+			return err
+		}
+
+		pongHandler := func(message string) error {
+			wsdogLogger.Info("< Received pong")
+			return nil
+		}
+
+		client.conn.SetPingHandler(pingHandler)
+		client.conn.SetPongHandler(pongHandler)
 	}
+}
 
-	wsdogLogger.Infof("Connected (press CTRL+C to quit)")
-
-	defer c.Close()
-
-	done := make(chan struct{})
-
+func (client *Client) setupReadFromConn() {
+	client.setupPingPongHandler()
 	go func() {
-		defer close(done)
+		defer close(client.done)
 		for {
-			messageType, message, err := c.ReadMessage()
+			_, message, err := client.conn.ReadMessage()
 			if err != nil {
 				closeErr, ok := err.(*websocket.CloseError)
 				if ok {
@@ -65,55 +82,69 @@ func runAsClient(cliOpts CommandLineArguments) {
 				return
 			}
 
-			switch messageType {
-			case websocket.TextMessage:
-				wsdogLogger.Infof("<: %s", message)
-			case websocket.PongMessage:
-				wsdogLogger.Infof("<: Received pong")
-				//if cliOpts.ShowPingPong{
-				//
-				//}
-			case websocket.PingMessage:
-				wsdogLogger.Infof("<: Received ping")
-				//if cliOpts.ShowPingPong {
-				//
-				//}
-			}
-
+			wsdogLogger.Infof("< %s", message)
 		}
 	}()
+}
+
+func (client *Client) run() {
+	client.setupReadFromConn()
+
+	consoleReader := newConsoleInputReader()
+	defer consoleReader.close()
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
 	for {
 		select {
-		case <-done:
+		case <-client.done:
 			return
-		case _ = <-ticker.C:
-			wsdogLogger.Infof("asdfasdf %b", cliOpts.ShowPingPong)
-			c.SetWriteDeadline(time.Now().Add(time.Hour))
-			err := c.WriteMessage(websocket.PingMessage, []byte(""))
+		case text := <-consoleReader.outputChan:
+			if err := client.conn.SetWriteDeadline(time.Now().Add(defaultWriteWaitDuration)); err != nil {
+				panic(err)
+			}
+
+			err := client.conn.WriteMessage(websocket.TextMessage, []byte(text))
 			if err != nil {
-				log.Println("error: ", err)
-				return
+				panic(err)
 			}
 		case <-interrupt:
 			// Cleanly close the connection by sending a close message and then
 			// waiting (with timeout) for the server to close the connection.
-			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+			err := client.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
-				log.Println("write close:", err)
 				return
 			}
 			select {
-			case <-done:
+			case <-client.done:
 			case <-time.After(time.Second):
 			}
 			return
 		}
 	}
+}
+
+func (client *Client) close() {
+	if err := client.conn.Close(); err != nil {
+		panic(err)
+	}
+}
+
+func runAsClient(cliOpts CommandLineArguments) {
+	connectUrl := parseConnectUrl(cliOpts.ConnectUrl)
+
+	dialer := newDialer()
+	conn, _, err := dialer.Dial(connectUrl.String(), nil)
+	if err != nil {
+		wsdogLogger.Fatalf("connect to \"%s\" failed with error: \"%s\"", connectUrl, err)
+	}
+
+	wsdogLogger.Infof("Connected (press CTRL+C to quit)")
+
+	client := Client{conn: conn, cliOpts: cliOpts, done: make(chan struct{})}
+
+	defer client.close()
+
+	client.run()
 }
