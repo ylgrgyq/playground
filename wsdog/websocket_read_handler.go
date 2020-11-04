@@ -6,9 +6,14 @@ import (
 	"time"
 )
 
+type WebSocketMessage struct {
+	messageType int
+	payload     []byte
+}
+
 type SetupReadOptions struct {
-	done chan struct{}
-	output chan []byte
+	done         chan struct{}
+	output       chan WebSocketMessage
 	showPingPong bool
 }
 
@@ -42,7 +47,7 @@ func setupReadForConn(conn *websocket.Conn, opts SetupReadOptions) {
 	go func() {
 		defer close(opts.done)
 		for {
-			_, message, err := conn.ReadMessage()
+			mt, message, err := conn.ReadMessage()
 			if err != nil {
 				closeErr, ok := err.(*websocket.CloseError)
 				if ok {
@@ -53,7 +58,7 @@ func setupReadForConn(conn *websocket.Conn, opts SetupReadOptions) {
 				return
 			}
 
-			opts.output <- message
+			opts.output <- WebSocketMessage{mt, message}
 		}
 	}()
 }

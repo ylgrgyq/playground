@@ -27,7 +27,7 @@ func generateWsHandler(cliOpts CommandLineArguments) func(w http.ResponseWriter,
 			return
 		}
 
-		readWsChan := make(chan []byte)
+		readWsChan := make(chan WebSocketMessage)
 		done := make(chan struct{})
 		setupReadForConn(conn, SetupReadOptions{done, readWsChan, cliOpts.ShowPingPong})
 
@@ -37,10 +37,10 @@ func generateWsHandler(cliOpts CommandLineArguments) func(w http.ResponseWriter,
 			case <-done:
 				return
 			case message := <-readWsChan:
-				wsdogLogger.Infof("< %s", message)
-				err = conn.WriteMessage(websocket.TextMessage, message)
+				wsdogLogger.Infof("< %s", message.payload)
+				err = conn.WriteMessage(message.messageType, message.payload)
 				if err != nil {
-					log.Println("write:", err)
+					panic(err)
 				}
 			}
 		}

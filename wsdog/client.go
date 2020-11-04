@@ -94,7 +94,7 @@ func (client *Client) writeMessage(input string) {
 }
 
 func (client *Client) run() {
-	readWsChan := make(chan []byte)
+	readWsChan := make(chan WebSocketMessage)
 
 	setupReadForConn(client.conn, SetupReadOptions{client.done, readWsChan, client.cliOpts.ShowPingPong})
 
@@ -109,7 +109,7 @@ func (client *Client) run() {
 		case <-client.done:
 			return
 		case message := <-readWsChan:
-			wsdogLogger.Infof("< %s", message)
+			wsdogLogger.Infof("< %s", message.payload)
 		case input := <-consoleReader.outputChan:
 			client.writeMessage(input)
 		case <-interrupt:
