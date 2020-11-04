@@ -4,50 +4,51 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"log"
-	"net"
 	"net/http"
-	"time"
 )
 
 var upgrader = websocket.Upgrader{} // use default options
 
-func echo(w http.ResponseWriter, r *http.Request) {
-	c, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Print("upgrade:", err)
-		return
+func closeConn(conn *websocket.Conn) {
+	if err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); err != nil {
+		panic(err)
 	}
 
-	h := func(message string) error {
-		wsdogLogger.Infof("receive ping")
-		err := c.WriteControl(websocket.PongMessage, []byte(message), time.Now().Add(time.Second))
-		if err == websocket.ErrCloseSent {
-			return nil
-		} else if e, ok := err.(net.Error); ok && e.Temporary() {
-			return nil
-		}
-		return err
+	if err := conn.Close(); err != nil {
+		panic(err)
 	}
+}
 
-	c.SetPingHandler(h)
-	defer c.Close()
-	for {
-		mt, message, err := c.ReadMessage()
+func generateWsHandler(cliOpts CommandLineArguments) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Println("read:", err)
-			break
+			log.Print("upgrade:", err)
+			return
 		}
-		log.Printf("recv: %s, type: %d", message, mt)
-		err = c.WriteMessage(mt, message)
-		if err != nil {
-			log.Println("write:", err)
-			break
+
+		readWsChan := make(chan []byte)
+		done := make(chan struct{})
+		setupReadForConn(conn, SetupReadOptions{done, readWsChan, cliOpts.ShowPingPong})
+
+		defer closeConn(conn)
+		for {
+			select {
+			case <-done:
+				return
+			case message := <-readWsChan:
+				wsdogLogger.Infof("< %s", message)
+				err = conn.WriteMessage(websocket.TextMessage, message)
+				if err != nil {
+					log.Println("write:", err)
+				}
+			}
 		}
 	}
 }
 
 func runAsServer(cliOpts CommandLineArguments) {
-	http.HandleFunc("/", echo)
+	http.HandleFunc("/", generateWsHandler(cliOpts))
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("localhost:%d",cliOpts.ListenPort), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("localhost:%d", cliOpts.ListenPort), nil))
 }

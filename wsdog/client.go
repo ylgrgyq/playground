@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/gorilla/websocket"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -46,50 +45,6 @@ type Client struct {
 	conn    *websocket.Conn
 	done    chan struct{}
 	cliOpts CommandLineArguments
-}
-
-func (client *Client) setupPingPongHandler() {
-	if client.cliOpts.ShowPingPong {
-		pingHandler := func(message string) error {
-			wsdogLogger.Infof("< Received ping")
-			err := client.conn.WriteControl(websocket.PongMessage, []byte(message), time.Now().Add(defaultWriteWaitDuration))
-			if err == websocket.ErrCloseSent {
-				return nil
-			} else if e, ok := err.(net.Error); ok && e.Temporary() {
-				return nil
-			}
-			return err
-		}
-
-		pongHandler := func(message string) error {
-			wsdogLogger.Info("< Received pong")
-			return nil
-		}
-
-		client.conn.SetPingHandler(pingHandler)
-		client.conn.SetPongHandler(pongHandler)
-	}
-}
-
-func (client *Client) setupReadFromConn() {
-	client.setupPingPongHandler()
-	go func() {
-		defer close(client.done)
-		for {
-			_, message, err := client.conn.ReadMessage()
-			if err != nil {
-				closeErr, ok := err.(*websocket.CloseError)
-				if ok {
-					wsdogLogger.Infof("Disconnected (code: %d, reason: \"%s\")", closeErr.Code, closeErr.Text)
-				} else {
-					wsdogLogger.Infof("error: %s", err.Error())
-				}
-				return
-			}
-
-			wsdogLogger.Infof("< %s", message)
-		}
-	}()
 }
 
 func (client *Client) doWriteMessage(messageType int, message []byte) {
@@ -139,7 +94,9 @@ func (client *Client) writeMessage(input string) {
 }
 
 func (client *Client) run() {
-	client.setupReadFromConn()
+	readWsChan := make(chan []byte)
+
+	setupReadForConn(client.conn, SetupReadOptions{client.done, readWsChan, client.cliOpts.ShowPingPong})
 
 	consoleReader := newConsoleInputReader()
 	defer consoleReader.close()
@@ -151,6 +108,8 @@ func (client *Client) run() {
 		select {
 		case <-client.done:
 			return
+		case message := <-readWsChan:
+			wsdogLogger.Infof("< %s", message)
 		case input := <-consoleReader.outputChan:
 			client.writeMessage(input)
 		case <-interrupt:
@@ -158,7 +117,7 @@ func (client *Client) run() {
 			// waiting (with timeout) for the server to close the connection.
 			err := client.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
-				return
+				panic(err)
 			}
 			select {
 			case <-client.done:
