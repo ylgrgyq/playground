@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/base64"
+	"fmt"
 	"github.com/gorilla/websocket"
 	"net/http"
 	"net/url"
@@ -34,11 +36,35 @@ func parseConnectUrl(urlStr string) *url.URL {
 	return connectUrl
 }
 
-func newDialer() websocket.Dialer {
+func newDialer(cliOpts CommandLineArguments) websocket.Dialer {
 	return websocket.Dialer{
+		Subprotocols:     []string{cliOpts.Subprotocol},
 		Proxy:            http.ProxyFromEnvironment,
 		HandshakeTimeout: defaultHandshakeTimeout,
 	}
+}
+
+func buildConnectHeaders(cliOpts CommandLineArguments) http.Header {
+	headers := http.Header{}
+	if len(cliOpts.Origin) > 0 {
+		headers["Origin"] = []string{cliOpts.Origin}
+	}
+
+	if len(cliOpts.Host) > 0 {
+		headers["Host"] = []string{cliOpts.Host}
+	}
+
+	if len(cliOpts.Headers) > 0 {
+		for k, v := range cliOpts.Headers {
+			headers[k] = []string{v}
+		}
+	}
+
+	if len(cliOpts.Auth) > 0 {
+		auth := fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(cliOpts.Auth)))
+		headers["Authorization"] = []string{auth}
+	}
+	return headers
 }
 
 type Client struct {
@@ -137,8 +163,10 @@ func (client *Client) close() {
 func runAsClient(cliOpts CommandLineArguments) {
 	connectUrl := parseConnectUrl(cliOpts.ConnectUrl)
 
-	dialer := newDialer()
-	conn, _, err := dialer.Dial(connectUrl.String(), nil)
+	dialer := newDialer(cliOpts)
+	headers := buildConnectHeaders(cliOpts)
+
+	conn, _, err := dialer.Dial(connectUrl.String(), headers)
 	if err != nil {
 		wsdogLogger.Fatalf("connect to \"%s\" failed with error: \"%s\"", connectUrl, err)
 	}

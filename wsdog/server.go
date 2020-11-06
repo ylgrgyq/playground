@@ -50,5 +50,6 @@ func generateWsHandler(cliOpts CommandLineArguments) func(w http.ResponseWriter,
 func runAsServer(cliOpts CommandLineArguments) {
 	http.HandleFunc("/", generateWsHandler(cliOpts))
 
+	wsdogLogger.Infof("listening on port %d (press CTRL+C to quit)", cliOpts.ListenPort)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("localhost:%d", cliOpts.ListenPort), nil))
 }

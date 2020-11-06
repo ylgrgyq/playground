@@ -6,11 +6,17 @@ import (
 )
 
 type CommandLineArguments struct {
-	ListenPort   uint16 `short:"l" long:"listen" description:"listen on port"`
-	ConnectUrl   string `short:"c" long:"connect" description:"connect to a WebSocket server"`
-	EnableDebug  bool   `long:"debug" description:"enable debug log"`
-	EnableSlash  bool   `long:"slash" description:"Enable slash commands for control frames (/ping, /pong, /close [code [, reason]])"`
-	ShowPingPong bool   `short:"P" long:"show-ping-pong" description:"print a notification when a ping or pong is received"`
+	ListenPort     uint16            `short:"l" long:"listen" description:"listen on port"`
+	ConnectUrl     string            `short:"c" long:"connect" description:"connect to a WebSocket server"`
+	Origin         string            `short:"o" long:"origin" description:"optional origin"`
+	ExecuteCommand string            `short:"x" long:"execute" descritpion:"execute command after connecting"`
+	Host           string            `long:"host" description:"optional host"`
+	Subprotocol    string            `short:"s" long:"subprotocol" description:"optional subprotocol (default: )"`
+	Headers        map[string]string `short:"H" long:"header" description:"Set an HTTP header <header:value>. Repeat to set multiple. (--connect only) (default: )"`
+	Auth           string            `long:"auth" description:"Add basic HTTP authentication header <username:password>. (--connect only)"`
+	EnableDebug    bool              `long:"debug" description:"enable debug log"`
+	EnableSlash    bool              `long:"slash" description:"Enable slash commands for control frames (/ping, /pong, /close [code [, reason]])"`
+	ShowPingPong   bool              `short:"P" long:"show-ping-pong" description:"print a notification when a ping or pong is received"`
 }
 
 func parseCommandLineArguments() CommandLineArguments {
