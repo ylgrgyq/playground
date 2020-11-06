@@ -19,6 +19,7 @@ const defaultHandshakeTimeout = 5 * time.Second
 const defaultWriteWaitDuration = 5 * time.Second
 const defaultCloseStatusCode = 1000
 const defaultCloseReason = ""
+const subProtocolHeader = "Sec-WebSocket-Protocol"
 
 func parseConnectUrl(urlStr string) *url.URL {
 	connectUrl, err := url.Parse(urlStr)
@@ -203,15 +204,25 @@ func (client *Client) mustClose() {
 	}
 }
 
+func checkResponseSubprotocol(requiredProtocol string, resp *http.Response) {
+	if len(resp.Header[subProtocolHeader]) < 1 || resp.Header[subProtocolHeader][0] != requiredProtocol {
+		wsdogLogger.Fatal("error: Server sent no subprotocol")
+	}
+}
+
 func runAsClient(cliOpts CommandLineArguments) {
 	connectUrl := parseConnectUrl(cliOpts.ConnectUrl)
 
 	dialer := newDialer(cliOpts)
 	headers := buildConnectHeaders(cliOpts)
 
-	conn, _, err := dialer.Dial(connectUrl.String(), headers)
+	conn, resp, err := dialer.Dial(connectUrl.String(), headers)
 	if err != nil {
 		wsdogLogger.Fatalf("connect to \"%s\" failed with error: \"%s\"", connectUrl, err)
+	}
+
+	if len(cliOpts.Subprotocol) > 0 {
+		checkResponseSubprotocol(cliOpts.Subprotocol, resp)
 	}
 
 	wsdogLogger.Infof("Connected (press CTRL+C to quit)")

@@ -14,7 +14,7 @@ type CommandLineArguments struct {
 	Host           string            `long:"host" description:"optional host"`
 	Subprotocol    string            `short:"s" long:"subprotocol" description:"optional subprotocol (default: )"`
 	NoTlsCheck     bool              `short:"n" long:"no-check" description:"Do not check for unauthorized certificates"`
-	Headers        map[string]string `short:"H" long:"header" description:"Set an HTTP header <header:value>. Repeat to set multiple. (--connect only) (default: )"`
+	Headers        map[string]string `short:"H" long:"header" description:"Set an HTTP header <header:value>. Repeat to set multiple like -H header1:value1 -H header2:value2. (--connect only)"`
 	Auth           string            `long:"auth" description:"Add basic HTTP authentication header <username:password>. (--connect only)"`
 	Ca             string            `long:"ca" description:"Specify a Certificate Authority (--connect only)"`
 	Cert           string            `long:"cert" description:"Specify a Client SSL Certificate (--connect only)"`
