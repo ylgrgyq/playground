@@ -10,9 +10,8 @@ import (
 var upgrader = websocket.Upgrader{} // use default options
 
 func closeConn(conn *websocket.Conn) {
-	if err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")); err != nil {
-		panic(err)
-	}
+	// failed to send the last close message is tolerable due to the connection may broken
+	_ = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 
 	if err := conn.Close(); err != nil {
 		panic(err)

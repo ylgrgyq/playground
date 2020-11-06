@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"github.com/gorilla/websocket"
@@ -37,7 +38,12 @@ func parseConnectUrl(urlStr string) *url.URL {
 }
 
 func newDialer(cliOpts CommandLineArguments) websocket.Dialer {
+	var tlsConfig = tls.Config{}
+	if cliOpts.NoTlsCheck {
+		tlsConfig.InsecureSkipVerify = true
+	}
 	return websocket.Dialer{
+		TLSClientConfig:  &tlsConfig,
 		Subprotocols:     []string{cliOpts.Subprotocol},
 		Proxy:            http.ProxyFromEnvironment,
 		HandshakeTimeout: defaultHandshakeTimeout,
@@ -119,11 +125,45 @@ func (client *Client) writeMessage(input string) {
 	}
 }
 
-func (client *Client) run() {
-	readWsChan := make(chan WebSocketMessage)
+func (client *Client) normalCloseConn() {
+	// Cleanly close the connection by sending a close message and then
+	// waiting (with timeout) for the server to close the connection.
+	err := client.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	if err != nil {
+		panic(err)
+	}
+	select {
+	case <-client.done:
+	case <-time.After(time.Second):
+	}
+}
 
-	setupReadForConn(client.conn, SetupReadOptions{client.done, readWsChan, client.cliOpts.ShowPingPong})
+func (client *Client) executeCommandThenShutdown(readWsChan chan WebSocketMessage) {
+	client.writeMessage(client.cliOpts.ExecuteCommand)
 
+	timout := time.Second * time.Duration(client.cliOpts.Wait)
+	ticker := time.NewTicker(timout)
+
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+
+	for {
+		select {
+		case <-ticker.C:
+			client.normalCloseConn()
+			return
+		case <-client.done:
+			return
+		case message := <-readWsChan:
+			wsdogLogger.Infof("< %s", message.payload)
+		case <-interrupt:
+			client.normalCloseConn()
+			return
+		}
+	}
+}
+
+func (client *Client) loopExecuteCommandFromConsole(readWsChan chan WebSocketMessage) {
 	consoleReader := newConsoleInputReader()
 	defer consoleReader.close()
 
@@ -136,25 +176,28 @@ func (client *Client) run() {
 			return
 		case message := <-readWsChan:
 			wsdogLogger.Infof("< %s", message.payload)
-		case input := <-consoleReader.outputChan:
-			client.writeMessage(input)
+		case output := <-consoleReader.outputChan:
+			client.writeMessage(output)
 		case <-interrupt:
-			// Cleanly close the connection by sending a close message and then
-			// waiting (with timeout) for the server to close the connection.
-			err := client.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-			if err != nil {
-				panic(err)
-			}
-			select {
-			case <-client.done:
-			case <-time.After(time.Second):
-			}
+			client.normalCloseConn()
 			return
 		}
 	}
 }
 
-func (client *Client) close() {
+func (client *Client) run() {
+	readWsChan := make(chan WebSocketMessage)
+
+	setupReadForConn(client.conn, SetupReadOptions{client.done, readWsChan, client.cliOpts.ShowPingPong})
+
+	if len(client.cliOpts.ExecuteCommand) > 0 {
+		client.executeCommandThenShutdown(readWsChan)
+	} else {
+		client.loopExecuteCommandFromConsole(readWsChan)
+	}
+}
+
+func (client *Client) mustClose() {
 	if err := client.conn.Close(); err != nil {
 		panic(err)
 	}
@@ -175,7 +218,7 @@ func runAsClient(cliOpts CommandLineArguments) {
 
 	client := Client{conn: conn, cliOpts: cliOpts, done: make(chan struct{})}
 
-	defer client.close()
+	defer client.mustClose()
 
 	client.run()
 }
