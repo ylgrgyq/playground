@@ -18,7 +18,7 @@ func closeConn(conn *websocket.Conn) {
 	}
 }
 
-func generateWsHandler(cliOpts CommandLineArguments) func(w http.ResponseWriter, r *http.Request) {
+func generateWsHandler(cliOpts ListenOnPortOptions) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -46,9 +46,9 @@ func generateWsHandler(cliOpts CommandLineArguments) func(w http.ResponseWriter,
 	}
 }
 
-func runAsServer(cliOpts CommandLineArguments) {
+func runAsServer(listenPort uint16, cliOpts ListenOnPortOptions) {
 	http.HandleFunc("/", generateWsHandler(cliOpts))
 
-	wsdogLogger.Infof("listening on port %d (press CTRL+C to quit)", cliOpts.ListenPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("localhost:%d", cliOpts.ListenPort), nil))
+	wsdogLogger.Infof("listening on port %d (press CTRL+C to quit)", listenPort)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("localhost:%d", listenPort), nil))
 }

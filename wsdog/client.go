@@ -38,7 +38,7 @@ func parseConnectUrl(urlStr string) *url.URL {
 	return connectUrl
 }
 
-func newDialer(cliOpts CommandLineArguments) websocket.Dialer {
+func newDialer(cliOpts ConnectOptions) websocket.Dialer {
 	var tlsConfig = tls.Config{}
 	if cliOpts.NoTlsCheck {
 		tlsConfig.InsecureSkipVerify = true
@@ -51,7 +51,7 @@ func newDialer(cliOpts CommandLineArguments) websocket.Dialer {
 	}
 }
 
-func buildConnectHeaders(cliOpts CommandLineArguments) http.Header {
+func buildConnectHeaders(cliOpts ConnectOptions) http.Header {
 	headers := http.Header{}
 	if len(cliOpts.Origin) > 0 {
 		headers["Origin"] = []string{cliOpts.Origin}
@@ -77,7 +77,7 @@ func buildConnectHeaders(cliOpts CommandLineArguments) http.Header {
 type Client struct {
 	conn    *websocket.Conn
 	done    chan struct{}
-	cliOpts CommandLineArguments
+	cliOpts ConnectOptions
 }
 
 func (client *Client) doWriteMessage(messageType int, message []byte) {
@@ -210,8 +210,8 @@ func checkResponseSubprotocol(requiredProtocol string, resp *http.Response) {
 	}
 }
 
-func runAsClient(cliOpts CommandLineArguments) {
-	connectUrl := parseConnectUrl(cliOpts.ConnectUrl)
+func runAsClient(url string, cliOpts ConnectOptions) {
+	connectUrl := parseConnectUrl(url)
 
 	dialer := newDialer(cliOpts)
 	headers := buildConnectHeaders(cliOpts)
