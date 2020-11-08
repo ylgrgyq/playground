@@ -1,9 +1,8 @@
 # wsdog
-
-WebSocket dog just like https://github.com/ylgrgyq/wsdog
+ 
+A copycat for the great lib https://github.com/websockets/wscat but it does not need to install anything in advance like Node. Thus, it's suitable for environments where you cannot install software at will, such as your online servers.
 
 ## Installation
-
 
 
 
