@@ -11,10 +11,13 @@ var upgrader = websocket.Upgrader{} // use default options
 
 func closeConn(conn *websocket.Conn) {
 	// failed to send the last close message is tolerable due to the connection may broken
-	_ = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	if err != nil {
+		wsdogLogger.Debugf("write close message failed: %s", err.Error())
+	}
 
 	if err := conn.Close(); err != nil {
-		panic(err)
+		wsdogLogger.Debugf("close websocket connection failed: %s", err.Error())
 	}
 }
 
@@ -26,21 +29,22 @@ func generateWsHandler(opts CommandLineOptions) func(w http.ResponseWriter, r *h
 			return
 		}
 
-		readWsChan := make(chan WebSocketMessage)
-		done := make(chan struct{})
-		setupReadForConn(conn, SetupReadOptions{done, readWsChan, opts.ShowPingPong})
-
+		readWsChan, readFromConnDone := SetupReadFromConn(conn, opts.ShowPingPong)
 		defer closeConn(conn)
 		for {
 			select {
-			case <-done:
+			case <-readFromConnDone:
 				return
 			case message := <-readWsChan:
 				wsdogLogger.ReceiveMessagef("< %s", message.payload)
-				err = conn.WriteMessage(message.messageType, message.payload)
-				if err != nil {
-					panic(err)
+				if message.messageType == websocket.TextMessage {
+					err = conn.WriteMessage(message.messageType, message.payload)
+					if err != nil {
+						wsdogLogger.Errorf("error: %s", err)
+						return
+					}
 				}
+
 			}
 		}
 	}

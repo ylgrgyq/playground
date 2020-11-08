@@ -76,12 +76,12 @@ func buildConnectHeaders(cliOpts CommandLineOptions) http.Header {
 
 type Client struct {
 	conn    *websocket.Conn
-	done    chan struct{}
-	cliOpts CommandLineOptions
+	readWsChan chan WebSocketMessage
+	readWsDoneChan chan struct{}
+	enableSlash bool
 }
 
 func (client *Client) doWriteMessage(messageType int, message []byte) {
-
 	if err := client.conn.SetWriteDeadline(time.Now().Add(defaultWriteWaitDuration)); err != nil {
 		panic(err)
 	}
@@ -93,7 +93,7 @@ func (client *Client) doWriteMessage(messageType int, message []byte) {
 }
 
 func (client *Client) writeMessage(input string) {
-	if !client.cliOpts.EnableSlash || input[0:1] != "/" {
+	if !client.enableSlash || input[0:1] != "/" {
 		client.doWriteMessage(websocket.TextMessage, []byte(input))
 		return
 	}
@@ -126,23 +126,21 @@ func (client *Client) writeMessage(input string) {
 	}
 }
 
-func (client *Client) normalCloseConn() {
+func (client *Client) gracefulCloseConn() {
 	// Cleanly close the connection by sending a close message and then
 	// waiting (with timeout) for the server to close the connection.
-	err := client.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-	if err != nil {
-		panic(err)
-	}
+	client.doWriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+
 	select {
-	case <-client.done:
+	case <-client.readWsDoneChan:
 	case <-time.After(time.Second):
 	}
 }
 
-func (client *Client) executeCommandThenShutdown(readWsChan chan WebSocketMessage) {
-	client.writeMessage(client.cliOpts.ExecuteCommand)
+func (client *Client) executeCommandThenShutdown(cliOpts CommandLineOptions) {
+	client.writeMessage(cliOpts.ExecuteCommand)
 
-	timout := time.Second * time.Duration(client.cliOpts.Wait)
+	timout := time.Second * time.Duration(cliOpts.Wait)
 	ticker := time.NewTicker(timout)
 
 	interrupt := make(chan os.Signal, 1)
@@ -151,20 +149,18 @@ func (client *Client) executeCommandThenShutdown(readWsChan chan WebSocketMessag
 	for {
 		select {
 		case <-ticker.C:
-			client.normalCloseConn()
 			return
-		case <-client.done:
+		case <-client.readWsDoneChan:
 			return
-		case message := <-readWsChan:
+		case message := <-client.readWsChan:
 			wsdogLogger.ReceiveMessagef("< %s", message.payload)
 		case <-interrupt:
-			client.normalCloseConn()
 			return
 		}
 	}
 }
 
-func (client *Client) loopExecuteCommandFromConsole(readWsChan chan WebSocketMessage) {
+func (client *Client) loopExecuteCommandFromConsole(cliOpts CommandLineOptions) {
 	consoleReader := NewConsoleInputReader()
 	defer consoleReader.Close()
 
@@ -173,38 +169,36 @@ func (client *Client) loopExecuteCommandFromConsole(readWsChan chan WebSocketMes
 
 	for {
 		select {
-		case <-client.done:
+		case <-client.readWsDoneChan:
+			return
+		case <-consoleReader.done:
 			return
 		case output := <-consoleReader.outputChan:
 			if len(output) > 0 {
 				client.writeMessage(output)
 			}
-		case message := <-readWsChan:
+		case message := <-client.readWsChan:
 			consoleReader.Clean()
 			wsdogLogger.ReceiveMessagef("< %s", message.payload)
 			consoleReader.Refresh()
 		case <-interrupt:
-			client.normalCloseConn()
 			return
 		}
 	}
 }
 
-func (client *Client) run() {
-	readWsChan := make(chan WebSocketMessage)
-
-	setupReadForConn(client.conn, SetupReadOptions{client.done, readWsChan, client.cliOpts.ShowPingPong})
-
-	if len(client.cliOpts.ExecuteCommand) > 0 {
-		client.executeCommandThenShutdown(readWsChan)
+func (client *Client) run(cliOpts CommandLineOptions) {
+	if len(cliOpts.ExecuteCommand) > 0 {
+		client.executeCommandThenShutdown(cliOpts)
 	} else {
-		client.loopExecuteCommandFromConsole(readWsChan)
+		client.loopExecuteCommandFromConsole(cliOpts)
 	}
 }
 
-func (client *Client) mustClose() {
+func (client *Client) Close() {
+	client.gracefulCloseConn()
 	if err := client.conn.Close(); err != nil {
-		panic(err)
+		wsdogLogger.Debugf("close client failed: %s", err.Error())
 	}
 }
 
@@ -231,9 +225,10 @@ func runAsClient(url string, cliOpts CommandLineOptions) {
 
 	wsdogLogger.Ok("Connected (press CTRL+C to quit)")
 
-	client := Client{conn: conn, cliOpts: cliOpts, done: make(chan struct{})}
+	readWsChan, readWsDoneChan := SetupReadFromConn(conn, cliOpts.ShowPingPong)
+	client := Client{conn, readWsChan, readWsDoneChan, cliOpts.EnableSlash}
 
-	defer client.mustClose()
+	defer client.Close()
 
-	client.run()
+	client.run(cliOpts)
 }

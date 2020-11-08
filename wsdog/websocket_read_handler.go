@@ -11,15 +11,9 @@ type WebSocketMessage struct {
 	payload     []byte
 }
 
-type SetupReadOptions struct {
-	done         chan struct{}
-	output       chan WebSocketMessage
-	showPingPong bool
-}
-
-func SetupPingPongHandler(conn *websocket.Conn) {
+func SetupPingPongHandler(conn *websocket.Conn, output chan WebSocketMessage) {
 	pingHandler := func(message string) error {
-		wsdogLogger.ReceiveMessage("< Received ping")
+		output <- WebSocketMessage{websocket.PingMessage, []byte("Received ping")}
 		err := conn.WriteControl(websocket.PongMessage, []byte(message), time.Now().Add(defaultWriteWaitDuration))
 		if err == websocket.ErrCloseSent {
 			return nil
@@ -30,7 +24,7 @@ func SetupPingPongHandler(conn *websocket.Conn) {
 	}
 
 	pongHandler := func(message string) error {
-		wsdogLogger.ReceiveMessage("< Received pong")
+		output <- WebSocketMessage{websocket.PongMessage, []byte("Received pong")}
 		return nil
 	}
 
@@ -39,13 +33,15 @@ func SetupPingPongHandler(conn *websocket.Conn) {
 
 }
 
-func setupReadForConn(conn *websocket.Conn, opts SetupReadOptions) {
-	if opts.showPingPong {
-		SetupPingPongHandler(conn)
+func SetupReadFromConn(conn *websocket.Conn, showPingPong bool) (chan WebSocketMessage, chan struct{}) {
+	done := make(chan struct{})
+	output := make(chan WebSocketMessage)
+	if showPingPong {
+		SetupPingPongHandler(conn, output)
 	}
 
 	go func() {
-		defer close(opts.done)
+		defer close(done)
 		for {
 			mt, message, err := conn.ReadMessage()
 			if err != nil {
@@ -58,7 +54,8 @@ func setupReadForConn(conn *websocket.Conn, opts SetupReadOptions) {
 				return
 			}
 
-			opts.output <- WebSocketMessage{mt, message}
+			output <- WebSocketMessage{mt, message}
 		}
 	}()
+	return output, done
 }

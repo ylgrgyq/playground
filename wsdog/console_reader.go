@@ -8,8 +8,8 @@ import (
 
 type ConsoleInputReader struct {
 	outputChan chan string
-	done bool
 	reader *readline.Instance
+	done chan struct{}
 }
 
 // Move cursor to the first character of the line and erase the entire line
@@ -23,27 +23,28 @@ func (c *ConsoleInputReader) Refresh() {
 }
 
 func (c *ConsoleInputReader) Close() {
-	c.done = true
-	_ = c.reader.Close()
-	close(c.outputChan)
+	if err := c.reader.Close(); err != nil {
+		wsdogLogger.Debugf("close input reader failed: %s", err.Error())
+	}
 }
 
 func NewConsoleInputReader() *ConsoleInputReader {
-	reader,_ := readline.New("> ")
+	reader,err := readline.New("> ")
+	if err != nil {
+		wsdogLogger.Fatalf("setup read from console failed: %s", err)
+	}
 
 	outputChan := make(chan string)
-	r := ConsoleInputReader{outputChan, false, reader}
+	done := make(chan struct{})
+	r := ConsoleInputReader{outputChan, reader, done}
 
 	go func() {
-		defer r.Close()
+		defer close(outputChan)
+		defer close(done)
 		for {
-			if r.done {
-				return
-			}
-
 			text, err := reader.Readline()
 			if err != nil {
-				wsdogLogger.Debugf("receive error when read from console %s", err)
+				wsdogLogger.Debugf("receive error when read from console %s", err.Error())
 				return
 			}
 
