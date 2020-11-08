@@ -36,7 +36,7 @@ func generateWsHandler(cliOpts ListenOnPortOptions) func(w http.ResponseWriter, 
 			case <-done:
 				return
 			case message := <-readWsChan:
-				wsdogLogger.Infof("< %s", message.payload)
+				wsdogLogger.ReceiveMessagef("< %s", message.payload)
 				err = conn.WriteMessage(message.messageType, message.payload)
 				if err != nil {
 					panic(err)
@@ -49,6 +49,6 @@ func generateWsHandler(cliOpts ListenOnPortOptions) func(w http.ResponseWriter, 
 func runAsServer(listenPort uint16, cliOpts ListenOnPortOptions) {
 	http.HandleFunc("/", generateWsHandler(cliOpts))
 
-	wsdogLogger.Infof("listening on port %d (press CTRL+C to quit)", listenPort)
+	wsdogLogger.Okf("listening on port %d (press CTRL+C to quit)", listenPort)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("localhost:%d", listenPort), nil))
 }

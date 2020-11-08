@@ -6,9 +6,10 @@ import (
 )
 
 type ApplicationOptions struct {
-	ListenPort   uint16 `short:"l" long:"listen" description:"listen on port"`
-	ConnectUrl   string `short:"c" long:"connect" description:"connect to a WebSocket server"`
-	EnableDebug  bool   `long:"debug" description:"enable debug log"`
+	ListenPort  uint16 `short:"l" long:"listen" description:"listen on port"`
+	ConnectUrl  string `short:"c" long:"connect" description:"connect to a WebSocket server"`
+	EnableDebug bool   `long:"debug" description:"enable debug log"`
+	NoColor     bool   `long:"no-color" description:"Run without color"`
 }
 
 type ListenOnPortOptions struct {
@@ -73,8 +74,13 @@ func parseCommandLineArguments() CommandLineOptions {
 		os.Exit(1)
 	}
 
+	if appOpts.NoColor {
+		SetLogger(noColorLogger)
+	}
+
 	if appOpts.EnableDebug {
 		defaultLogger.EnableDebug()
+		noColorLogger.EnableDebug()
 	}
 
 	return CommandLineOptions{appOpts, listenOptions, connectOptions}

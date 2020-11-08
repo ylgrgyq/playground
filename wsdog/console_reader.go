@@ -27,7 +27,7 @@ func newConsoleInputReader() *ConsoleInputReader {
 				return
 			}
 
-			wsdogLogger.Infof("> ")
+			wsdogLogger.SendMessagef("> ")
 			text, err := ioReader.ReadString('\n')
 			if err != nil {
 				panic(err)

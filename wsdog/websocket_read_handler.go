@@ -19,7 +19,7 @@ type SetupReadOptions struct {
 
 func setupPingPongHandler(conn *websocket.Conn) {
 	pingHandler := func(message string) error {
-		wsdogLogger.Infof("< Received ping")
+		wsdogLogger.ReceiveMessage("< Received ping")
 		err := conn.WriteControl(websocket.PongMessage, []byte(message), time.Now().Add(defaultWriteWaitDuration))
 		if err == websocket.ErrCloseSent {
 			return nil
@@ -30,7 +30,7 @@ func setupPingPongHandler(conn *websocket.Conn) {
 	}
 
 	pongHandler := func(message string) error {
-		wsdogLogger.Info("< Received pong")
+		wsdogLogger.ReceiveMessage("< Received pong")
 		return nil
 	}
 
@@ -51,9 +51,9 @@ func setupReadForConn(conn *websocket.Conn, opts SetupReadOptions) {
 			if err != nil {
 				closeErr, ok := err.(*websocket.CloseError)
 				if ok {
-					wsdogLogger.Infof("Disconnected (code: %d, reason: \"%s\")", closeErr.Code, closeErr.Text)
+					wsdogLogger.Okf("Disconnected (code: %d, reason: \"%s\")", closeErr.Code, closeErr.Text)
 				} else {
-					wsdogLogger.Infof("error: %s", err.Error())
+					wsdogLogger.Errorf("error: %s", err.Error())
 				}
 				return
 			}

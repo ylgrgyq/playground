@@ -156,7 +156,7 @@ func (client *Client) executeCommandThenShutdown(readWsChan chan WebSocketMessag
 		case <-client.done:
 			return
 		case message := <-readWsChan:
-			wsdogLogger.Infof("< %s", message.payload)
+			wsdogLogger.ReceiveMessagef("< %s", message.payload)
 		case <-interrupt:
 			client.normalCloseConn()
 			return
@@ -176,7 +176,7 @@ func (client *Client) loopExecuteCommandFromConsole(readWsChan chan WebSocketMes
 		case <-client.done:
 			return
 		case message := <-readWsChan:
-			wsdogLogger.Infof("< %s", message.payload)
+			wsdogLogger.ReceiveMessagef("< %s", message.payload)
 		case output := <-consoleReader.outputChan:
 			client.writeMessage(output)
 		case <-interrupt:
@@ -225,7 +225,7 @@ func runAsClient(url string, cliOpts ConnectOptions) {
 		checkResponseSubprotocol(cliOpts.Subprotocol, resp)
 	}
 
-	wsdogLogger.Infof("Connected (press CTRL+C to quit)")
+	wsdogLogger.Ok("Connected (press CTRL+C to quit)")
 
 	client := Client{conn: conn, cliOpts: cliOpts, done: make(chan struct{})}
 
