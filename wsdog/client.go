@@ -38,7 +38,7 @@ func parseConnectUrl(urlStr string) *url.URL {
 	return connectUrl
 }
 
-func newDialer(cliOpts ConnectOptions) websocket.Dialer {
+func newDialer(cliOpts CommandLineOptions) websocket.Dialer {
 	var tlsConfig = tls.Config{}
 	if cliOpts.NoTlsCheck {
 		tlsConfig.InsecureSkipVerify = true
@@ -51,7 +51,7 @@ func newDialer(cliOpts ConnectOptions) websocket.Dialer {
 	}
 }
 
-func buildConnectHeaders(cliOpts ConnectOptions) http.Header {
+func buildConnectHeaders(cliOpts CommandLineOptions) http.Header {
 	headers := http.Header{}
 	if len(cliOpts.Origin) > 0 {
 		headers["Origin"] = []string{cliOpts.Origin}
@@ -77,7 +77,7 @@ func buildConnectHeaders(cliOpts ConnectOptions) http.Header {
 type Client struct {
 	conn    *websocket.Conn
 	done    chan struct{}
-	cliOpts ConnectOptions
+	cliOpts CommandLineOptions
 }
 
 func (client *Client) doWriteMessage(messageType int, message []byte) {
@@ -165,8 +165,8 @@ func (client *Client) executeCommandThenShutdown(readWsChan chan WebSocketMessag
 }
 
 func (client *Client) loopExecuteCommandFromConsole(readWsChan chan WebSocketMessage) {
-	consoleReader := newConsoleInputReader()
-	defer consoleReader.close()
+	consoleReader := NewConsoleInputReader()
+	defer consoleReader.Close()
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
@@ -175,10 +175,14 @@ func (client *Client) loopExecuteCommandFromConsole(readWsChan chan WebSocketMes
 		select {
 		case <-client.done:
 			return
-		case message := <-readWsChan:
-			wsdogLogger.ReceiveMessagef("< %s", message.payload)
 		case output := <-consoleReader.outputChan:
-			client.writeMessage(output)
+			if len(output) > 0 {
+				client.writeMessage(output)
+			}
+		case message := <-readWsChan:
+			consoleReader.Clean()
+			wsdogLogger.ReceiveMessagef("< %s", message.payload)
+			consoleReader.Refresh()
 		case <-interrupt:
 			client.normalCloseConn()
 			return
@@ -210,7 +214,7 @@ func checkResponseSubprotocol(requiredProtocol string, resp *http.Response) {
 	}
 }
 
-func runAsClient(url string, cliOpts ConnectOptions) {
+func runAsClient(url string, cliOpts CommandLineOptions) {
 	connectUrl := parseConnectUrl(url)
 
 	dialer := newDialer(cliOpts)

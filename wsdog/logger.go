@@ -18,7 +18,6 @@ type Logger interface {
 	ReceiveMessagef(format string, v ...interface{})
 
 	SendMessage(v ...interface{})
-	SendMessagef(format string, v ...interface{})
 
 	Error(v ...interface{})
 	Errorf(format string, v ...interface{})
@@ -68,55 +67,51 @@ func (l *DefaultLogger) EnableDebug() {
 
 func (l *DefaultLogger) Debug(v ...interface{}) {
 	if l.debug {
-		logln(l.debugColor, fmt.Sprintf("DEBUG: %s", v...))
+		printConsoleln(l.debugColor, fmt.Sprintf("DEBUG: %s", v...))
 	}
 }
 
 func (l *DefaultLogger) Debugf(format string, v ...interface{}) {
 	if l.debug {
-		logln(l.okColor, fmt.Sprintf("DEBUG: %s", fmt.Sprintf(format, v...)))
+		printConsoleln(l.debugColor, fmt.Sprintf("DEBUG: %s", fmt.Sprintf(format, v...)))
 	}
 }
 
 func (l *DefaultLogger) ReceiveMessage(v ...interface{}) {
-	logln(l.receiveColor, v...)
+	printConsoleln(l.receiveColor, v...)
 }
 
 func (l *DefaultLogger) ReceiveMessagef(format string, v ...interface{}) {
-	loglnf(l.receiveColor, format, v...)
+	printConsolelnf(l.receiveColor, format, v...)
 }
 
 func (l *DefaultLogger) Ok(v ...interface{}) {
-	logln(l.okColor, v...)
+	printConsoleln(l.okColor, v...)
 }
 
 func (l *DefaultLogger) Okf(format string, v ...interface{}) {
-	loglnf(l.okColor, format, v...)
+	printConsolelnf(l.okColor, format, v...)
 }
 
 func (l *DefaultLogger) SendMessage(v ...interface{}) {
-	logln(l.sendColor, v...)
-}
-
-func (l *DefaultLogger) SendMessagef(format string, v ...interface{}) {
-	loglnf(l.sendColor, format, v...)
+	printConsole(l.sendColor, v...)
 }
 
 func (l *DefaultLogger) Error(v ...interface{}) {
-	logln(l.errorColor, v...)
+	printConsoleln(l.errorColor, v...)
 }
 
 func (l *DefaultLogger) Errorf(format string, v ...interface{}) {
-	loglnf(l.errorColor, format, v...)
+	printConsolelnf(l.errorColor, format, v...)
 }
 
 func (l *DefaultLogger) Fatal(v ...interface{}) {
-	logln(l.errorColor, v...)
+	printConsoleln(l.errorColor, v...)
 	os.Exit(1)
 }
 
 func (l *DefaultLogger) Fatalf(format string, v ...interface{}) {
-	loglnf(l.errorColor, format, v...)
+	printConsolelnf(l.errorColor, format, v...)
 	os.Exit(1)
 }
 
@@ -124,13 +119,19 @@ func trailingNewLine(msg string) string {
 	return fmt.Sprintf("%s\n", msg)
 }
 
-func logln(c *color.Color, v ...interface{}) {
+func printConsole(c *color.Color, v ...interface{}) {
+	if _, err := c.Print(v...); err != nil {
+		panic(err)
+	}
+}
+
+func printConsoleln(c *color.Color, v ...interface{}) {
 	if _, err := c.Println(v...); err != nil {
 		panic(err)
 	}
 }
 
-func loglnf(c *color.Color, format string, v ...interface{}) {
+func printConsolelnf(c *color.Color, format string, v ...interface{}) {
 	if _, err := c.Printf(trailingNewLine(fmt.Sprintf(format, v...))); err != nil {
 		panic(err)
 	}

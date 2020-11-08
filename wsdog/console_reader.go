@@ -1,36 +1,50 @@
 package main
 
 import (
-	"bufio"
-	"os"
+	"fmt"
+	"github.com/chzyer/readline"
 	"strings"
 )
 
 type ConsoleInputReader struct {
 	outputChan chan string
 	done bool
+	reader *readline.Instance
 }
 
-func (c *ConsoleInputReader) close() {
+// Move cursor to the first character of the line and erase the entire line
+func (c *ConsoleInputReader) Clean() {
+	fmt.Print("\r\u001b[2K\u001b[3D")
+}
+
+// Re-print the unfinished line to STDOUT with prompt.
+func (c *ConsoleInputReader) Refresh() {
+	c.reader.Refresh()
+}
+
+func (c *ConsoleInputReader) Close() {
 	c.done = true
+	_ = c.reader.Close()
+	close(c.outputChan)
 }
 
-func newConsoleInputReader() *ConsoleInputReader {
-	outputChan := make(chan string)
+func NewConsoleInputReader() *ConsoleInputReader {
+	reader,_ := readline.New("> ")
 
-	r := ConsoleInputReader{outputChan, false}
+	outputChan := make(chan string)
+	r := ConsoleInputReader{outputChan, false, reader}
 
 	go func() {
-		ioReader := bufio.NewReader(os.Stdin)
+		defer r.Close()
 		for {
 			if r.done {
 				return
 			}
 
-			wsdogLogger.SendMessagef("> ")
-			text, err := ioReader.ReadString('\n')
+			text, err := reader.Readline()
 			if err != nil {
-				panic(err)
+				wsdogLogger.Debugf("receive error when read from console %s", err)
+				return
 			}
 
 			outputChan <- strings.TrimSuffix(text, "\n")

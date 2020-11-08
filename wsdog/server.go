@@ -18,7 +18,7 @@ func closeConn(conn *websocket.Conn) {
 	}
 }
 
-func generateWsHandler(cliOpts ListenOnPortOptions) func(w http.ResponseWriter, r *http.Request) {
+func generateWsHandler(opts CommandLineOptions) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -28,7 +28,7 @@ func generateWsHandler(cliOpts ListenOnPortOptions) func(w http.ResponseWriter, 
 
 		readWsChan := make(chan WebSocketMessage)
 		done := make(chan struct{})
-		setupReadForConn(conn, SetupReadOptions{done, readWsChan, cliOpts.ShowPingPong})
+		setupReadForConn(conn, SetupReadOptions{done, readWsChan, opts.ShowPingPong})
 
 		defer closeConn(conn)
 		for {
@@ -46,8 +46,8 @@ func generateWsHandler(cliOpts ListenOnPortOptions) func(w http.ResponseWriter, 
 	}
 }
 
-func runAsServer(listenPort uint16, cliOpts ListenOnPortOptions) {
-	http.HandleFunc("/", generateWsHandler(cliOpts))
+func runAsServer(listenPort uint16, opts CommandLineOptions) {
+	http.HandleFunc("/", generateWsHandler(opts))
 
 	wsdogLogger.Okf("listening on port %d (press CTRL+C to quit)", listenPort)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf("localhost:%d", listenPort), nil))

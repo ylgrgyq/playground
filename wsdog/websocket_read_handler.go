@@ -17,7 +17,7 @@ type SetupReadOptions struct {
 	showPingPong bool
 }
 
-func setupPingPongHandler(conn *websocket.Conn) {
+func SetupPingPongHandler(conn *websocket.Conn) {
 	pingHandler := func(message string) error {
 		wsdogLogger.ReceiveMessage("< Received ping")
 		err := conn.WriteControl(websocket.PongMessage, []byte(message), time.Now().Add(defaultWriteWaitDuration))
@@ -41,7 +41,7 @@ func setupPingPongHandler(conn *websocket.Conn) {
 
 func setupReadForConn(conn *websocket.Conn, opts SetupReadOptions) {
 	if opts.showPingPong {
-		setupPingPongHandler(conn)
+		SetupPingPongHandler(conn)
 	}
 
 	go func() {

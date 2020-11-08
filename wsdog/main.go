@@ -10,16 +10,16 @@ type ApplicationOptions struct {
 	ConnectUrl  string `short:"c" long:"connect" description:"connect to a WebSocket server"`
 	EnableDebug bool   `long:"debug" description:"enable debug log"`
 	NoColor     bool   `long:"no-color" description:"Run without color"`
+	ShowPingPong bool   `short:"P" long:"show-ping-pong" description:"print a notification when a ping or pong is received"`
+	Subprotocol  string `short:"s" long:"subprotocol" description:"optional subprotocol (default: )"`
 }
 
 type ListenOnPortOptions struct {
-	Subprotocol  string `short:"s" long:"subprotocol" description:"optional subprotocol (default: )"`
-	ShowPingPong bool   `short:"P" long:"show-ping-pong" description:"print a notification when a ping or pong is received"`
+
 }
 
 type ConnectOptions struct {
 	Origin         string            `short:"o" long:"origin" description:"optional origin"`
-	Subprotocol    string            `short:"s" long:"subprotocol" description:"optional subprotocol (default: )"`
 	ExecuteCommand string            `short:"x" long:"execute" description:"execute command after connecting"`
 	Wait           int64             `short:"w" long:"wait" default:"2" description:" wait given seconds after executing command"`
 	Host           string            `long:"host" description:"optional host"`
@@ -31,7 +31,6 @@ type ConnectOptions struct {
 	Key            string            `long:"key" description:"Specify a Client SSL Certificate's key"`
 	Passphrase     string            `long:"passphrase" description:"Specify a Client SSL Certificate Key's passphrase. If you don't provide a value, it will be prompted for."`
 	EnableSlash    bool              `long:"slash" description:"Enable slash commands for control frames (/ping, /pong, /close [code [, reason]])"`
-	ShowPingPong   bool              `short:"P" long:"show-ping-pong" description:"print a notification when a ping or pong is received"`
 }
 
 type CommandLineOptions struct {
@@ -89,9 +88,9 @@ func parseCommandLineArguments() CommandLineOptions {
 func main() {
 	var cliOpts = parseCommandLineArguments()
 
-	if cliOpts.ApplicationOptions.ConnectUrl != "" {
-		runAsClient(cliOpts.ConnectUrl, cliOpts.ConnectOptions)
+	if cliOpts.ConnectUrl != "" {
+		runAsClient(cliOpts.ConnectUrl, cliOpts)
 	} else {
-		runAsServer(cliOpts.ListenPort, cliOpts.ListenOnPortOptions)
+		runAsServer(cliOpts.ListenPort, cliOpts)
 	}
 }
