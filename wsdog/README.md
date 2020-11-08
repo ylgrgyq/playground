@@ -1,42 +1,38 @@
 # wsdog
 
-WebSocket dog just like https://github.com/websockets/wscat
+WebSocket dog just like https://github.com/ylgrgyq/wsdog
 
 ## Installation
 
-This module needs to be installed globally so use the `-g` flag when installing:
 
-```
-npm install -g wscat
-```
+
 
 ## Usage
 
 ```
-Usage: wscat [options] (--listen <port> | --connect <url>)
+Usage:
+  wsdog [OPTIONS]
 
-Options:
-  -V, --version                       output the version number
-  -l, --listen <port>                 listen on port
-  -c, --connect <url>                 connect to a WebSocket server
-  -p, --protocol <version>            optional protocol version
-  -o, --origin <origin>               optional origin
-  -x, --execute <command>             execute command after connecting
-  -w, --wait <seconds>                wait given seconds after executing command
-  -P, --show-ping-pong                print a notification when a ping or pong is received
-  --host <host>                       optional host
-  -s, --subprotocol <protocol>        optional subprotocol (default: [])
-  -n, --no-check                      do not check for unauthorized certificates
-  -H, --header <header:value>         set an HTTP header. Repeat to set multiple (--connect only) (default: [])
-  --auth <username:password>          add basic HTTP authentication header (--connect only)
-  --ca <ca>                           specify a Certificate Authority (--connect only)
-  --cert <cert>                       specify a Client SSL Certificate (--connect only)
-  --key <key>                         specify a Client SSL Certificate's key (--connect only)
-  --passphrase [passphrase]           specify a Client SSL Certificate Key's passphrase (--connect only). If you don't provide a value, it will be prompted for
-  --no-color                          run without color
-  --slash                             enable slash commands for control frames (/ping, /pong, /close [code [, reason]])
-  --proxy <[protocol://]host[:port]>  connect via a proxy. Proxy must support CONNECT method
-  -h, --help                          output usage information
+Application Options:
+  -l, --listen=         listen on port
+  -c, --connect=        connect to a WebSocket server
+      --debug           enable debug log
+      --no-color        Run without color
+  -P, --show-ping-pong  print a notification when a ping or pong is received
+  -s, --subprotocol=    optional subprotocol (default: )
+
+Connect To A WebSocket Server Options:
+  -o, --origin=         optional origin
+  -x, --execute=        execute command after connecting
+  -w, --wait=           wait given seconds after executing command (default: 2)
+      --host=           optional host
+  -n, --no-check        Do not check for unauthorized certificates
+  -H, --header=         Set an HTTP header <header:value>. Repeat to set multiple like -H header1:value1 -H header2:value2.
+      --auth=           Add basic HTTP authentication header <username:password>.
+      --slash           Enable slash commands for control frames (/ping, /pong, /close [code [, reason]])
+
+Help Options:
+  -h, --help            Show this help message
 ```
 
 ## Example
