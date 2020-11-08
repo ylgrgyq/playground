@@ -26,10 +26,10 @@ type ConnectOptions struct {
 	NoTlsCheck     bool              `short:"n" long:"no-check" description:"Do not check for unauthorized certificates"`
 	Headers        map[string]string `short:"H" long:"header" description:"Set an HTTP header <header:value>. Repeat to set multiple like -H header1:value1 -H header2:value2."`
 	Auth           string            `long:"auth" description:"Add basic HTTP authentication header <username:password>."`
-	Ca             string            `long:"ca" description:"Specify a Certificate Authority"`
-	Cert           string            `long:"cert" description:"Specify a Client SSL Certificate"`
-	Key            string            `long:"key" description:"Specify a Client SSL Certificate's key"`
-	Passphrase     string            `long:"passphrase" description:"Specify a Client SSL Certificate Key's passphrase. If you don't provide a value, it will be prompted for."`
+	//Ca             string            `long:"ca" description:"Specify a Certificate Authority"`
+	//Cert           string            `long:"cert" description:"Specify a Client SSL Certificate"`
+	//Key            string            `long:"key" description:"Specify a Client SSL Certificate's key"`
+	//Passphrase     string            `long:"passphrase" description:"Specify a Client SSL Certificate Key's passphrase. If you don't provide a value, it will be prompted for."`
 	EnableSlash    bool              `long:"slash" description:"Enable slash commands for control frames (/ping, /pong, /close [code [, reason]])"`
 }
 

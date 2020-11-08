@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"github.com/gorilla/websocket"
-	"log"
 	"net/http"
 )
 
@@ -25,7 +24,7 @@ func generateWsHandler(opts CommandLineOptions) func(w http.ResponseWriter, r *h
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Print("upgrade:", err)
+			wsdogLogger.Errorf("websocket upgrade failed: %s", err.Error())
 			return
 		}
 
@@ -44,7 +43,6 @@ func generateWsHandler(opts CommandLineOptions) func(w http.ResponseWriter, r *h
 						return
 					}
 				}
-
 			}
 		}
 	}
@@ -54,5 +52,5 @@ func runAsServer(listenPort uint16, opts CommandLineOptions) {
 	http.HandleFunc("/", generateWsHandler(opts))
 
 	wsdogLogger.Okf("listening on port %d (press CTRL+C to quit)", listenPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("localhost:%d", listenPort), nil))
+	wsdogLogger.Fatal(http.ListenAndServe(fmt.Sprintf("localhost:%d", listenPort), nil))
 }
