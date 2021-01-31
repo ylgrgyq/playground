@@ -8,4 +8,8 @@ type Transport interface {
 	sendMsg(target *Endpoint, msg []byte) error
 
 	readMsg() (*Endpoint, []byte)
+
+	registerInboundChannel(inboundMsgChan chan InboundMessage)
+
+	BlockShutdown() error
 }
