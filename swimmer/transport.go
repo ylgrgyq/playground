@@ -2,14 +2,22 @@ package swimmer
 
 type messageType uint8
 
+type InboundMessageHandler interface {
+	handleMessage(inboundMessage Message)
+}
+
 type Transport interface {
-	sendMsgAndWaitResponse(target *Endpoint, msg []byte) []byte
+	SendMsg(target *Endpoint, msg []byte) error
 
-	sendMsg(target *Endpoint, msg []byte) error
-
-	readMsg() (*Endpoint, []byte)
-
-	registerInboundChannel(inboundMsgChan chan InboundMessage)
+	RegisterInboundMessageHandler(handler InboundMessageHandler)
 
 	BlockShutdown() error
+}
+
+type CodecTransportWrapper struct {
+	innerTransport Transport
+}
+
+func (c *CodecTransportWrapper) SendMessage(target *Endpoint, msg []byte) error {
+
 }

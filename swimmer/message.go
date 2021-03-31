@@ -17,18 +17,19 @@ type message struct {
 	payload interface{}
 }
 
-type InboundMessage struct {
+type Message struct {
 	from *Endpoint
 	messageType messageType
 	payload []byte
 }
 
 type joinMessage struct {
-	newEndpoint *EndpointState
+	from *Endpoint
+	knownGroup []*Endpoint
 }
 
 type joinMessageResp struct {
-	remoteEndpoints []*EndpointState
+	remoteEndpoints []*Endpoint
 }
 
 func encodeMessage(msgType messageType, payload interface{})(*bytes.Buffer, error) {

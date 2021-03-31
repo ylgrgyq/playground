@@ -8,7 +8,14 @@ import (
 	"sync/atomic"
 )
 
+type SelfState uint8
 type EndpointStatusType uint8
+
+const (
+	Init = iota
+	Started
+	Shutdown
+)
 
 const (
 	AliveStateType = iota
@@ -20,22 +27,20 @@ const (
 type Endpoint struct {
 	Name    string
 	Address []byte
-}
-
-type EndpointState struct {
-	Endpoint
-	Status EndpointStatusType
+	Status  EndpointStatusType
 }
 
 type EndpointGroup struct {
-	self           *Endpoint
-	group          []*EndpointState
-	logger         *log.Logger
-	transport      Transport
-	inboundMsgChan chan InboundMessage
-	shutdownMark   int32
-	shutdownChan   chan struct{}
-	shutdownLock   sync.Mutex
+	self            *Endpoint
+	selfState       SelfState
+	group           []*Endpoint
+	logger          *log.Logger
+	transport       Transport
+	inboundMsgChan  chan Message
+	shutdownMark    int32
+	shutdownChan    chan struct{}
+	shutdownLock    sync.Mutex
+	updateGroupLock sync.Mutex
 }
 
 func newEndpointGroup(config *Config) (*EndpointGroup, error) {
@@ -45,7 +50,7 @@ func newEndpointGroup(config *Config) (*EndpointGroup, error) {
 
 	logDest := config.LogOutput
 	if logDest == nil {
-		logDest = os.Stderr
+		logDest = os.Stdout
 	}
 
 	logger := config.Logger
@@ -53,22 +58,39 @@ func newEndpointGroup(config *Config) (*EndpointGroup, error) {
 		logger = log.New(logDest, "", log.LstdFlags)
 	}
 
-	inboundMessageChan := make(chan InboundMessage)
+	inboundMessageChan := make(chan Message)
 
-	config.transport.registerInboundChannel(inboundMessageChan)
+	config.transport.RegisterInboundChannel(inboundMessageChan)
 	eg := &EndpointGroup{
-		self:           config.Endpoint,
-		group:          []*EndpointState{{*config.Endpoint, AliveStateType}},
-		logger:         logger,
-		transport:      config.transport,
-		inboundMsgChan: inboundMessageChan,
-		shutdownChan:   make(chan struct{}),
+		self:            config.Endpoint,
+		selfState:       Init,
+		group:           []*Endpoint{{config.Endpoint.Name, config.Endpoint.Address, AliveStateType}},
+		logger:          logger,
+		transport:       config.transport,
+		inboundMsgChan:  inboundMessageChan,
+		shutdownChan:    make(chan struct{}),
+		shutdownLock:    sync.Mutex{},
+		updateGroupLock: sync.Mutex{},
 	}
 
 	return eg, nil
 }
 
-func (e *EndpointGroup) handleReceivedMessage(inboundMsg InboundMessage) {
+func (e *EndpointGroup) addEndpointToGroup(endpoint *Endpoint) bool {
+	e.updateGroupLock.Lock()
+	defer e.updateGroupLock.Unlock()
+
+	for _, e := range e.group {
+		if e.Name == endpoint.Name {
+			return false
+		}
+	}
+
+	e.group = append(e.group, endpoint)
+	return true
+}
+
+func (e *EndpointGroup) handleReceivedMessage(inboundMsg Message) {
 	switch inboundMsg.messageType {
 	case joinRespMessageType:
 		var resp joinMessage
@@ -78,8 +100,6 @@ func (e *EndpointGroup) handleReceivedMessage(inboundMsg InboundMessage) {
 			return
 		}
 
-
-
 	case joinMessageType:
 		var resp joinMessage
 		err := decodePayload(inboundMsg.payload, &resp)
@@ -88,7 +108,7 @@ func (e *EndpointGroup) handleReceivedMessage(inboundMsg InboundMessage) {
 			return
 		}
 
-		e.group = append(e.group, resp.newEndpoint)
+		e.group = append(e.group, resp.from)
 
 		joinResp := joinMessageResp{remoteEndpoints: e.group}
 		buf, err := encodeMessage(joinRespMessageType, joinResp)
@@ -97,12 +117,11 @@ func (e *EndpointGroup) handleReceivedMessage(inboundMsg InboundMessage) {
 			return
 		}
 
-		err = e.transport.sendMsg(inboundMsg.from, buf.Bytes())
+		err = e.transport.SendMsg(inboundMsg.from, buf.Bytes())
 		if err != nil {
 			e.logger.Printf("encode joinMessageType request failed, from: %s", inboundMsg.from)
 			return
 		}
-
 
 	}
 }
@@ -134,16 +153,22 @@ func CreateEndpointGroup(config *Config) (*EndpointGroup, error) {
 }
 
 func (e *EndpointGroup) Join(endpoint *Endpoint) error {
-	joinMsg := joinMessage{newEndpoint: &EndpointState{*e.self, AliveStateType}}
+	if !e.addEndpointToGroup(endpoint) {
+		return nil
+	}
+
+	joinMsg := joinMessage{from: e.self, knownGroup: e.group}
 	joinBuf, err := encodeMessage(joinMessageType, joinMsg)
 	if err != nil {
 		return err
 	}
 
-	if err := e.transport.sendMsg(endpoint, joinBuf.Bytes()); err != nil {
+
+	if err := e.transport.SendMsg(endpoint, joinBuf.Bytes()); err != nil {
 		return err
 	}
 
+	atomic.CompareAndSwapInt32(&(e.selfState.(uint8)), Init, Started)
 	go e.mainLoop()
 
 	return nil
