@@ -9,7 +9,7 @@ const (
 	pingMessageType messageType = iota
 	pingAckMessageType
 	joinMessageType
-	joinRespMessageType
+	joinResponseMessageType
 )
 
 type message struct {
@@ -17,19 +17,19 @@ type message struct {
 	payload interface{}
 }
 
-type Message struct {
-	from *Endpoint
+type InboundMessage struct {
+	From        Endpoint
 	messageType messageType
-	payload []byte
+	payload     interface{}
 }
 
-type joinMessage struct {
-	from *Endpoint
-	knownGroup []*Endpoint
+type JoinMessage struct {
+	From           Endpoint
+	KnownEndpoints []Endpoint
 }
 
-type joinMessageResp struct {
-	remoteEndpoints []*Endpoint
+type JoinResponseMessage struct {
+	KnownEndpoints []Endpoint
 }
 
 func encodeMessage(msgType messageType, payload interface{})(*bytes.Buffer, error) {

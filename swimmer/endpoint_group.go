@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 )
 
-type SelfState uint8
+type SelfState int32
 type EndpointStatusType uint8
 
 const (
@@ -32,11 +32,11 @@ type Endpoint struct {
 
 type EndpointGroup struct {
 	self            *Endpoint
-	selfState       SelfState
+	selfState       int32
 	group           []*Endpoint
 	logger          *log.Logger
 	transport       Transport
-	inboundMsgChan  chan Message
+	inboundMsgChan  chan InboundMessage
 	shutdownMark    int32
 	shutdownChan    chan struct{}
 	shutdownLock    sync.Mutex
@@ -58,22 +58,23 @@ func newEndpointGroup(config *Config) (*EndpointGroup, error) {
 		logger = log.New(logDest, "", log.LstdFlags)
 	}
 
-	inboundMessageChan := make(chan Message)
-
-	config.transport.RegisterInboundChannel(inboundMessageChan)
 	eg := &EndpointGroup{
 		self:            config.Endpoint,
 		selfState:       Init,
 		group:           []*Endpoint{{config.Endpoint.Name, config.Endpoint.Address, AliveStateType}},
 		logger:          logger,
 		transport:       config.transport,
-		inboundMsgChan:  inboundMessageChan,
 		shutdownChan:    make(chan struct{}),
-		shutdownLock:    sync.Mutex{},
 		updateGroupLock: sync.Mutex{},
 	}
 
 	return eg, nil
+}
+
+func (e *EndpointGroup) tryStartMainLoop() {
+	if atomic.CompareAndSwapInt32(&e.selfState, Init, Started) {
+		go e.mainLoop()
+	}
 }
 
 func (e *EndpointGroup) addEndpointToGroup(endpoint *Endpoint) bool {
@@ -90,58 +91,67 @@ func (e *EndpointGroup) addEndpointToGroup(endpoint *Endpoint) bool {
 	return true
 }
 
-func (e *EndpointGroup) handleReceivedMessage(inboundMsg Message) {
-	switch inboundMsg.messageType {
-	case joinRespMessageType:
-		var resp joinMessage
-		err := decodePayload(inboundMsg.payload, &resp)
-		if err != nil {
-			e.logger.Printf("decode joinMessageType request failed, from: %s", inboundMsg.from)
-			return
-		}
-
-	case joinMessageType:
-		var resp joinMessage
-		err := decodePayload(inboundMsg.payload, &resp)
-		if err != nil {
-			e.logger.Printf("decode joinMessageType request failed, from: %s", inboundMsg.from)
-			return
-		}
-
-		e.group = append(e.group, resp.from)
-
-		joinResp := joinMessageResp{remoteEndpoints: e.group}
-		buf, err := encodeMessage(joinRespMessageType, joinResp)
-		if err != nil {
-			e.logger.Printf("encode joinMessageType request failed, from: %s", inboundMsg.from)
-			return
-		}
-
-		err = e.transport.SendMsg(inboundMsg.from, buf.Bytes())
-		if err != nil {
-			e.logger.Printf("encode joinMessageType request failed, from: %s", inboundMsg.from)
-			return
-		}
-
-	}
-}
-
 func (e *EndpointGroup) mainLoop() {
 	for {
 		select {
-		case <-e.shutdownChan:
-			return
 		case inboundMsg := <-e.inboundMsgChan:
-			if len(inboundMsg.payload) == 0 {
+			if inboundMsg.payload == nil {
 				continue
 			}
 			e.handleReceivedMessage(inboundMsg)
+		case <-e.shutdownChan:
+			return
 		}
 	}
 }
 
-func (e *EndpointGroup) hasShutdown() bool {
-	return atomic.LoadInt32(&e.shutdownMark) == 1
+func (e *EndpointGroup) getEndpointGroup() []Endpoint {
+	group := make([]Endpoint, len(e.group))
+	for _, endpoint := range e.group {
+		group = append(group, *endpoint)
+	}
+}
+
+func (e *EndpointGroup) handleReceivedMessage(inboundMsg InboundMessage) {
+	switch inboundMsg.messageType {
+	case joinResponseMessageType:
+		resp, ok := inboundMsg.payload.(JoinResponseMessage)
+		if !ok {
+			e.logger.Printf("receive invalid JoinResponseMessage, from: %s", inboundMsg.From.Name)
+			return
+		}
+
+		for _, endpoint := range resp.KnownEndpoints {
+			e.addEndpointToGroup(&endpoint)
+		}
+	case joinMessageType:
+		resp, ok := inboundMsg.payload.(JoinMessage)
+		if !ok {
+			e.logger.Printf("receive invalid join message, from: %s", inboundMsg.From.Name)
+			return
+		}
+
+		joinResp := JoinResponseMessage{KnownEndpoints: e.getEndpointGroup()}
+		buf, err := encodeMessage(joinResponseMessageType, joinResp)
+		if err != nil {
+			e.logger.Printf("encode joinMessageType request failed, from: %s", inboundMsg.From)
+			return
+		}
+
+		err = e.transport.SendMsg(&inboundMsg.From, buf.Bytes())
+		if err != nil {
+			e.logger.Printf("encode joinMessageType request failed, from: %s", inboundMsg.From)
+			return
+		}
+
+		endpointsToAdd := append(resp.KnownEndpoints, resp.From)
+		for _, endpoint := range endpointsToAdd  {
+			e.addEndpointToGroup(&endpoint)
+		}
+
+
+
+	}
 }
 
 func CreateEndpointGroup(config *Config) (*EndpointGroup, error) {
@@ -153,37 +163,32 @@ func CreateEndpointGroup(config *Config) (*EndpointGroup, error) {
 }
 
 func (e *EndpointGroup) Join(endpoint *Endpoint) error {
+	e.tryStartMainLoop()
+
 	if !e.addEndpointToGroup(endpoint) {
 		return nil
 	}
 
-	joinMsg := joinMessage{from: e.self, knownGroup: e.group}
+	joinMsg := JoinMessage{From: *e.self, KnownEndpoints: e.getEndpointGroup()}
 	joinBuf, err := encodeMessage(joinMessageType, joinMsg)
 	if err != nil {
 		return err
 	}
 
-
 	if err := e.transport.SendMsg(endpoint, joinBuf.Bytes()); err != nil {
 		return err
 	}
-
-	atomic.CompareAndSwapInt32(&(e.selfState.(uint8)), Init, Started)
-	go e.mainLoop()
 
 	return nil
 }
 
 func (e *EndpointGroup) Shutdown() error {
-	e.shutdownLock.Lock()
-	defer e.shutdownLock.Unlock()
-
-	if err := e.transport.BlockShutdown(); err != nil {
-		e.logger.Printf("[ERR] Failed to shutdown transport: %v", err)
+	if !atomic.CompareAndSwapInt32(&e.selfState, Started, Shutdown) {
+		return nil
 	}
 
-	if !atomic.CompareAndSwapInt32(&e.shutdownMark, 0, 1) {
-		return nil
+	if err := e.transport.Shutdown(); err != nil {
+		e.logger.Printf("[ERR] Failed to shutdown transport: %v", err)
 	}
 
 	close(e.shutdownChan)
