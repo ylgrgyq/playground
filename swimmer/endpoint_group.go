@@ -95,7 +95,7 @@ func (e *EndpointGroup) mainLoop() {
 	for {
 		select {
 		case inboundMsg := <-e.inboundMsgChan:
-			if inboundMsg.payload == nil {
+			if inboundMsg.Payload == nil {
 				continue
 			}
 			e.handleReceivedMessage(inboundMsg)
@@ -105,17 +105,10 @@ func (e *EndpointGroup) mainLoop() {
 	}
 }
 
-func (e *EndpointGroup) getEndpointGroup() []Endpoint {
-	group := make([]Endpoint, len(e.group))
-	for _, endpoint := range e.group {
-		group = append(group, *endpoint)
-	}
-}
-
 func (e *EndpointGroup) handleReceivedMessage(inboundMsg InboundMessage) {
-	switch inboundMsg.messageType {
+	switch inboundMsg.MessageType {
 	case joinResponseMessageType:
-		resp, ok := inboundMsg.payload.(JoinResponseMessage)
+		resp, ok := inboundMsg.Payload.(JoinResponseMessage)
 		if !ok {
 			e.logger.Printf("receive invalid JoinResponseMessage, from: %s", inboundMsg.From.Name)
 			return
@@ -125,32 +118,23 @@ func (e *EndpointGroup) handleReceivedMessage(inboundMsg InboundMessage) {
 			e.addEndpointToGroup(&endpoint)
 		}
 	case joinMessageType:
-		resp, ok := inboundMsg.payload.(JoinMessage)
+		resp, ok := inboundMsg.Payload.(JoinMessage)
 		if !ok {
 			e.logger.Printf("receive invalid join message, from: %s", inboundMsg.From.Name)
 			return
 		}
 
-		joinResp := JoinResponseMessage{KnownEndpoints: e.getEndpointGroup()}
-		buf, err := encodeMessage(joinResponseMessageType, joinResp)
+		joinResp := JoinResponseMessage{KnownEndpoints: e.GetEndpoints()}
+		err := e.transport.SendMsg(&inboundMsg.From, joinMessageType, joinResp)
 		if err != nil {
 			e.logger.Printf("encode joinMessageType request failed, from: %s", inboundMsg.From)
 			return
 		}
 
-		err = e.transport.SendMsg(&inboundMsg.From, buf.Bytes())
-		if err != nil {
-			e.logger.Printf("encode joinMessageType request failed, from: %s", inboundMsg.From)
-			return
-		}
-
-		endpointsToAdd := append(resp.KnownEndpoints, resp.From)
-		for _, endpoint := range endpointsToAdd  {
+		endpointsToAdd := append(resp.KnownEndpoints, inboundMsg.From)
+		for _, endpoint := range endpointsToAdd {
 			e.addEndpointToGroup(&endpoint)
 		}
-
-
-
 	}
 }
 
@@ -169,18 +153,26 @@ func (e *EndpointGroup) Join(endpoint *Endpoint) error {
 		return nil
 	}
 
-	joinMsg := JoinMessage{From: *e.self, KnownEndpoints: e.getEndpointGroup()}
-	joinBuf, err := encodeMessage(joinMessageType, joinMsg)
-	if err != nil {
-		return err
-	}
-
-	if err := e.transport.SendMsg(endpoint, joinBuf.Bytes()); err != nil {
+	joinMsg := JoinMessage{KnownEndpoints: e.GetEndpoints()}
+	if err := e.transport.SendMsg(endpoint, joinMessageType, joinMsg); err != nil {
 		return err
 	}
 
 	return nil
 }
+
+func (e *EndpointGroup) NumOfKnownEndpoints() int {
+	return len(e.group)
+}
+
+func (e *EndpointGroup) GetEndpoints() []Endpoint {
+	eds := make([]Endpoint, len(e.group))
+	for _, endpoint := range e.group {
+		eds = append(eds, *endpoint)
+	}
+	return eds
+}
+
 
 func (e *EndpointGroup) Shutdown() error {
 	if !atomic.CompareAndSwapInt32(&e.selfState, Started, Shutdown) {
@@ -188,7 +180,7 @@ func (e *EndpointGroup) Shutdown() error {
 	}
 
 	if err := e.transport.Shutdown(); err != nil {
-		e.logger.Printf("[ERR] Failed to shutdown transport: %v", err)
+		e.logger.Printf("[ERR] Failed to shutdownChan transport: %v", err)
 	}
 
 	close(e.shutdownChan)

@@ -3,28 +3,24 @@ package swimmer
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 )
 
 const (
-	pingMessageType messageType = iota
+	pingMessageType MessageType = iota
 	pingAckMessageType
 	joinMessageType
 	joinResponseMessageType
+	errorMessageType
 )
-
-type message struct {
-	messageType
-	payload interface{}
-}
 
 type InboundMessage struct {
 	From        Endpoint
-	messageType messageType
-	payload     interface{}
+	MessageType MessageType
+	Payload     interface{}
 }
 
 type JoinMessage struct {
-	From           Endpoint
 	KnownEndpoints []Endpoint
 }
 
@@ -32,7 +28,7 @@ type JoinResponseMessage struct {
 	KnownEndpoints []Endpoint
 }
 
-func encodeMessage(msgType messageType, payload interface{})(*bytes.Buffer, error) {
+func encodePayload(msgType MessageType, payload interface{}) (*bytes.Buffer, error) {
 	payloadInBytes, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
@@ -45,8 +41,16 @@ func encodeMessage(msgType messageType, payload interface{})(*bytes.Buffer, erro
 	return buf, nil
 }
 
-func decodePayload(payloadInBytes []byte, payload interface{}) error {
-	return json.Unmarshal(payloadInBytes, payload)
+func decodePayload(msgType MessageType, payloadInBytes []byte) (interface{}, error) {
+
+	switch msgType {
+	case joinMessageType:
+		var joinMsg interface{}
+		err := json.Unmarshal(payloadInBytes, joinMsg)
+		if err != nil {
+			return nil, err
+		}
+		return joinMsg, nil
+	}
+	return nil, fmt.Errorf("known supported message type")
 }
-
-

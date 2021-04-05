@@ -19,4 +19,5 @@ func main() {
 
 	eg1.Join(config.Endpoint)
 
+
 }
