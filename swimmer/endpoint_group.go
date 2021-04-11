@@ -26,17 +26,17 @@ const (
 
 type Endpoint struct {
 	Name    string
-	Address []byte
+	Address string
 	Status  EndpointStatusType
 }
 
 type EndpointGroup struct {
-	self            *Endpoint
+	self            Endpoint
 	selfState       int32
 	group           []*Endpoint
 	logger          *log.Logger
-	transport       Transport
-	inboundMsgChan  chan InboundMessage
+	transport       MessageTransport
+	inboundMsgChan  chan Message
 	shutdownMark    int32
 	shutdownChan    chan struct{}
 	shutdownLock    sync.Mutex
@@ -59,7 +59,7 @@ func newEndpointGroup(config *Config) (*EndpointGroup, error) {
 	}
 
 	eg := &EndpointGroup{
-		self:            config.Endpoint,
+		self:            *config.Endpoint,
 		selfState:       Init,
 		group:           []*Endpoint{{config.Endpoint.Name, config.Endpoint.Address, AliveStateType}},
 		logger:          logger,
@@ -105,12 +105,12 @@ func (e *EndpointGroup) mainLoop() {
 	}
 }
 
-func (e *EndpointGroup) handleReceivedMessage(inboundMsg InboundMessage) {
+func (e *EndpointGroup) handleReceivedMessage(inboundMsg Message) {
 	switch inboundMsg.MessageType {
 	case joinResponseMessageType:
-		resp, ok := inboundMsg.Payload.(JoinResponseMessage)
+		resp, ok := inboundMsg.Payload.(JoinResponse)
 		if !ok {
-			e.logger.Printf("receive invalid JoinResponseMessage, from: %s", inboundMsg.From.Name)
+			e.logger.Printf("receive invalid JoinResponse, from: %s", inboundMsg.From.Name)
 			return
 		}
 
@@ -118,16 +118,20 @@ func (e *EndpointGroup) handleReceivedMessage(inboundMsg InboundMessage) {
 			e.addEndpointToGroup(&endpoint)
 		}
 	case joinMessageType:
-		resp, ok := inboundMsg.Payload.(JoinMessage)
+		resp, ok := inboundMsg.Payload.(Join)
 		if !ok {
 			e.logger.Printf("receive invalid join message, from: %s", inboundMsg.From.Name)
 			return
 		}
 
-		joinResp := JoinResponseMessage{KnownEndpoints: e.GetEndpoints()}
-		err := e.transport.SendMsg(&inboundMsg.From, joinMessageType, joinResp)
+		joinResp := Message{
+			e.self,
+			joinMessageType,
+			JoinResponse{KnownEndpoints: e.GetEndpoints()},
+		}
+		err := e.transport.SendMessage(&inboundMsg.From, joinResp)
 		if err != nil {
-			e.logger.Printf("encode joinMessageType request failed, from: %s", inboundMsg.From)
+			e.logger.Printf("encode joinMessageType request failed, from: %s", inboundMsg.From.Name)
 			return
 		}
 
@@ -153,8 +157,12 @@ func (e *EndpointGroup) Join(endpoint *Endpoint) error {
 		return nil
 	}
 
-	joinMsg := JoinMessage{KnownEndpoints: e.GetEndpoints()}
-	if err := e.transport.SendMsg(endpoint, joinMessageType, joinMsg); err != nil {
+	joinMsg := Message{
+		e.self,
+		joinMessageType,
+		Join{KnownEndpoints: e.GetEndpoints()},
+	}
+	if err := e.transport.SendMessage(endpoint, joinMsg); err != nil {
 		return err
 	}
 
@@ -172,7 +180,6 @@ func (e *EndpointGroup) GetEndpoints() []Endpoint {
 	}
 	return eds
 }
-
 
 func (e *EndpointGroup) Shutdown() error {
 	if !atomic.CompareAndSwapInt32(&e.selfState, Started, Shutdown) {

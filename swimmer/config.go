@@ -8,7 +8,7 @@ import (
 type Config struct {
 	Endpoint *Endpoint
 
-	transport Transport
+	transport MessageTransport
 	// LogOutput is the writer where logs should be sent. If this is not
 	// set, logging will go to stderr by default. You cannot specify both LogOutput
 	// and Logger at the same time.
