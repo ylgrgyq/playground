@@ -1,7 +1,7 @@
 use rusqlite::{Connection, params, ToSql};
 use std::error::Error;
 use crate::{SearchArguments};
-use crate::note::{Note};
+use crate::article::{Article};
 use crate::db::{BearDb};
 
 const DEFAULT_BEAR_SQLITE_DB_PATH: &str = "Library/Group Containers/9K33E3U3T4.net.shinyfrog.bear/Application Data/database.sqlite";
@@ -20,8 +20,8 @@ fn get_db_connection() -> rusqlite::Result<Connection> {
     Connection::open(db_path)
 }
 
-fn do_search(sql: &str, args: &[&dyn ToSql]) -> Result<Vec<Note>, Box<dyn Error>> {
-    let mut ret: Vec<Note> = vec![];
+fn do_search(sql: &str, args: &[&dyn ToSql]) -> Result<Vec<Article>, Box<dyn Error>> {
+    let mut ret: Vec<Article> = vec![];
     let conn = get_db_connection()?;
     let mut stmt = conn.prepare(sql)?;
 
@@ -31,11 +31,11 @@ fn do_search(sql: &str, args: &[&dyn ToSql]) -> Result<Vec<Note>, Box<dyn Error>
             let uuid = row.get(0)?;
             let title = row.get(1)?;
             let text = row.get(2)?;
-            Ok(Note::new(uuid, title, text))
+            Ok(Article::new(uuid, title, text))
         })?
-        .for_each(|note| {
-            if note.is_ok() {
-                ret.push(note.unwrap())
+        .for_each(|article| {
+            if article.is_ok() {
+                ret.push(article.unwrap())
             }
         });
     Ok(ret)
@@ -47,7 +47,7 @@ const SEARCH_WITHOUT_TITLE: &str = "SELECT ZUNIQUEIDENTIFIER, ZTITLE, ZTEXT FROM
         WHERE `ZTRASHED` LIKE '0' AND `ZARCHIVED` LIKE '0' LIMIT ?1,?2";
 
 impl BearDb for SqliteBearDb {
-    fn search(&self, search_args: &SearchArguments) -> Result<Vec<Note>, Box<dyn Error>> {
+    fn search(&self, search_args: &SearchArguments) -> Result<Vec<Article>, Box<dyn Error>> {
         if search_args.title.is_some() {
             do_search(SEARCH_WITH_TITLE,
                       params![search_args.title.unwrap(), search_args.offset, search_args.limit])

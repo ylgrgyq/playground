@@ -1,6 +1,6 @@
 use strum_macros::{EnumString, EnumIter, IntoStaticStr};
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use crate::note::{Note, Header};
+use crate::article::{Article, Header};
 use itertools::Itertools;
 
 #[derive(Debug, EnumString, EnumIter, IntoStaticStr)]
@@ -32,9 +32,9 @@ fn render_header<F>(header: &Header, anchor_generator: &F) -> String
     format!("{}* [{}]({})", "\t".repeat(header.level - 1), header.header, anchor_generator(header))
 }
 
-fn render_headers<F>(note: &Note, anchor_generator: F) -> String
+fn render_headers<F>(article: &Article, anchor_generator: F) -> String
     where F: Fn(&Header) -> String {
-    let headers = note.headers_ref();
+    let headers = article.headers_ref();
 
     let mut ret = vec![];
     for header in headers {
@@ -45,30 +45,30 @@ fn render_headers<F>(note: &Note, anchor_generator: F) -> String
     ret.join("\n")
 }
 
-pub fn render_note(note: Note, render_args: &RenderArguments) -> String {
+pub fn render_article(article: Article, render_args: &RenderArguments) -> String {
     match render_args.render_field {
-        RenderField::TITLE => note.title(),
-        RenderField::WHOLE => note.text(),
+        RenderField::TITLE => article.title(),
+        RenderField::WHOLE => article.text(),
         RenderField::HEADERS => {
             if let Some(method) = render_args.render_headers_method.as_ref() {
                 match method {
                     RenderHeaderMethod::MARKDOWN => {
-                        render_headers(&note, |header| {
+                        render_headers(&article, |header| {
                             format!("#{}", utf8_percent_encode(header.header.as_str(),
                                                                NON_ALPHANUMERIC).to_string())
                         })
                     }
                     RenderHeaderMethod::BEAR => {
-                        render_headers(&note, |header| {
+                        render_headers(&article, |header| {
                             format!("bear://x-callback-url/open-note?id={}&header={}",
-                                    note.uuid_ref(),
+                                    article.uuid_ref(),
                                     utf8_percent_encode(header.header.as_str(),
                                                         NON_ALPHANUMERIC).to_string())
                         })
                     }
                 }
             } else {
-                note.headers().iter().join("\n")
+                article.headers().iter().join("\n")
             }
         }
     }
@@ -83,11 +83,11 @@ mod tests {
         let uuid = "UUID 11";
         let title = "Title";
         let content = "Content";
-        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+        let article = Article::new(String::from(uuid), String::from(title), String::from(content));
 
 
         assert_eq!(title,
-                   render_note(note,
+                   render_article(article,
                                &RenderArguments { render_field: RenderField::TITLE, render_headers_method: None }))
     }
 
@@ -96,10 +96,10 @@ mod tests {
         let uuid = "UUID 11";
         let title = "Title";
         let content = "Content";
-        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+        let article = Article::new(String::from(uuid), String::from(title), String::from(content));
 
         assert_eq!(content,
-                   render_note(note, &RenderArguments { render_field: RenderField::WHOLE, render_headers_method: None }))
+                   render_article(article, &RenderArguments { render_field: RenderField::WHOLE, render_headers_method: None }))
     }
 
     #[test]
@@ -107,9 +107,9 @@ mod tests {
         let uuid = "UUID 11";
         let title = "Title";
         let content = "Content";
-        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+        let article = Article::new(String::from(uuid), String::from(title), String::from(content));
 
-        assert!(render_note(note,
+        assert!(render_article(article,
                             &RenderArguments { render_field: RenderField::HEADERS, render_headers_method: None })
             .is_empty())
     }
@@ -124,10 +124,10 @@ mod tests {
         \n\
         ## Second Header  \n\
         ### Third Header";
-        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+        let article = Article::new(String::from(uuid), String::from(title), String::from(content));
 
         assert_eq!("# Header Line\n## Second Header\n### Third Header",
-                   render_note(note, &RenderArguments { render_field: RenderField::HEADERS, render_headers_method: None }));
+                   render_article(article, &RenderArguments { render_field: RenderField::HEADERS, render_headers_method: None }));
     }
 
     #[test]
@@ -140,10 +140,10 @@ mod tests {
         \n\
         ## Second Header  \n\
         ### Third Header";
-        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+        let article = Article::new(String::from(uuid), String::from(title), String::from(content));
 
         assert_eq!("* [Header Line](#Header%20Line)\n\t* [Second Header](#Second%20Header)\n\t\t* [Third Header](#Third%20Header)",
-                   render_note(note,
+                   render_article(article,
                                &RenderArguments {
                                    render_field: RenderField::HEADERS,
                                    render_headers_method: Some(RenderHeaderMethod::MARKDOWN),
@@ -160,13 +160,13 @@ mod tests {
         \n\
         ## Second Header  \n\
         ### Third Header";
-        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+        let article = Article::new(String::from(uuid), String::from(title), String::from(content));
 
         assert_eq!("\
         * [Header Line](bear://x-callback-url/open-note?id=UUID_11&header=Header%20Line)\n\
         \t* [Second Header](bear://x-callback-url/open-note?id=UUID_11&header=Second%20Header)\n\
         \t\t* [Third Header](bear://x-callback-url/open-note?id=UUID_11&header=Third%20Header)",
-                   render_note(note,
+                   render_article(article,
                                &RenderArguments {
                                    render_field: RenderField::HEADERS,
                                    render_headers_method: Some(RenderHeaderMethod::BEAR),

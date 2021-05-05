@@ -5,7 +5,7 @@ fn main() {
 
     match bear_reader::read_bear() {
         Ok(ret) => {
-            println!("{}", ret.join("\n\n"));
+            println!("{}", ret.join("\n ----------------------------------------------------------------------- \n"));
         }
         Err(error) => {
             eprintln!("Error: {:?}", error);

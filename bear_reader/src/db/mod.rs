@@ -1,8 +1,9 @@
-use crate::note::{Note};
+use crate::article::{Article};
 use std::error::Error;
 
 mod sqlite_db;
 
+/// This is the arguments used to filter articles from DB
 #[derive(Debug)]
 pub struct SearchArguments<'a> {
     title: Option<&'a str>,
@@ -17,7 +18,7 @@ impl<'a> SearchArguments<'a> {
 }
 
 pub trait BearDb {
-    fn search(&self, search_args: &SearchArguments) -> Result<Vec<Note>, Box<dyn Error>>;
+    fn search(&self, search_args: &SearchArguments) -> Result<Vec<Article>, Box<dyn Error>>;
 }
 
 pub fn get_bear_db() -> Box<dyn BearDb> {

@@ -17,7 +17,7 @@ impl Display for Header {
     }
 }
 
-pub struct Note {
+pub struct Article {
     uuid: String,
     title: String,
     headers: Vec<Header>,
@@ -27,7 +27,7 @@ pub struct Note {
 fn find_header(line: &str) -> Option<Header> {
     lazy_static! {
         static ref MATCHER: Regex = Regex::new(r"(^#+)\s(.*)")
-        .expect("Error initializing regex for note headers");
+        .expect("Error initializing regex for article headers");
     }
 
     if let Some(caps) = MATCHER.captures(line) {
@@ -53,8 +53,8 @@ fn find_header(line: &str) -> Option<Header> {
     None
 }
 
-impl Note {
-    pub fn new(uuid: String, title: String, text: String) -> Note {
+impl Article {
+    pub fn new(uuid: String, title: String, text: String) -> Article {
         let mut headers = vec![];
         let mut in_code_block = false;
         let mut headers_in_code_block = vec![];
@@ -80,7 +80,7 @@ impl Note {
             headers.append(&mut headers_in_code_block);
         }
 
-        Note { uuid, title, headers, text }
+        Article { uuid, title, headers, text }
     }
 
     pub fn uuid_ref(&self) -> &String {
@@ -109,20 +109,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_note_with_empty_header() {
+    fn new_article_with_empty_header() {
         let uuid = "UUID 11";
         let title = "Title";
         let content = "Content";
-        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+        let article = Article::new(String::from(uuid), String::from(title), String::from(content));
 
-        assert_eq!(uuid, note.uuid);
-        assert_eq!(title, note.title);
-        assert_eq!(content, note.text);
-        assert!(note.headers.is_empty())
+        assert_eq!(uuid, article.uuid);
+        assert_eq!(title, article.title);
+        assert_eq!(content, article.text);
+        assert!(article.headers.is_empty())
     }
 
     #[test]
-    fn new_note_with_header() {
+    fn new_article_with_header() {
         let uuid = "UUID 11";
         let title = "Title";
         let content = "Content\n\
@@ -134,18 +134,18 @@ mod tests {
         ##  Second Header  \n\
         ### Third Header\n\
         ";
-        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+        let article = Article::new(String::from(uuid), String::from(title), String::from(content));
 
-        assert_eq!(uuid, note.uuid);
-        assert_eq!(title, note.title);
-        assert_eq!(content, note.text);
-        assert_eq!("Header Line", note.headers.get(0).unwrap().header);
-        assert_eq!(1, note.headers.get(0).unwrap().level);
-        assert_eq!("Second Header", note.headers.get(1).unwrap().header);
-        assert_eq!(2, note.headers.get(1).unwrap().level);
-        assert_eq!("Third Header", note.headers.get(2).unwrap().header);
-        assert_eq!(3, note.headers.get(2).unwrap().level);
-        assert_eq!(3, note.headers.len());
+        assert_eq!(uuid, article.uuid);
+        assert_eq!(title, article.title);
+        assert_eq!(content, article.text);
+        assert_eq!("Header Line", article.headers.get(0).unwrap().header);
+        assert_eq!(1, article.headers.get(0).unwrap().level);
+        assert_eq!("Second Header", article.headers.get(1).unwrap().header);
+        assert_eq!(2, article.headers.get(1).unwrap().level);
+        assert_eq!("Third Header", article.headers.get(2).unwrap().header);
+        assert_eq!(3, article.headers.get(2).unwrap().level);
+        assert_eq!(3, article.headers.len());
     }
 
     #[test]
@@ -163,14 +163,14 @@ mod tests {
         ### Third Header\n\
         ```
         ";
-        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+        let article = Article::new(String::from(uuid), String::from(title), String::from(content));
 
-        assert_eq!(uuid, note.uuid);
-        assert_eq!(title, note.title);
-        assert_eq!(content, note.text);
-        assert_eq!("Header Line", note.headers.get(0).unwrap().header);
-        assert_eq!(1, note.headers.get(0).unwrap().level);
-        assert_eq!(1, note.headers.len());
+        assert_eq!(uuid, article.uuid);
+        assert_eq!(title, article.title);
+        assert_eq!(content, article.text);
+        assert_eq!("Header Line", article.headers.get(0).unwrap().header);
+        assert_eq!(1, article.headers.get(0).unwrap().level);
+        assert_eq!(1, article.headers.len());
     }
 
     #[test]
@@ -187,18 +187,18 @@ mod tests {
         ##  Second Header  \n\
         ### Third Header\n\
         ";
-        let note = Note::new(String::from(uuid), String::from(title), String::from(content));
+        let article = Article::new(String::from(uuid), String::from(title), String::from(content));
 
-        assert_eq!(uuid, note.uuid);
-        assert_eq!(title, note.title);
-        assert_eq!(content, note.text);
-        assert_eq!("Header Line", note.headers.get(0).unwrap().header);
-        assert_eq!(1, note.headers.get(0).unwrap().level);
-        assert_eq!("Second Header", note.headers.get(1).unwrap().header);
-        assert_eq!(2, note.headers.get(1).unwrap().level);
-        assert_eq!("Third Header", note.headers.get(2).unwrap().header);
-        assert_eq!(3, note.headers.get(2).unwrap().level);
-        assert_eq!(3, note.headers.len());
+        assert_eq!(uuid, article.uuid);
+        assert_eq!(title, article.title);
+        assert_eq!(content, article.text);
+        assert_eq!("Header Line", article.headers.get(0).unwrap().header);
+        assert_eq!(1, article.headers.get(0).unwrap().level);
+        assert_eq!("Second Header", article.headers.get(1).unwrap().header);
+        assert_eq!(2, article.headers.get(1).unwrap().level);
+        assert_eq!("Third Header", article.headers.get(2).unwrap().header);
+        assert_eq!(3, article.headers.get(2).unwrap().level);
+        assert_eq!(3, article.headers.len());
     }
 
     #[test]
