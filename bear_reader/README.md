@@ -1,6 +1,6 @@
 # Bear Reader
 
-A tool to read articles from Bear. I use it to generate TOC in Markdown or Bear format.
+A tool to read articles from [Bear](https://bear.app/). I use it to generate TOC in Markdown or Bear format.
 
 Currently, it's only available on MacOS.
 
