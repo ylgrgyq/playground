@@ -5,7 +5,7 @@ use std::collections::hash_map::RandomState;
 use std::hash::{Hash, Hasher};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-enum EndpointStatus {
+pub enum EndpointStatus {
     Alive,
     Suspect,
     Dead,
@@ -13,7 +13,7 @@ enum EndpointStatus {
 }
 
 #[derive(Debug, Clone, Eq)]
-struct Endpoint {
+pub struct Endpoint {
     name: String,
     address: String,
     status: RefCell<EndpointStatus>,
@@ -34,7 +34,7 @@ impl PartialEq for Endpoint {
 }
 
 impl Endpoint {
-    fn new(name: &str, address: &str) -> Endpoint {
+    pub fn new(name: &str, address: &str) -> Endpoint {
         Endpoint {
             name: String::from(name),
             address: String::from(address),
@@ -43,41 +43,61 @@ impl Endpoint {
         }
     }
 
-    fn get_status(&self) -> EndpointStatus {
+    pub fn get_status(&self) -> EndpointStatus {
         self.status.borrow().clone()
+    }
+
+    pub fn get_address(&self) -> String {
+        self.address.clone()
     }
 }
 
-struct EndpointGroup {
+pub struct EndpointGroup {
     group: HashMap<String, Endpoint>,
 }
 
 impl EndpointGroup {
-    fn new() -> EndpointGroup {
+    pub fn new() -> EndpointGroup {
         EndpointGroup { group: HashMap::new() }
     }
 
-    fn add_endpoint_to_group(&mut self, endpoint: Endpoint) -> HashSet<Endpoint> {
+    pub fn add_endpoint_to_group(&mut self, endpoint: Endpoint) -> bool {
+        if self.contains(&endpoint.name) {
+            return false;
+        }
+
         let group = &mut self.group;
         let name = &endpoint.name;
         group.insert(name.clone(), endpoint);
+        true
+    }
+
+    pub fn remove_endpoint_from_group(&mut self, name: &String) -> bool {
+        let group = &mut self.group;
+        match group.remove(name) {
+            None => false,
+            Some(_) => true
+        }
+    }
+
+    pub fn contains(&self, name: &String) -> bool {
+        self.group.contains_key(name)
+    }
+
+    pub fn get_group(&self) -> HashMap<String, Endpoint> {
+        self.group.clone()
+    }
+
+    pub fn get_endpoints(&self) -> HashSet<Endpoint> {
         let mut endpoints = HashSet::new();
+        let group = &self.group;
         group.values().for_each(|mut e| -> () {
             endpoints.insert(e.clone());
         });
         endpoints
     }
 
-    fn remove_endpoint_from_group(&mut self, name: &String) {
-        let group = &mut self.group;
-        group.remove(name);
-    }
-
-    fn get_group(&self) -> HashMap<String, Endpoint> {
-        self.group.clone()
-    }
-
-    fn update_active_timestamp(&self, name: &String) -> bool {
+    pub fn update_active_timestamp(&self, name: &String) -> bool {
         match self.group.get(name) {
             None => false,
             Some(endpoint) => {
@@ -87,7 +107,7 @@ impl EndpointGroup {
         }
     }
 
-    fn update_status(&self, name: &String, new_status: EndpointStatus) -> bool {
+    pub fn update_status(&self, name: &String, new_status: EndpointStatus) -> bool {
         match self.group.get(name) {
             None => false,
             Some(endpoint) => {
@@ -95,6 +115,10 @@ impl EndpointGroup {
                 true
             }
         }
+    }
+
+    pub fn len(&self) -> usize{
+        self.group.len()
     }
 }
 
@@ -107,14 +131,14 @@ mod tests {
         let endpoint1 = Endpoint::new("endpoint1", "127.0.0.1");
         let endpoint2 = Endpoint::new("endpoint2", "127.0.0.1");
         let mut group = EndpointGroup::new();
-        let new_group = &group.add_endpoint_to_group(endpoint1.clone());
-        assert!(new_group.contains(&endpoint1));
-        assert_eq!(1, new_group.len());
+        assert!(group.add_endpoint_to_group(endpoint1.clone()));
+        assert!(group.contains(&endpoint1.name));
+        assert_eq!(1, group.len());
 
-        let new_group = &group.add_endpoint_to_group(endpoint2.clone());
-        assert!(new_group.contains(&endpoint1));
-        assert!(new_group.contains(&endpoint2));
-        assert_eq!(2, new_group.len());
+        assert!(group.add_endpoint_to_group(endpoint2.clone()));
+        assert!(group.contains(&endpoint1.name));
+        assert!(group.contains(&endpoint2.name));
+        assert_eq!(2, group.len());
     }
 
     #[test]
@@ -122,10 +146,10 @@ mod tests {
         let endpoint1 = Endpoint::new("endpoint1", "127.0.0.1");
         let endpoint2 = Endpoint::new("endpoint1", "127.0.0.1");
         let mut group = EndpointGroup::new();
-        group.add_endpoint_to_group(endpoint1.clone());
-        let new_group = &group.add_endpoint_to_group(endpoint2);
-        assert!(new_group.contains(&endpoint1));
-        assert_eq!(1, new_group.len());
+        assert!(group.add_endpoint_to_group(endpoint1.clone()));
+        assert!(!group.add_endpoint_to_group(endpoint2));
+        assert!(group.contains(&endpoint1.name));
+        assert_eq!(1, group.len());
     }
 
     #[test]
@@ -136,13 +160,15 @@ mod tests {
         group.add_endpoint_to_group(endpoint1.clone());
         group.add_endpoint_to_group(endpoint2.clone());
 
-        group.remove_endpoint_from_group(&endpoint1.name);
-        assert!(!group.get_group().contains_key(&endpoint1.name));
-        assert_eq!(1, group.get_group().len());
+        assert!(group.remove_endpoint_from_group(&endpoint1.name));
+        assert!(!group.contains(&endpoint1.name));
+        assert_eq!(1, group.len());
 
-        group.remove_endpoint_from_group(&endpoint2.name);
-        assert!(!group.get_group().contains_key(&endpoint2.name));
-        assert_eq!(0, group.get_group().len());
+        assert!(group.remove_endpoint_from_group(&endpoint2.name));
+        assert!(!group.contains(&endpoint2.name));
+        assert_eq!(0, group.len());
+
+        assert!(!group.remove_endpoint_from_group(&String::from("not exists endpoint")));
     }
 
     #[test]
