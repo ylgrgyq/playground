@@ -50,6 +50,10 @@ impl Endpoint {
     pub fn get_address(&self) -> String {
         self.address.clone()
     }
+
+    pub fn get_name(&self) -> String {
+        self.name.clone()
+    }
 }
 
 pub struct EndpointGroup {
@@ -84,17 +88,18 @@ impl EndpointGroup {
         self.group.contains_key(name)
     }
 
-    pub fn get_group(&self) -> HashMap<String, Endpoint> {
-        self.group.clone()
-    }
-
-    pub fn get_endpoints(&self) -> HashSet<Endpoint> {
+    pub fn get_endpoints(&self) -> HashSet<&Endpoint> {
         let mut endpoints = HashSet::new();
         let group = &self.group;
-        group.values().for_each(|mut e| -> () {
-            endpoints.insert(e.clone());
+        group.values().for_each(|e| -> () {
+            endpoints.insert(e);
         });
         endpoints
+    }
+
+    pub fn get_endpoint(&self, name: &String) -> Option<&Endpoint> {
+        let group = &self.group;
+        group.get(name)
     }
 
     pub fn update_active_timestamp(&self, name: &String) -> bool {
@@ -117,7 +122,7 @@ impl EndpointGroup {
         }
     }
 
-    pub fn len(&self) -> usize{
+    pub fn len(&self) -> usize {
         self.group.len()
     }
 }
@@ -178,8 +183,7 @@ mod tests {
         group.add_endpoint_to_group(endpoint1.clone());
 
         assert!(group.update_active_timestamp(&endpoint1.name));
-        assert!(group.get_group().get(&endpoint1.name).unwrap().last_active_time > endpoint1.last_active_time);
-
+        assert!(group.get_endpoint(&endpoint1.name).unwrap().last_active_time > endpoint1.last_active_time);
         assert!(!group.update_active_timestamp(&String::from("not exists endpoint")));
     }
 
@@ -191,9 +195,9 @@ mod tests {
 
         assert!(group.update_status(&endpoint1.name, EndpointStatus::Dead));
 
-        assert_eq!(EndpointStatus::Dead, group.get_group().get(&endpoint1.name).unwrap().get_status());
+        assert_eq!(EndpointStatus::Dead, group.get_endpoint(&endpoint1.name).unwrap().get_status());
 
-        assert_ne!(endpoint1.get_status(), group.get_group().get(&endpoint1.name).unwrap().get_status());
+        assert_ne!(endpoint1.get_status(), group.get_endpoint(&endpoint1.name).unwrap().get_status());
 
         assert!(!group.update_status(&String::from("not exists endpoint"), EndpointStatus::Dead));
     }
