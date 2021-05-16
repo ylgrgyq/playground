@@ -12,9 +12,9 @@ trait PingReqHandler {
 }
 
 pub trait Transport {
-    fn ping(&self, target_address: &String, from: &EndpointId, known_endpoints: HashSet<&Endpoint>);
+    fn ping(&self, from: &EndpointId, target_address: &String, known_endpoints: HashSet<Endpoint>);
 
-    fn ping_req(&self, target_address: &String, origin: &EndpointId, target: &EndpointId);
+    fn ping_req(&self, origin: &EndpointId, target: &EndpointId);
 
     fn left(&self, from: &EndpointId);
 
@@ -23,19 +23,17 @@ pub trait Transport {
     fn add_ping_response_handler<H: PingResponseHandler>(&mut self, handler: H);
 }
 
-struct MockTransport {
-
-}
+struct MockTransport {}
 
 impl Transport for MockTransport {
-    fn ping(&self, target_address: &String, from: &EndpointId, known_endpoints: HashSet<&Endpoint>) {
+    fn ping(&self, from: &EndpointId, target_address: &String, known_endpoints: HashSet<Endpoint>) {
         let mut endpoints = HashSet::new();
         endpoints.insert(EndpointId::new("haha", "100"));
         endpoints.insert(EndpointId::new("hoho", "200"));
         endpoints.insert(from.clone());
     }
 
-    fn ping_req(&self, target_address: &String, origin: &EndpointId, target: &EndpointId) {
+    fn ping_req(&self, origin: &EndpointId, target: &EndpointId) {
         todo!()
     }
 

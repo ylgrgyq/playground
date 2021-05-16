@@ -112,11 +112,11 @@ impl EndpointGroup {
         self.group.contains_key(name)
     }
 
-    pub fn get_endpoints(&self) -> HashSet<&Endpoint> {
+    pub fn get_endpoints(&self) -> HashSet<Endpoint> {
         let mut endpoints = HashSet::new();
         let group = &self.group;
         group.values().for_each(|e| -> () {
-            endpoints.insert(e);
+            endpoints.insert(e.clone());
         });
         endpoints
     }
