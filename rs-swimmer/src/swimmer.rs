@@ -1,6 +1,5 @@
-use crate::endpoint::{Endpoint, EndpointGroup};
+use crate::endpoint::{Endpoint, EndpointGroup, EndpointId, EndpointStatus};
 use crate::transport::{Transport};
-use std::io::SeekFrom::End;
 use std::time::{SystemTime, Duration};
 use std::collections::HashSet;
 use std::option::{Iter, IntoIter};
@@ -19,7 +18,7 @@ struct SwimmerStateMaintainer<L: EndpointChangeListener> {
 
 impl<L: EndpointChangeListener> SwimmerStateMaintainer<L> {
     fn new(name: &str, address: &str, transport: Transport) -> SwimmerStateMaintainer<L> {
-        let self_endpoint = Endpoint::new(name, address);
+        let self_endpoint = Endpoint::new(EndpointId::new(name, address), EndpointStatus::Alive);
         let mut endpoint_group = EndpointGroup::new();
         endpoint_group.add_endpoint_to_group(self_endpoint.clone());
         SwimmerStateMaintainer {
@@ -31,23 +30,21 @@ impl<L: EndpointChangeListener> SwimmerStateMaintainer<L> {
         }
     }
 
-    fn join<T>(&mut self, endpoints: T)
-    where T: IntoIterator<Item=Endpoint> {
-        for endpoint in endpoints {
-            let address = endpoint.get_address();
-            let name = endpoint.get_name();
-            // self.transport.ping(address, &self.self_endpoint, self.get_endpoints())
-            self.send_join(&address);
+    fn join<T>(&mut self, endpoint_ids: T)
+    where T: IntoIterator<Item=EndpointId> {
+        for endpoint_id in endpoint_ids {
+            let endpoint = Endpoint::new(endpoint_id.clone(), EndpointStatus::Suspect);
             if self.endpoint_group.add_endpoint_to_group(endpoint) {
-                match self.endpoint_group.get_endpoint(&name) {
+                self.send_join(&endpoint_id.address);
+                match self.endpoint_group.get_endpoint(&endpoint_id.name) {
                     None => (),
-                    Some(endpoint) => self.broadcast_endpoint_changed(endpoint),
+                    Some(endpoint_ref) => self.broadcast_endpoint_changed(endpoint_ref),
                 }
             }
         }
     }
 
-    pub fn add_endpoint_change_listener(&mut self, listener: L) {
+    fn add_endpoint_change_listener(&mut self, listener: L) {
         self.endpoint_change_listeners.push(listener)
     }
 
@@ -59,7 +56,13 @@ impl<L: EndpointChangeListener> SwimmerStateMaintainer<L> {
         self.endpoint_group.get_endpoints()
     }
 
-    fn send_join(&self, address: &String) {}
+    fn send_join(&self, address: &String) {
+        self.transport.ping(
+            address,
+            &self.self_endpoint,
+            self.get_endpoints()
+        );
+    }
 
     fn ping(&self) {}
 
@@ -83,13 +86,13 @@ impl<L: EndpointChangeListener> Swimmer<L> {
         }
     }
 
-    pub fn join(&mut self, endpoint: Endpoint) -> HashSet<&Endpoint> {
+    pub fn join(&mut self, endpoint: EndpointId) -> HashSet<&Endpoint> {
         self.state.join(vec![endpoint].into_iter());
         self.get_endpoints()
     }
 
     pub fn batch_join<T>(&mut self, endpoints: T) -> HashSet<&Endpoint>
-    where T: IntoIterator<Item=Endpoint> {
+    where T: IntoIterator<Item=EndpointId> {
         self.state.join(endpoints);
         self.get_endpoints()
     }
