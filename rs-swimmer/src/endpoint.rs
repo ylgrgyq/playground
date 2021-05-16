@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::hash_map::RandomState;
 use std::hash::{Hash, Hasher};
 use std::borrow::Borrow;
+use std::fmt;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum EndpointStatus {
@@ -24,6 +25,12 @@ impl EndpointId {
             name: String::from(name),
             address: String::from(address),
         }
+    }
+}
+
+impl fmt::Display for EndpointId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{name: {}, address: {}}}", self.name, self.address)
     }
 }
 

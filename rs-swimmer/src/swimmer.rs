@@ -60,7 +60,7 @@ impl<L: EndpointChangeListener> SwimmerStateMaintainer<L> {
         self.transport.ping(
             address,
             &self.self_endpoint,
-            self.get_endpoints()
+            self.get_endpoints(),
         );
     }
 
@@ -77,35 +77,59 @@ impl<L: EndpointChangeListener> SwimmerStateMaintainer<L> {
 
 struct Swimmer<L: EndpointChangeListener> {
     state: SwimmerStateMaintainer<L>,
+    stopped: bool,
 }
 
 impl<L: EndpointChangeListener> Swimmer<L> {
     pub fn new(name: &str, address: &str, transport: Transport) -> Swimmer<L> {
         Swimmer {
             state: SwimmerStateMaintainer::new(name, address, transport),
+            stopped: false,
         }
     }
 
-    pub fn join(&mut self, endpoint: EndpointId) -> HashSet<&Endpoint> {
+    pub fn join(&mut self, endpoint: EndpointId) -> Result<HashSet<&Endpoint>, String> {
+        if self.stopped {
+            return Err(format!("Swimmer: {} has stopped", self.state.self_endpoint.get_id()));
+        }
+
         self.state.join(vec![endpoint].into_iter());
-        self.get_endpoints()
+        Ok(self.get_endpoints()?)
     }
 
-    pub fn batch_join<T>(&mut self, endpoints: T) -> HashSet<&Endpoint>
+    pub fn batch_join<T>(&mut self, endpoints: T) -> Result<HashSet<&Endpoint>, String>
     where T: IntoIterator<Item=EndpointId> {
+        if self.stopped {
+            return Err(format!("Swimmer: {} has stopped", self.state.self_endpoint.get_id()));
+        }
+
         self.state.join(endpoints);
-        self.get_endpoints()
+        Ok(self.get_endpoints()?)
     }
 
-    pub fn get_endpoints(&self) -> HashSet<&Endpoint> {
-        self.state.get_endpoints()
+    pub fn get_endpoints(&self) -> Result<HashSet<&Endpoint>, String> {
+        if self.stopped {
+            return Err(format!("Swimmer: {} has stopped", self.state.self_endpoint.get_id()));
+        }
+
+        Ok(self.state.get_endpoints())
     }
 
-    pub fn add_endpoint_change_listener(&mut self, listener: L) {
-        self.state.add_endpoint_change_listener(listener)
+    pub fn add_endpoint_change_listener(&mut self, listener: L) -> Result<(), String> {
+        if self.stopped {
+            return Err(format!("Swimmer: {} has stopped", self.state.self_endpoint.get_id()));
+        }
+
+        self.state.add_endpoint_change_listener(listener);
+        Ok(())
     }
 
-    pub fn shutdown(&self) {
+    pub fn shutdown(&mut self) {
+        if self.stopped {
+            return;
+        }
+
+        self.stopped = true;
         self.state.shutdown();
     }
 }
