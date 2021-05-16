@@ -37,8 +37,8 @@ impl fmt::Display for EndpointId {
 #[derive(Debug, Clone, Eq)]
 pub struct Endpoint {
     id: EndpointId,
-    status: RefCell<EndpointStatus>,
-    last_active_time: RefCell<SystemTime>,
+    status: EndpointStatus,
+    last_active_time: SystemTime,
 }
 
 impl Hash for Endpoint {
@@ -58,8 +58,8 @@ impl Endpoint {
     pub fn new(id: EndpointId, status: EndpointStatus) -> Endpoint {
         Endpoint {
             id,
-            status: RefCell::new(status),
-            last_active_time: RefCell::new(SystemTime::now()),
+            status,
+            last_active_time: SystemTime::now(),
         }
     }
 
@@ -126,21 +126,21 @@ impl EndpointGroup {
         group.get(name)
     }
 
-    pub fn update_active_timestamp(&self, name: &String) -> bool {
-        match self.group.get(name) {
+    pub fn update_active_timestamp(&mut self, name: &String) -> bool {
+        match self.group.get_mut(name) {
             None => false,
             Some(endpoint) => {
-                *endpoint.last_active_time.borrow_mut() = SystemTime::now();
+                endpoint.last_active_time = SystemTime::now();
                 true
             }
         }
     }
 
-    pub fn update_status(&self, name: &String, new_status: EndpointStatus) -> bool {
-        match self.group.get(name) {
+    pub fn update_status(&mut self, name: &String, new_status: EndpointStatus) -> bool {
+        match self.group.get_mut(name) {
             None => false,
             Some(endpoint) => {
-                *endpoint.status.borrow_mut() = new_status;
+                endpoint.status = new_status;
                 true
             }
         }
