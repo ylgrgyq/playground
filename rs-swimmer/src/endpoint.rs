@@ -13,7 +13,7 @@ pub enum EndpointStatus {
     Dead,
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, )]
 pub struct EndpointId {
     pub name: String,
     pub address: String,
@@ -80,6 +80,7 @@ impl Endpoint {
     }
 }
 
+#[derive(Debug, Default)]
 pub struct EndpointGroup {
     group: HashMap<String, Endpoint>,
 }
@@ -112,13 +113,8 @@ impl EndpointGroup {
         self.group.contains_key(name)
     }
 
-    pub fn get_endpoints(&self) -> HashSet<Endpoint> {
-        let mut endpoints = HashSet::new();
-        let group = &self.group;
-        group.values().for_each(|e| -> () {
-            endpoints.insert(e.clone());
-        });
-        endpoints
+    pub fn get_endpoints_iter(&self) -> impl Iterator<Item=&Endpoint> {
+        self.group.values()
     }
 
     pub fn get_endpoint(&self, name: &String) -> Option<&Endpoint> {
