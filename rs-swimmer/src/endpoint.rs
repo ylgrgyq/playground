@@ -1,7 +1,7 @@
 use std::collections::{HashSet, HashMap};
-use std::time::SystemTime;
+use std::time::{SystemTime, Duration};
 use std::cell::RefCell;
-use std::collections::hash_map::RandomState;
+use std::collections::hash_map::{RandomState, Entry};
 use std::hash::{Hash, Hasher};
 use std::borrow::Borrow;
 use std::fmt;
@@ -67,6 +67,10 @@ impl Endpoint {
         self.status.borrow().clone()
     }
 
+    pub fn set_status(&mut self, new_status:EndpointStatus) {
+        self.status = new_status;
+    }
+
     pub fn get_address(&self) -> &String {
         &self.id.address
     }
@@ -77,6 +81,15 @@ impl Endpoint {
 
     pub fn get_id(&self) -> &EndpointId {
         &self.id
+    }
+
+    pub fn get_last_active_time(&self) -> SystemTime {
+        self.last_active_time
+    }
+
+    pub fn get_inactive_duration(&self, now: &SystemTime) -> Duration {
+        now.duration_since(self.last_active_time)
+            .unwrap_or(Duration::from_secs(0))
     }
 }
 
@@ -115,6 +128,26 @@ impl EndpointGroup {
 
     pub fn get_endpoints_iter(&self) -> impl Iterator<Item=&Endpoint> {
         self.group.values()
+    }
+
+    pub fn get_mut_endpoints_iter(&mut self) -> impl Iterator<Item=&mut Endpoint> {
+        self.group.values_mut()
+    }
+
+    pub fn clear_dead_endpoints(&mut self) {
+        self.group.retain(|_, v| v.status != EndpointStatus::Dead)
+    }
+
+    pub fn classify(&self) -> HashMap<EndpointStatus, Vec<&Endpoint>>{
+        let mut classified_endpoint: HashMap<EndpointStatus, Vec<&Endpoint>> = HashMap::new();
+        for endpoint in self.get_endpoints_iter() {
+            let status = endpoint.get_status();
+            match classified_endpoint.entry(status) {
+                Entry::Occupied(o) => { o.into_mut().push(endpoint); }
+                Entry::Vacant(v) => { v.insert(vec![]); }
+            }
+        }
+        classified_endpoint
     }
 
     pub fn get_endpoint(&self, name: &String) -> Option<&Endpoint> {

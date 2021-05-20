@@ -1,7 +1,7 @@
 use crate::endpoint::{Endpoint, EndpointGroup, EndpointId, EndpointStatus};
 use crate::transport::{Transport};
 use std::time::{SystemTime, Duration, Instant};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::option::{Iter, IntoIter};
 use std::sync::{Arc, RwLock, Mutex};
 use std::thread::JoinHandle;
@@ -11,6 +11,7 @@ use std::sync::mpsc::RecvTimeoutError;
 use futures::SinkExt;
 use core::mem;
 use std::net::Shutdown::Read;
+use std::collections::hash_map::Entry;
 
 trait EndpointChangeListener {
     fn on_endpoint_changed(&self, id: &EndpointId, status: &EndpointStatus);
@@ -24,6 +25,16 @@ enum InputCommand {
 enum OutputEvent {
     Ping(String, HashSet<Endpoint>),
     PingReq(String),
+}
+
+impl OutputEvent {
+    fn create_ping(target_address: String, known_endpoints: HashSet<Endpoint>) -> OutputEvent {
+        OutputEvent::Ping(target_address, known_endpoints)
+    }
+
+    fn create_ping_req(target_address: String) -> OutputEvent {
+        OutputEvent::PingReq(target_address)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -48,21 +59,25 @@ struct SwimmerStateMaintainer {
     endpoint_group: EndpointGroup,
     event_box: Vec<OutputEvent>,
     changed_endpoints: Vec<Endpoint>,
+    alive_timeout: Duration,
+    suspect_timeout: Duration,
 }
 
 impl SwimmerStateMaintainer {
-    fn new(self_id: EndpointId) -> SwimmerStateMaintainer {
+    pub fn new(self_id: EndpointId) -> SwimmerStateMaintainer {
         let self_endpoint = Endpoint::new(self_id.clone(), EndpointStatus::Alive);
         let mut endpoint_group = EndpointGroup::new();
         endpoint_group.add_endpoint_to_group(self_endpoint.clone());
         SwimmerStateMaintainer {
             self_id,
             endpoint_group,
+            alive_timeout: Duration::from_secs(20),
+            suspect_timeout: Duration::from_secs(30),
             ..Default::default()
         }
     }
 
-    fn join(&mut self, endpoint_id: EndpointId) {
+    pub fn join(&mut self, endpoint_id: EndpointId) {
         let endpoint = Endpoint::new(endpoint_id.clone(), EndpointStatus::Suspect);
         if self.endpoint_group.add_endpoint_to_group(endpoint.clone()) {
             self.send_join(&endpoint_id.address);
@@ -71,28 +86,20 @@ impl SwimmerStateMaintainer {
     }
 
     fn tick(&mut self) {
-        // self.endpoint_group.update_status(&String::from("sdf"), EndpointStatus::Alive);
-        // let ps = self.get_endpoints_iter();
-        // for endpoint in ps.into_iter() {
-        //
-        //     match endpoint.get_status() {
-        //         EndpointStatus::Alive => {
-        //             self.ping(endpoint.get_address());
-        //         },
-        //         EndpointStatus::Suspect => {
-        //             self.ping_req(endpoint.get_address());
-        //         },
-        //         EndpointStatus::Dead => {
-        //
-        //         }
-        //     }
-        // }
+        self.update_endpoint_status();
+        self.endpoint_group.clear_dead_endpoints();
+        self.check_endpoints();
     }
 
     fn shutdown(&self) {}
 
     fn get_endpoints_iter(&self) -> impl Iterator<Item=&Endpoint> {
         self.endpoint_group.get_endpoints_iter()
+    }
+
+    fn get_mut_endpoints_iter(&mut self) -> impl Iterator<Item=&mut Endpoint> {
+        let e = &mut self.endpoint_group;
+        e.get_mut_endpoints_iter()
     }
 
     fn clone_endpoints(&self) -> HashSet<Endpoint> {
@@ -110,6 +117,51 @@ impl SwimmerStateMaintainer {
 
     fn ping_req(&mut self, target_address: &String) {
         self.event_box.push(OutputEvent::PingReq(target_address.clone()))
+    }
+
+    fn update_endpoint_status(&mut self) {
+        let now = SystemTime::now();
+        let group = &mut self.endpoint_group;
+        for endpoint in group.get_mut_endpoints_iter() {
+            let inactive_duration = endpoint.get_inactive_duration(&now);
+            if inactive_duration > self.suspect_timeout {
+                endpoint.set_status(EndpointStatus::Dead)
+            } else if inactive_duration > self.alive_timeout {
+                endpoint.set_status(EndpointStatus::Suspect)
+            }
+        }
+    }
+
+    fn check_endpoints(&mut self) {
+        let mut classified_endpoint = self.get_classify();
+
+
+        let mut ebox = vec![];
+        for (k, v) in classified_endpoint {
+            match k {
+                EndpointStatus::Alive => {
+                    let ss = self.clone_endpoints();
+                    for e in v {
+                        ebox.push(OutputEvent::Ping(e.get_address().clone(), ss.clone()))
+                    }
+                }
+                EndpointStatus::Suspect => {
+                    for e in v {
+                        ebox.push(OutputEvent::PingReq(e.get_address().clone()))
+                    }
+                }
+                EndpointStatus::Dvdxead => {
+                    // let mut_group = &mut self.endpoint_group;
+                    // for e in v {
+                    //     mut_group.remove_endpoint_from_group(e.get_name());
+                    // }
+                }
+            }
+        }
+    }
+
+    fn get_classify(&self) -> HashMap<EndpointStatus, Vec<&Endpoint>> {
+        self.endpoint_group.classify()
     }
 
     fn broadcast_endpoint_changed(&mut self, endpoint: &Endpoint) {
