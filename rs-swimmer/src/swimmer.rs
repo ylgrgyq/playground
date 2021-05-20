@@ -87,7 +87,6 @@ impl SwimmerStateMaintainer {
 
     fn tick(&mut self) {
         self.update_endpoint_status();
-        self.endpoint_group.clear_dead_endpoints();
         self.check_endpoints();
     }
 
@@ -111,14 +110,6 @@ impl SwimmerStateMaintainer {
         self.event_box.push(OutputEvent::Ping(target_address.clone(), self.clone_endpoints()))
     }
 
-    fn ping(&mut self, target_address: &String) {
-        self.event_box.push(OutputEvent::Ping(target_address.clone(), self.clone_endpoints()))
-    }
-
-    fn ping_req(&mut self, target_address: &String) {
-        self.event_box.push(OutputEvent::PingReq(target_address.clone()))
-    }
-
     fn update_endpoint_status(&mut self) {
         let now = SystemTime::now();
         let group = &mut self.endpoint_group;
@@ -133,35 +124,40 @@ impl SwimmerStateMaintainer {
     }
 
     fn check_endpoints(&mut self) {
-        let mut classified_endpoint = self.get_classify();
-
-
         let mut ebox = vec![];
-        for (k, v) in classified_endpoint {
+        let mut dead_endpoint = None;
+        for (k, v) in self.endpoint_group.classify_endpoints_by_status() {
             match k {
                 EndpointStatus::Alive => {
-                    let ss = self.clone_endpoints();
-                    for e in v {
-                        ebox.push(OutputEvent::Ping(e.get_address().clone(), ss.clone()))
+                    let known_endpoints = self.clone_endpoints();
+                    for endpoint_name in v {
+                        // endpoint must be found
+                        let e = self.endpoint_group.get_endpoint(&endpoint_name).unwrap();
+                        ebox.push(OutputEvent::Ping(e.get_address().clone(), known_endpoints.clone()))
                     }
                 }
                 EndpointStatus::Suspect => {
-                    for e in v {
+                    for endpoint_name in v {
+                        // endpoint must be found
+                        let e = self.endpoint_group.get_endpoint(&endpoint_name).unwrap();
                         ebox.push(OutputEvent::PingReq(e.get_address().clone()))
                     }
                 }
-                EndpointStatus::Dvdxead => {
-                    // let mut_group = &mut self.endpoint_group;
-                    // for e in v {
-                    //     mut_group.remove_endpoint_from_group(e.get_name());
-                    // }
+                EndpointStatus::Dead => {
+                    dead_endpoint = Some(v);
                 }
             }
         }
-    }
 
-    fn get_classify(&self) -> HashMap<EndpointStatus, Vec<&Endpoint>> {
-        self.endpoint_group.classify()
+        for event in ebox {
+            self.event_box.push(event);
+        }
+
+        if let Some(names) = dead_endpoint {
+            for dead_endpoint_name in names {
+                self.endpoint_group.remove_endpoint_from_group(&dead_endpoint_name);
+            }
+        }
     }
 
     fn broadcast_endpoint_changed(&mut self, endpoint: &Endpoint) {

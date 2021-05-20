@@ -134,16 +134,12 @@ impl EndpointGroup {
         self.group.values_mut()
     }
 
-    pub fn clear_dead_endpoints(&mut self) {
-        self.group.retain(|_, v| v.status != EndpointStatus::Dead)
-    }
-
-    pub fn classify(&self) -> HashMap<EndpointStatus, Vec<&Endpoint>>{
-        let mut classified_endpoint: HashMap<EndpointStatus, Vec<&Endpoint>> = HashMap::new();
+    pub fn classify_endpoints_by_status(&self) -> HashMap<EndpointStatus, Vec<String>>{
+        let mut classified_endpoint: HashMap<EndpointStatus, Vec<String>> = HashMap::new();
         for endpoint in self.get_endpoints_iter() {
             let status = endpoint.get_status();
             match classified_endpoint.entry(status) {
-                Entry::Occupied(o) => { o.into_mut().push(endpoint); }
+                Entry::Occupied(o) => { o.into_mut().push(endpoint.get_name().clone()); }
                 Entry::Vacant(v) => { v.insert(vec![]); }
             }
         }
