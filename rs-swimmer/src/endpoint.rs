@@ -13,51 +13,31 @@ pub enum EndpointStatus {
     Dead,
 }
 
-#[derive(Debug, Default, Clone, Hash, PartialEq, Eq, )]
-pub struct EndpointId {
-    pub name: String,
-    pub address: String,
-}
-
-impl EndpointId {
-    pub fn new(name: &str, address: &str) -> EndpointId {
-        EndpointId {
-            name: String::from(name),
-            address: String::from(address),
-        }
-    }
-}
-
-impl fmt::Display for EndpointId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{name: {}, address: {}}}", self.name, self.address)
-    }
-}
-
 #[derive(Debug, Clone, Eq)]
 pub struct Endpoint {
-    id: EndpointId,
+    name: String,
+    address: String,
     status: EndpointStatus,
     last_active_time: SystemTime,
 }
 
 impl Hash for Endpoint {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.name.hash(state);
-        self.id.address.hash(state);
+        self.name.hash(state);
     }
 }
 
 impl PartialEq for Endpoint {
     fn eq(&self, other: &Self) -> bool {
-        return self.id.name == other.id.name;
+        return self.name == other.name;
     }
 }
 
 impl Endpoint {
-    pub fn new(id: EndpointId, status: EndpointStatus) -> Endpoint {
+    pub fn new(name: String, address: String, status: EndpointStatus) -> Endpoint {
         Endpoint {
-            id,
+            name,
+            address,
             status,
             last_active_time: SystemTime::now(),
         }
@@ -72,15 +52,11 @@ impl Endpoint {
     }
 
     pub fn get_address(&self) -> &String {
-        &self.id.address
+        &self.address
     }
 
     pub fn get_name(&self) -> &String {
-        &self.id.name
-    }
-
-    pub fn get_id(&self) -> &EndpointId {
-        &self.id
+        &self.name
     }
 
     pub fn get_last_active_time(&self) -> SystemTime {
@@ -114,12 +90,9 @@ impl EndpointGroup {
         true
     }
 
-    pub fn remove_endpoint_from_group(&mut self, name: &String) -> bool {
+    pub fn remove_endpoint_from_group(&mut self, name: &String) -> Option<Endpoint> {
         let group = &mut self.group;
-        match group.remove(name) {
-            None => false,
-            Some(_) => true
-        }
+        group.remove(name)
     }
 
     pub fn contains(&self, name: &String) -> bool {
@@ -182,8 +155,8 @@ mod tests {
 
     #[test]
     fn basic_add_endpoint() {
-        let endpoint1 = Endpoint::new(EndpointId::new("endpoint1", "127.0.0.1"), EndpointStatus::Alive);
-        let endpoint2 = Endpoint::new(EndpointId::new("endpoint2", "127.0.0.1"), EndpointStatus::Alive);
+        let endpoint1 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
+        let endpoint2 = Endpoint::new(String::from("endpoint2"), String::from("127.0.0.1"), EndpointStatus::Alive);
         let mut group = EndpointGroup::new();
         assert!(group.add_endpoint_to_group(endpoint1.clone()));
         assert!(group.contains(endpoint1.get_name()));
@@ -197,8 +170,8 @@ mod tests {
 
     #[test]
     fn add_duplicate_endpoint() {
-        let endpoint1 = Endpoint::new(EndpointId::new("endpoint1", "127.0.0.1"), EndpointStatus::Alive);
-        let endpoint2 = Endpoint::new(EndpointId::new("endpoint1", "127.0.0.1"), EndpointStatus::Alive);
+        let endpoint1 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
+        let endpoint2 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
         let mut group = EndpointGroup::new();
         assert!(group.add_endpoint_to_group(endpoint1.clone()));
         assert!(!group.add_endpoint_to_group(endpoint2));
@@ -208,26 +181,26 @@ mod tests {
 
     #[test]
     fn remove_endpoint() {
-        let endpoint1 = Endpoint::new(EndpointId::new("endpoint1", "127.0.0.1"), EndpointStatus::Alive);
-        let endpoint2 = Endpoint::new(EndpointId::new("endpoint2", "127.0.0.1"), EndpointStatus::Alive);
+        let endpoint1 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
+        let endpoint2 = Endpoint::new(String::from("endpoint2"), String::from("127.0.0.1"), EndpointStatus::Alive);
         let mut group = EndpointGroup::new();
         group.add_endpoint_to_group(endpoint1.clone());
         group.add_endpoint_to_group(endpoint2.clone());
 
-        assert!(group.remove_endpoint_from_group(endpoint1.get_name()));
+        assert_eq!(endpoint1, group.remove_endpoint_from_group(endpoint1.get_name()).unwrap());
         assert!(!group.contains(endpoint1.get_name()));
         assert_eq!(1, group.len());
 
-        assert!(group.remove_endpoint_from_group(endpoint2.get_name()));
+        assert_eq!(endpoint2, group.remove_endpoint_from_group(endpoint2.get_name()).unwrap());
         assert!(!group.contains(endpoint2.get_name()));
         assert_eq!(0, group.len());
 
-        assert!(!group.remove_endpoint_from_group(&String::from("not exists endpoint")));
+        assert_eq!(None, group.remove_endpoint_from_group(&String::from("not exists endpoint")));
     }
 
     #[test]
     fn update_active_timestamp() {
-        let endpoint1 = Endpoint::new(EndpointId::new("endpoint1", "127.0.0.1"), EndpointStatus::Alive);
+        let endpoint1 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
         let mut group = EndpointGroup::new();
         group.add_endpoint_to_group(endpoint1.clone());
 
@@ -238,7 +211,7 @@ mod tests {
 
     #[test]
     fn update_status() {
-        let endpoint1 = Endpoint::new(EndpointId::new("endpoint1", "127.0.0.1"), EndpointStatus::Alive);
+        let endpoint1 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
         let mut group = EndpointGroup::new();
         group.add_endpoint_to_group(endpoint1.clone());
 

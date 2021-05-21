@@ -1,6 +1,6 @@
 mod http_transport;
 
-use crate::endpoint::{EndpointId, Endpoint};
+use crate::endpoint::{Endpoint};
 use std::collections::HashSet;
 
 trait PingResponseHandler {
@@ -12,13 +12,13 @@ trait PingReqHandler {
 }
 
 pub trait Transport {
-    fn ping(&self, from: &EndpointId, target_address: &String, known_endpoints: HashSet<Endpoint>);
+    fn ping(&self, from: &String, target_address: &String, known_endpoints: HashSet<Endpoint>);
 
-    fn ping_req(&self, origin: &EndpointId, target: &EndpointId);
+    fn ping_req(&self, origin: &String, target: &String);
 
-    fn left(&self, from: &EndpointId);
+    fn left(&self, from: &String);
 
-    fn suspect(&self, from: &EndpointId);
+    fn suspect(&self, from: &String);
 
     fn add_ping_response_handler<H: PingResponseHandler>(&mut self, handler: H);
 }
@@ -26,22 +26,20 @@ pub trait Transport {
 struct MockTransport {}
 
 impl Transport for MockTransport {
-    fn ping(&self, from: &EndpointId, target_address: &String, known_endpoints: HashSet<Endpoint>) {
+    fn ping(&self, from_name: &String, target_address: &String, known_endpoints: HashSet<Endpoint>) {
         let mut endpoints = HashSet::new();
-        endpoints.insert(EndpointId::new("haha", "100"));
-        endpoints.insert(EndpointId::new("hoho", "200"));
-        endpoints.insert(from.clone());
+        endpoints.insert(from_name.clone());
     }
 
-    fn ping_req(&self, origin: &EndpointId, target: &EndpointId) {
+    fn ping_req(&self, origin: &String, target: &String) {
         todo!()
     }
 
-    fn left(&self, from: &EndpointId) {
+    fn left(&self, from: &String) {
         todo!()
     }
 
-    fn suspect(&self, from: &EndpointId) {
+    fn suspect(&self, from: &String) {
         todo!()
     }
 
