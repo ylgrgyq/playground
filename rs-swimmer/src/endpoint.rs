@@ -6,6 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::borrow::Borrow;
 use std::fmt;
 use futures::FutureExt;
+use std::fmt::Formatter;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum EndpointStatus {
@@ -40,13 +41,33 @@ impl Endpoint {
         }
     }
 
+    #[inline]
     pub fn get_address(&self) -> &String {
         &self.address
     }
 
+    #[inline]
     pub fn get_name(&self) -> &String {
         &self.name
     }
+}
+
+pub struct AliveEndpoint {
+    pub incarnation: u32,
+    pub name: String,
+    pub address: String,
+}
+
+pub struct DeadEndpoint {
+    pub incarnation: u32,
+    pub name: String,
+    pub from: String,
+}
+
+pub struct SuspectEndpoint {
+    pub incarnation: u32,
+    pub name: String,
+    pub from: String,
 }
 
 #[derive(Debug, Clone, Eq)]
@@ -79,31 +100,36 @@ impl EndpointWithState {
         }
     }
 
+    #[inline]
     pub fn get_endpoint(&self) -> &Endpoint {
         &self.endpoint
     }
 
+    #[inline]
     pub fn clone_endpoint(&self) -> Endpoint {
         self.endpoint.clone()
     }
 
+    #[inline]
     pub fn get_incarnation(&self) -> u32 {
         self.incarnation
     }
 
+    #[inline]
     pub fn get_status(&self) -> EndpointStatus {
         self.status
     }
 
+    #[inline]
     pub fn set_status(&mut self, new_status: EndpointStatus) {
         self.status = new_status;
     }
 
+    #[inline]
     pub fn get_last_state_change_time(&self) -> SystemTime {
         self.last_state_change_time
     }
 }
-
 
 #[derive(Debug, Default)]
 pub struct EndpointGroup {
@@ -121,7 +147,7 @@ impl EndpointGroup {
         }
 
         let group = &mut self.group;
-        let name = endpoint.get_endpoint().get_address();
+        let name = endpoint.get_endpoint().get_name();
         group.insert(name.clone(), endpoint);
         true
     }
@@ -160,6 +186,11 @@ impl EndpointGroup {
         group.get(name)
     }
 
+    pub fn get_mut_endpoint(&mut self, name: &String) -> Option<&mut EndpointWithState> {
+        let group = &mut self.group;
+        group.get_mut(name)
+    }
+
     pub fn update_status(&mut self, name: &String, new_status: EndpointStatus) -> bool {
         match self.group.get_mut(name) {
             None => false,
@@ -174,6 +205,65 @@ impl EndpointGroup {
     pub fn len(&self) -> usize {
         self.group.len()
     }
+
+    pub fn add_alive_endpoint(&mut self, alive: AliveEndpoint) -> Result<(), String> {
+        match self.get_mut_endpoint(&alive.name) {
+            Some(old_endpoint) => {
+                if alive.incarnation < old_endpoint.incarnation {
+                    return Ok(());
+                }
+
+                if old_endpoint.status != EndpointStatus::Dead {
+                    return Err(format!("Can't update address for endpoint with state: {:?}", old_endpoint.status))
+                }
+
+                old_endpoint.incarnation = alive.incarnation;
+                old_endpoint.endpoint.address = alive.address;
+                old_endpoint.status = EndpointStatus::Alive;
+                old_endpoint.last_state_change_time = SystemTime::now();
+            }
+            None => {
+                let name = alive.name.clone();
+                let new_endpoint = EndpointWithState {
+                    endpoint: Endpoint {
+                        name: alive.name,
+                        address: alive.address,
+                    },
+                    incarnation: alive.incarnation,
+                    status: EndpointStatus::Alive,
+                    last_state_change_time: SystemTime::now(),
+                };
+                self.group.insert(name.clone(), new_endpoint);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn add_suspect_endpoint(&mut self, suspect: SuspectEndpoint) -> Result<(), String>{
+        match self.get_mut_endpoint(&suspect.name) {
+            Some(old_endpoint) => {
+                if suspect.incarnation < old_endpoint.incarnation {
+                    return Ok(());
+                }
+
+                if old_endpoint.status != EndpointStatus::Alive {
+                    return Ok(())
+                }
+
+                old_endpoint.incarnation = suspect.incarnation;
+                old_endpoint.status = EndpointStatus::Suspect;
+                old_endpoint.last_state_change_time = SystemTime::now();
+            }
+            None => {}
+        }
+
+        Ok(())
+    }
+
+    pub fn add_dead_endpoint(&mut self, dead: DeadEndpoint) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -186,6 +276,7 @@ mod tests {
         let endpoint2 = create_test_endpoint_with_state("endpoint2");
         let mut group = EndpointGroup::new();
         assert!(group.add_endpoint_to_group(endpoint1.clone()));
+
         assert!(group.contains(endpoint1.get_endpoint().get_name()));
         assert_eq!(1, group.len());
 
@@ -234,6 +325,8 @@ mod tests {
         assert!(group.update_status(endpoint1.get_endpoint().get_name(), EndpointStatus::Dead));
 
         assert_eq!(EndpointStatus::Dead, group.get_endpoint(endpoint1.get_endpoint().get_name()).unwrap().get_status());
+
+        assert_ne!(endpoint1.last_state_change_time, group.get_endpoint(endpoint1.get_endpoint().get_name()).unwrap().get_last_state_change_time());
 
         assert_ne!(endpoint1.get_status(), group.get_endpoint(endpoint1.get_endpoint().get_name()).unwrap().get_status());
 
