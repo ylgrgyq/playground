@@ -1,4 +1,4 @@
-use crate::endpoint::{Endpoint, EndpointGroup, EndpointStatus};
+use crate::endpoint::{Endpoint, EndpointGroup, EndpointStatus, EndpointWithState};
 use crate::transport::{Transport};
 use std::time::{SystemTime, Duration, Instant};
 use std::collections::{HashSet, HashMap};
@@ -19,6 +19,7 @@ trait EndpointChangeListener {
 
 enum InputCommand {
     Join(String, String),
+    JoinResponse(String),
 }
 
 #[derive(Debug)]
@@ -46,7 +47,6 @@ impl Ready {
 #[derive(Debug, Default)]
 struct SwimmerStateMaintainer {
     name: String,
-    address: String,
     endpoint_group: EndpointGroup,
     event_box: Vec<OutputEvent>,
     changed_endpoints: Vec<Endpoint>,
@@ -56,12 +56,12 @@ struct SwimmerStateMaintainer {
 
 impl SwimmerStateMaintainer {
     pub fn new(name: String, address: String) -> SwimmerStateMaintainer {
-        let self_endpoint = Endpoint::new(name.clone(), address.clone(), EndpointStatus::Alive);
+        let self_endpoint = Endpoint::new(name.clone(), address.clone());
+        let self_state = EndpointWithState::new(self_endpoint, 1, EndpointStatus::Alive);
         let mut endpoint_group = EndpointGroup::new();
-        endpoint_group.add_endpoint_to_group(self_endpoint.clone());
+        endpoint_group.add_endpoint_to_group(self_state);
         SwimmerStateMaintainer {
             name,
-            address,
             endpoint_group,
             alive_timeout: Duration::from_secs(20),
             suspect_timeout: Duration::from_secs(30),
@@ -69,12 +69,8 @@ impl SwimmerStateMaintainer {
         }
     }
 
-    pub fn join(&mut self, name: String, address: String) {
-        let endpoint = Endpoint::new(name.clone(), address.clone(),EndpointStatus::Suspect);
-        if self.endpoint_group.add_endpoint_to_group(endpoint.clone()) {
-            self.send_join(&address);
-            self.broadcast_endpoint_changed(endpoint);
-        }
+    pub fn join(&mut self, address: String) {
+        self.send_join(&address);
     }
 
     pub fn left(&mut self, name: String) {
@@ -101,11 +97,11 @@ impl SwimmerStateMaintainer {
         }
     }
 
-    fn get_endpoints_iter(&self) -> impl Iterator<Item=&Endpoint> {
+    fn get_endpoints_iter(&self) -> impl Iterator<Item=&EndpointWithState> {
         self.endpoint_group.get_endpoints_iter()
     }
 
-    fn get_mut_endpoints_iter(&mut self) -> impl Iterator<Item=&mut Endpoint> {
+    fn get_mut_endpoints_iter(&mut self) -> impl Iterator<Item=&mut EndpointWithState> {
         let e = &mut self.endpoint_group;
         e.get_mut_endpoints_iter()
     }
@@ -113,7 +109,7 @@ impl SwimmerStateMaintainer {
     fn clone_endpoints(&self) -> HashSet<Endpoint> {
         self.endpoint_group.get_endpoints_iter()
             .into_iter()
-            .map(|e| e.clone())
+            .map(|e| e.clone_endpoint())
             .collect()
     }
 
@@ -125,12 +121,12 @@ impl SwimmerStateMaintainer {
         let now = SystemTime::now();
         let group = &mut self.endpoint_group;
         for endpoint in group.get_mut_endpoints_iter() {
-            let inactive_duration = endpoint.get_inactive_duration(&now);
-            if inactive_duration > self.suspect_timeout {
-                endpoint.set_status(EndpointStatus::Dead)
-            } else if inactive_duration > self.alive_timeout {
-                endpoint.set_status(EndpointStatus::Suspect)
-            }
+            // let inactive_duration = endpoint.get_inactive_duration(&now);
+            // if inactive_duration > self.suspect_timeout {
+            //     endpoint.set_status(EndpointStatus::Dead)
+            // } else if inactive_duration > self.alive_timeout {
+            //     endpoint.set_status(EndpointStatus::Suspect)
+            // }
         }
     }
 
@@ -144,14 +140,14 @@ impl SwimmerStateMaintainer {
                     for endpoint_name in v {
                         // endpoint must be found
                         let e = self.endpoint_group.get_endpoint(&endpoint_name).unwrap();
-                        ebox.push(OutputEvent::Ping(e.get_name().clone(), e.get_address().clone(), known_endpoints.clone()))
+                        ebox.push(OutputEvent::Ping(e.get_endpoint().get_name().clone(), e.get_endpoint().get_address().clone(), known_endpoints.clone()))
                     }
                 }
                 EndpointStatus::Suspect => {
                     for endpoint_name in v {
                         // endpoint must be found
                         let e = self.endpoint_group.get_endpoint(&endpoint_name).unwrap();
-                        ebox.push(OutputEvent::PingReq(e.get_address().clone()))
+                        ebox.push(OutputEvent::PingReq(e.get_endpoint().get_address().clone()))
                     }
                 }
                 EndpointStatus::Dead => {
@@ -171,146 +167,146 @@ impl SwimmerStateMaintainer {
         }
     }
 
-    fn broadcast_endpoint_changed(&mut self, endpoint: Endpoint) {
-        self.changed_endpoints.push(endpoint);
+    fn broadcast_endpoint_changed(&mut self, endpoint: EndpointWithState) {
+        self.changed_endpoints.push(endpoint.clone_endpoint());
     }
 }
 
-struct Swimmer<L: EndpointChangeListener, T: Transport> {
-    stopped: bool,
-    endpoint_change_listeners: Arc<RwLock<Vec<L>>>,
-    transport: Arc<T>,
-    core_thread: JoinHandle<()>,
-    sender: mpsc::Sender<InputCommand>,
-}
-
-impl<L: EndpointChangeListener + Send + Sync + 'static, T: Transport + Send + Sync + 'static> Swimmer<L, T> {
-    pub fn new(name: &str, address: &str, transport: T) -> Swimmer<L, T> {
-        let endpoint_change_listeners = Arc::new(RwLock::new(vec![]));
-        let transport = Arc::new(transport);
-        let (sender, receiver) = mpsc::channel();
-        let core_thread = Swimmer::start_state_maintainer(
-            String::from(name),
-            String::from(address),
-            endpoint_change_listeners.clone(),
-            transport.clone(),
-            Duration::from_secs(10),
-            receiver,
-        );
-        Swimmer {
-            stopped: false,
-            endpoint_change_listeners,
-            core_thread,
-            transport,
-            sender,
-        }
-    }
-
-    pub fn join(&mut self, name: String, address: String) -> Result<HashSet<&Endpoint>, String> {
-        if self.stopped {
-            return Err(format!("Swimmer has stopped"));
-        }
-
-        self.sender.send(InputCommand::Join(name, address));
-        Ok(self.get_endpoints()?)
-    }
-
-    // pub fn batch_join<I>(&mut self, endpoint_ids: I) -> Result<HashSet<&Endpoint>, String>
-    // where I: IntoIterator<Item=EndpointId> {
-    //     if self.stopped {
-    //         return Err(format!("Swimmer has stopped"));
-    //     }
-    //
-    //     for id in endpoint_ids {
-    //         self.sender.send(InputCommand::Join(id));
-    //     }
-    //     Ok(self.get_endpoints()?)
-    // }
-
-    pub fn get_endpoints(&self) -> Result<HashSet<&Endpoint>, String> {
-        if self.stopped {
-            return Err(format!("Swimmer has stopped"));
-        }
-
-        // Ok(self.state.get_endpoints())
-        Err(String::from("asdf"))
-    }
-
-    pub fn add_endpoint_change_listener(&mut self, listener: L) -> Result<(), String> {
-        if self.stopped {
-            return Err(format!("Swimmer has stopped"));
-        }
-
-        self.endpoint_change_listeners.write().unwrap().push(listener);
-        Ok(())
-    }
-
-    fn start_state_maintainer(name: String,
-                              address: String,
-                              listeners: Arc<RwLock<Vec<L>>>,
-                              transport: Arc<T>,
-                              ping_interval: Duration,
-                              receiver: mpsc::Receiver<InputCommand>)
-                              -> JoinHandle<()> {
-        let mut state = SwimmerStateMaintainer::new(name.clone(), address);
-        let handle = std::thread::spawn(move || {
-            let on_ready = |state: &mut SwimmerStateMaintainer| {
-                let mut ready = state.ready();
-
-                for event in ready.take_event_box() {
-                    match event {
-                        OutputEvent::Ping(name, addr, ends) => {
-                            transport.ping(&name, &addr, ends)
-                        }
-                        OutputEvent::PingReq(addr) => {
-                            // transport.ping_req(&self_id, &addr, ends)
-                        }
-                    }
-                }
-
-                for endpoint in ready.take_changed_endpoints() {
-                    for l in listeners.read().unwrap().iter() {
-                        // l.on_endpoint_changed(&endpoint.get_id(), &endpoint.get_status())
-                    }
-                }
-            };
-
-            let mut t = Instant::now();
-            let mut timeout = ping_interval;
-            loop {
-                match receiver.recv_timeout(timeout) {
-                    Ok(InputCommand::Join(name, address)) => {
-                        state.join(name, address)
-                    }
-                    Err(RecvTimeoutError::Timeout) => (),
-                    Err(RecvTimeoutError::Disconnected) => {
-                        state.shutdown();
-                        return;
-                    }
-                }
-
-                let d = t.elapsed();
-                t = Instant::now();
-                if d >= timeout {
-                    timeout = ping_interval;
-                    state.tick();
-                } else {
-                    timeout -= d;
-                }
-
-                on_ready(&mut state);
-            }
-        });
-        handle
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn basic_add_endpoint() {
-
-    }
-}
+// struct Swimmer<L: EndpointChangeListener, T: Transport> {
+//     stopped: bool,
+//     endpoint_change_listeners: Arc<RwLock<Vec<L>>>,
+//     transport: Arc<T>,
+//     core_thread: JoinHandle<()>,
+//     sender: mpsc::Sender<InputCommand>,
+// }
+//
+// impl<L: EndpointChangeListener + Send + Sync + 'static, T: Transport + Send + Sync + 'static> Swimmer<L, T> {
+//     pub fn new(name: &str, address: &str, transport: T) -> Swimmer<L, T> {
+//         let endpoint_change_listeners = Arc::new(RwLock::new(vec![]));
+//         let transport = Arc::new(transport);
+//         let (sender, receiver) = mpsc::channel();
+//         let core_thread = Swimmer::start_state_maintainer(
+//             String::from(name),
+//             String::from(address),
+//             endpoint_change_listeners.clone(),
+//             transport.clone(),
+//             Duration::from_secs(10),
+//             receiver,
+//         );
+//         Swimmer {
+//             stopped: false,
+//             endpoint_change_listeners,
+//             core_thread,
+//             transport,
+//             sender,
+//         }
+//     }
+//
+//     pub fn join(&mut self, name: String, address: String) -> Result<HashSet<&Endpoint>, String> {
+//         if self.stopped {
+//             return Err(format!("Swimmer has stopped"));
+//         }
+//
+//         self.sender.send(InputCommand::Join(name, address));
+//         Ok(self.get_endpoints()?)
+//     }
+//
+//     // pub fn batch_join<I>(&mut self, endpoint_ids: I) -> Result<HashSet<&Endpoint>, String>
+//     // where I: IntoIterator<Item=EndpointId> {
+//     //     if self.stopped {
+//     //         return Err(format!("Swimmer has stopped"));
+//     //     }
+//     //
+//     //     for id in endpoint_ids {
+//     //         self.sender.send(InputCommand::Join(id));
+//     //     }
+//     //     Ok(self.get_endpoints()?)
+//     // }
+//
+//     pub fn get_endpoints(&self) -> Result<HashSet<&Endpoint>, String> {
+//         if self.stopped {
+//             return Err(format!("Swimmer has stopped"));
+//         }
+//
+//         // Ok(self.state.get_endpoints())
+//         Err(String::from("asdf"))
+//     }
+//
+//     pub fn add_endpoint_change_listener(&mut self, listener: L) -> Result<(), String> {
+//         if self.stopped {
+//             return Err(format!("Swimmer has stopped"));
+//         }
+//
+//         self.endpoint_change_listeners.write().unwrap().push(listener);
+//         Ok(())
+//     }
+//
+//     fn start_state_maintainer(name: String,
+//                               address: String,
+//                               listeners: Arc<RwLock<Vec<L>>>,
+//                               transport: Arc<T>,
+//                               ping_interval: Duration,
+//                               receiver: mpsc::Receiver<InputCommand>)
+//                               -> JoinHandle<()> {
+//         let mut state = SwimmerStateMaintainer::new(name.clone(), address);
+//         let handle = std::thread::spawn(move || {
+//             let on_ready = |state: &mut SwimmerStateMaintainer| {
+//                 let mut ready = state.ready();
+//
+//                 for event in ready.take_event_box() {
+//                     match event {
+//                         OutputEvent::Ping(name, addr, ends) => {
+//                             transport.ping(&name, &addr, ends)
+//                         }
+//                         OutputEvent::PingReq(addr) => {
+//                             // transport.ping_req(&self_id, &addr, ends)
+//                         }
+//                     }
+//                 }
+//
+//                 for endpoint in ready.take_changed_endpoints() {
+//                     for l in listeners.read().unwrap().iter() {
+//                         // l.on_endpoint_changed(&endpoint.get_id(), &endpoint.get_status())
+//                     }
+//                 }
+//             };
+//
+//             let mut t = Instant::now();
+//             let mut timeout = ping_interval;
+//             loop {
+//                 match receiver.recv_timeout(timeout) {
+//                     Ok(InputCommand::Join(name, address)) => {
+//                         state.join(name, address)
+//                     }
+//                     Err(RecvTimeoutError::Timeout) => (),
+//                     Err(RecvTimeoutError::Disconnected) => {
+//                         state.shutdown();
+//                         return;
+//                     }
+//                 }
+//
+//                 let d = t.elapsed();
+//                 t = Instant::now();
+//                 if d >= timeout {
+//                     timeout = ping_interval;
+//                     state.tick();
+//                 } else {
+//                     timeout -= d;
+//                 }
+//
+//                 on_ready(&mut state);
+//             }
+//         });
+//         handle
+//     }
+// }
+//
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     #[test]
+//     fn basic_add_endpoint() {
+//
+//     }
+// }

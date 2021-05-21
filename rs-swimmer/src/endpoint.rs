@@ -5,6 +5,7 @@ use std::collections::hash_map::{RandomState, Entry};
 use std::hash::{Hash, Hasher};
 use std::borrow::Borrow;
 use std::fmt;
+use futures::FutureExt;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum EndpointStatus {
@@ -17,8 +18,6 @@ pub enum EndpointStatus {
 pub struct Endpoint {
     name: String,
     address: String,
-    status: EndpointStatus,
-    last_active_time: SystemTime,
 }
 
 impl Hash for Endpoint {
@@ -34,21 +33,11 @@ impl PartialEq for Endpoint {
 }
 
 impl Endpoint {
-    pub fn new(name: String, address: String, status: EndpointStatus) -> Endpoint {
+    pub fn new(name: String, address: String) -> Endpoint {
         Endpoint {
             name,
             address,
-            status,
-            last_active_time: SystemTime::now(),
         }
-    }
-
-    pub fn get_status(&self) -> EndpointStatus {
-        self.status.borrow().clone()
-    }
-
-    pub fn set_status(&mut self, new_status:EndpointStatus) {
-        self.status = new_status;
     }
 
     pub fn get_address(&self) -> &String {
@@ -58,20 +47,67 @@ impl Endpoint {
     pub fn get_name(&self) -> &String {
         &self.name
     }
+}
 
-    pub fn get_last_active_time(&self) -> SystemTime {
-        self.last_active_time
-    }
+#[derive(Debug, Clone, Eq)]
+pub struct EndpointWithState {
+    endpoint: Endpoint,
+    incarnation: u32,
+    status: EndpointStatus,
+    last_state_change_time: SystemTime,
+}
 
-    pub fn get_inactive_duration(&self, now: &SystemTime) -> Duration {
-        now.duration_since(self.last_active_time)
-            .unwrap_or(Duration::from_secs(0))
+impl Hash for EndpointWithState {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.endpoint.name.hash(state);
     }
 }
 
+impl PartialEq for EndpointWithState {
+    fn eq(&self, other: &Self) -> bool {
+        return self.endpoint.name == other.endpoint.name;
+    }
+}
+
+impl EndpointWithState {
+    pub fn new(endpoint: Endpoint, incarnation: u32, status: EndpointStatus) -> EndpointWithState {
+        EndpointWithState {
+            endpoint,
+            incarnation,
+            status,
+            last_state_change_time: SystemTime::now(),
+        }
+    }
+
+    pub fn get_endpoint(&self) -> &Endpoint {
+        &self.endpoint
+    }
+
+    pub fn clone_endpoint(&self) -> Endpoint {
+        self.endpoint.clone()
+    }
+
+    pub fn get_incarnation(&self) -> u32 {
+        self.incarnation
+    }
+
+    pub fn get_status(&self) -> EndpointStatus {
+        self.status
+    }
+
+    pub fn set_status(&mut self, new_status: EndpointStatus) {
+        self.status = new_status;
+    }
+
+    pub fn get_last_state_change_time(&self) -> SystemTime {
+        self.last_state_change_time
+    }
+}
+
+
 #[derive(Debug, Default)]
 pub struct EndpointGroup {
-    group: HashMap<String, Endpoint>,
+    group: HashMap<String, EndpointWithState>,
 }
 
 impl EndpointGroup {
@@ -79,18 +115,18 @@ impl EndpointGroup {
         EndpointGroup { group: HashMap::new() }
     }
 
-    pub fn add_endpoint_to_group(&mut self, endpoint: Endpoint) -> bool {
-        if self.contains(endpoint.get_name()) {
+    pub fn add_endpoint_to_group(&mut self, endpoint: EndpointWithState) -> bool {
+        if self.contains(endpoint.get_endpoint().get_name()) {
             return false;
         }
 
         let group = &mut self.group;
-        let name = endpoint.get_name();
+        let name = endpoint.get_endpoint().get_address();
         group.insert(name.clone(), endpoint);
         true
     }
 
-    pub fn remove_endpoint_from_group(&mut self, name: &String) -> Option<Endpoint> {
+    pub fn remove_endpoint_from_group(&mut self, name: &String) -> Option<EndpointWithState> {
         let group = &mut self.group;
         group.remove(name)
     }
@@ -99,39 +135,29 @@ impl EndpointGroup {
         self.group.contains_key(name)
     }
 
-    pub fn get_endpoints_iter(&self) -> impl Iterator<Item=&Endpoint> {
+    pub fn get_endpoints_iter(&self) -> impl Iterator<Item=&EndpointWithState> {
         self.group.values()
     }
 
-    pub fn get_mut_endpoints_iter(&mut self) -> impl Iterator<Item=&mut Endpoint> {
+    pub fn get_mut_endpoints_iter(&mut self) -> impl Iterator<Item=&mut EndpointWithState> {
         self.group.values_mut()
     }
 
-    pub fn classify_endpoints_by_status(&self) -> HashMap<EndpointStatus, Vec<String>>{
+    pub fn classify_endpoints_by_status(&self) -> HashMap<EndpointStatus, Vec<String>> {
         let mut classified_endpoint: HashMap<EndpointStatus, Vec<String>> = HashMap::new();
         for endpoint in self.get_endpoints_iter() {
             let status = endpoint.get_status();
             match classified_endpoint.entry(status) {
-                Entry::Occupied(o) => { o.into_mut().push(endpoint.get_name().clone()); }
+                Entry::Occupied(o) => { o.into_mut().push(endpoint.get_endpoint().get_name().clone()); }
                 Entry::Vacant(v) => { v.insert(vec![]); }
             }
         }
         classified_endpoint
     }
 
-    pub fn get_endpoint(&self, name: &String) -> Option<&Endpoint> {
+    pub fn get_endpoint(&self, name: &String) -> Option<&EndpointWithState> {
         let group = &self.group;
         group.get(name)
-    }
-
-    pub fn update_active_timestamp(&mut self, name: &String) -> bool {
-        match self.group.get_mut(name) {
-            None => false,
-            Some(endpoint) => {
-                endpoint.last_active_time = SystemTime::now();
-                true
-            }
-        }
     }
 
     pub fn update_status(&mut self, name: &String, new_status: EndpointStatus) -> bool {
@@ -139,6 +165,7 @@ impl EndpointGroup {
             None => false,
             Some(endpoint) => {
                 endpoint.status = new_status;
+                endpoint.last_state_change_time = SystemTime::now();
                 true
             }
         }
@@ -155,73 +182,79 @@ mod tests {
 
     #[test]
     fn basic_add_endpoint() {
-        let endpoint1 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
-        let endpoint2 = Endpoint::new(String::from("endpoint2"), String::from("127.0.0.1"), EndpointStatus::Alive);
+        let endpoint1 = create_test_endpoint_with_state("endpoint1");
+        let endpoint2 = create_test_endpoint_with_state("endpoint2");
         let mut group = EndpointGroup::new();
         assert!(group.add_endpoint_to_group(endpoint1.clone()));
-        assert!(group.contains(endpoint1.get_name()));
+        assert!(group.contains(endpoint1.get_endpoint().get_name()));
         assert_eq!(1, group.len());
 
         assert!(group.add_endpoint_to_group(endpoint2.clone()));
-        assert!(group.contains(endpoint1.get_name()));
-        assert!(group.contains(endpoint2.get_name()));
+        assert!(group.contains(endpoint1.get_endpoint().get_name()));
+        assert!(group.contains(endpoint2.get_endpoint().get_name()));
         assert_eq!(2, group.len());
     }
 
     #[test]
     fn add_duplicate_endpoint() {
-        let endpoint1 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
-        let endpoint2 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
+        let endpoint1 = create_test_endpoint_with_state("endpoint1");
+        let endpoint2 = create_test_endpoint_with_state("endpoint1");
         let mut group = EndpointGroup::new();
         assert!(group.add_endpoint_to_group(endpoint1.clone()));
         assert!(!group.add_endpoint_to_group(endpoint2));
-        assert!(group.contains(endpoint1.get_name()));
+        assert!(group.contains(endpoint1.get_endpoint().get_name()));
         assert_eq!(1, group.len());
     }
 
     #[test]
     fn remove_endpoint() {
-        let endpoint1 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
-        let endpoint2 = Endpoint::new(String::from("endpoint2"), String::from("127.0.0.1"), EndpointStatus::Alive);
+        let endpoint1 = create_test_endpoint_with_state("endpoint1");
+        let endpoint2 = create_test_endpoint_with_state("endpoint2");
         let mut group = EndpointGroup::new();
         group.add_endpoint_to_group(endpoint1.clone());
         group.add_endpoint_to_group(endpoint2.clone());
 
-        assert_eq!(endpoint1, group.remove_endpoint_from_group(endpoint1.get_name()).unwrap());
-        assert!(!group.contains(endpoint1.get_name()));
+        assert_eq!(endpoint1, group.remove_endpoint_from_group(endpoint1.get_endpoint().get_name()).unwrap());
+        assert!(!group.contains(endpoint1.get_endpoint().get_name()));
         assert_eq!(1, group.len());
 
-        assert_eq!(endpoint2, group.remove_endpoint_from_group(endpoint2.get_name()).unwrap());
-        assert!(!group.contains(endpoint2.get_name()));
+        assert_eq!(endpoint2, group.remove_endpoint_from_group(endpoint2.get_endpoint().get_name()).unwrap());
+        assert!(!group.contains(endpoint2.get_endpoint().get_name()));
         assert_eq!(0, group.len());
 
         assert_eq!(None, group.remove_endpoint_from_group(&String::from("not exists endpoint")));
     }
 
     #[test]
-    fn update_active_timestamp() {
-        let endpoint1 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
-        let mut group = EndpointGroup::new();
-        group.add_endpoint_to_group(endpoint1.clone());
-
-        assert!(group.update_active_timestamp(endpoint1.get_name()));
-        assert!(group.get_endpoint(endpoint1.get_name()).unwrap().last_active_time > endpoint1.last_active_time);
-        assert!(!group.update_active_timestamp(&String::from("not exists endpoint")));
-    }
-
-    #[test]
     fn update_status() {
-        let endpoint1 = Endpoint::new(String::from("endpoint1"), String::from("127.0.0.1"), EndpointStatus::Alive);
+        let endpoint1 = create_test_endpoint_with_state("endpoint1");
         let mut group = EndpointGroup::new();
         group.add_endpoint_to_group(endpoint1.clone());
 
-        assert!(group.update_status(endpoint1.get_name(), EndpointStatus::Dead));
+        assert!(group.update_status(endpoint1.get_endpoint().get_name(), EndpointStatus::Dead));
 
-        assert_eq!(EndpointStatus::Dead, group.get_endpoint(endpoint1.get_name()).unwrap().get_status());
+        assert_eq!(EndpointStatus::Dead, group.get_endpoint(endpoint1.get_endpoint().get_name()).unwrap().get_status());
 
-        assert_ne!(endpoint1.get_status(), group.get_endpoint(endpoint1.get_name()).unwrap().get_status());
+        assert_ne!(endpoint1.get_status(), group.get_endpoint(endpoint1.get_endpoint().get_name()).unwrap().get_status());
 
         assert!(!group.update_status(&String::from("not exists endpoint"), EndpointStatus::Dead));
+    }
+
+    fn create_test_endpoint(name: &str) -> Endpoint {
+        Endpoint {
+            name: String::from(name),
+            address: String::from("127.0.0.1"),
+        }
+    }
+
+    fn create_test_endpoint_with_state(name: &str) -> EndpointWithState {
+        let endpoint = create_test_endpoint(name);
+        EndpointWithState {
+            endpoint,
+            incarnation: 100,
+            status: EndpointStatus::Alive,
+            last_state_change_time: SystemTime::now(),
+        }
     }
 }
 
