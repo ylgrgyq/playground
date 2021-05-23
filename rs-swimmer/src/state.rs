@@ -1,9 +1,13 @@
 use std::collections::HashSet;
 use crate::endpoint::{Endpoint, EndpointGroup, EndpointWithState, EndpointStatus, AliveEndpoint, SuspectEndpoint, DeadEndpoint};
+use crate::schedule::{Scheduler};
 use std::time::{Duration, SystemTime};
 use core::mem;
+use std::borrow::{Borrow, BorrowMut};
+use crate::state::Command::Ping;
 
-struct JoinEndpointResponse {
+#[derive(Debug)]
+struct JoinEndpoint {
     from: String,
     name: String,
     address: String,
@@ -11,26 +15,25 @@ struct JoinEndpointResponse {
     status: EndpointStatus,
 }
 
-enum InputCommand {
-    Join(String, String),
-    JoinResponse(String),
-}
-
 #[derive(Debug)]
-enum OutputEvent {
+enum Command {
     // from, target_address, known endpoints
-    Join(String, String, HashSet<Endpoint>),
+    Join(String, String, Vec<JoinEndpoint>),
+    // from, knwon_endpoints
+    JoinResponse(String, Vec<JoinEndpoint>),
     // from, target_address
     Ping(String, String),
-    //
-    PingReq(String),
+    // from, target_address
+    Ack(String, String),
+    // from, target_address
+    PingReq(String, String),
     // from, suspect_endpoint_name
     Suspect(String, String),
 }
 
 #[derive(Debug, Default)]
 struct Ready {
-    event_box: Vec<OutputEvent>,
+    event_box: Vec<Command>,
     changed_endpoints: Vec<Endpoint>,
 }
 
@@ -39,7 +42,7 @@ impl Ready {
         self.changed_endpoints.push(endpoint.clone_endpoint());
     }
 
-    fn add_output_event(&mut self, event: OutputEvent) {
+    fn add_output_event(&mut self, event: Command) {
         self.event_box.push(event)
     }
 }
@@ -49,6 +52,7 @@ struct SwimmerStateMaintainer {
     name: String,
     endpoint_group: EndpointGroup,
     next_ready: Ready,
+    tick_interval: Duration,
     alive_timeout: Duration,
     suspect_timeout: Duration,
 }
@@ -70,7 +74,78 @@ impl SwimmerStateMaintainer {
         }
     }
 
-    pub fn handle_join_response(&mut self, stats_to_merge: Vec<JoinEndpointResponse>) -> Result<(), String> {
+    pub fn handle_command(&mut self, command: Command) -> Result<(), String> {
+        match command {
+            // from, target_address, known endpoints
+            Command::Join(from, target_Address, other_known_endpoints) => {
+                if from == self.name {
+                    return Err(format!("handle invalid command from myself."));
+                }
+
+                self.merge_endpoints(other_known_endpoints);
+                let my_known_endpoints = self.endpoint_group.get_endpoints_iter()
+                    .map(|e| {
+                        JoinEndpoint {
+                            name: e.get_endpoint().get_name().clone(),
+                            address: e.get_endpoint().get_address().clone(),
+                            incarnation: e.get_incarnation(),
+                            status: e.get_status(),
+                            from: self.name.clone(),
+                        }
+                    })
+                    .collect();
+                let resp = Command::JoinResponse(self.name.clone(), my_known_endpoints);
+                self.next_ready.add_output_event(resp);
+            }
+            Command::JoinResponse(from, stats_to_merge) => {
+                if from == self.name {
+                    return Err(format!("handle invalid command from myself."));
+                }
+                self.merge_endpoints(stats_to_merge);
+            }
+            Command::Ping(from, _) => {
+                if from == self.name {
+                    return Err(format!("handle invalid command from myself."));
+                }
+                if let Some(e) = self.endpoint_group.get_mut_endpoint(&from) {
+                    let ack = Command::Ack(self.name.clone(), e.get_endpoint().get_address().clone());
+                    e.set_last_state_change_time(SystemTime::now());
+                    self.next_ready.add_output_event(ack);
+                } else {
+                    return Err(format!("ping from unknown endpoint with name: {}", from));
+                }
+            }
+            // Todo 是不是挪到上层做，因为这里不改变也不读取状态
+            Command::PingReq(from, target_address) => {
+                if from == self.name {
+                    return Err(format!("handle invalid command from myself."));
+                }
+                if let Some(e) = self.endpoint_group.get_mut_endpoint(&self.name) {
+                    if e.get_endpoint().get_address() == &target_address {
+                        let ack = Command::Ack(self.name.clone(), e.get_endpoint().get_address().clone());
+                        e.set_last_state_change_time(SystemTime::now());
+                        self.next_ready.add_output_event(ack);
+                    } else {
+                        e.set_ping_req_timeout(SystemTime::now() + self.alive_timeout);
+                        self.next_ready.add_output_event(Command::Ping(from, target_address))
+                    }
+                } else {
+                    return Err(format!("ping from unknown endpoint with name: {}", from));
+                }
+            }
+            Command::Ack(from, _) => {
+                if let Some(e) = self.endpoint_group.get_mut_endpoint(&from) {
+                    e.clear_ping_timeout();
+                } else {
+                    return Err(format!("ack from unknown endpoint with name: {}", from));
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn merge_endpoints(&mut self, stats_to_merge: Vec<JoinEndpoint>) -> Result<(), String> {
         for joined_endpoint in stats_to_merge {
             match joined_endpoint.status {
                 EndpointStatus::Alive => {
@@ -137,10 +212,6 @@ impl SwimmerStateMaintainer {
             .collect()
     }
 
-    fn send_join(&mut self, target_address: &String) {
-        self.next_ready.add_output_event(OutputEvent::Join(self.name.clone(), target_address.clone(), self.clone_endpoints()));
-    }
-
     fn update_endpoint_status(&mut self) {
         let now = SystemTime::now();
         let group = &mut self.endpoint_group;
@@ -163,14 +234,14 @@ impl SwimmerStateMaintainer {
                     for endpoint_name in v {
                         // endpoint must be found
                         let e = self.endpoint_group.get_endpoint(&endpoint_name).unwrap();
-                        self.next_ready.add_output_event(OutputEvent::Ping(e.get_endpoint().get_name().clone(), e.get_endpoint().get_address().clone()))
+                        self.next_ready.add_output_event(Command::Ping(e.get_endpoint().get_name().clone(), e.get_endpoint().get_address().clone()))
                     }
                 }
                 EndpointStatus::Suspect => {
                     for endpoint_name in v {
                         // endpoint must be found
                         let e = self.endpoint_group.get_endpoint(&endpoint_name).unwrap();
-                        self.next_ready.add_output_event(OutputEvent::PingReq(e.get_endpoint().get_address().clone()));
+                        // self.next_ready.add_output_event(Command::PingReq(e.get_endpoint().get_address().clone()));
                     }
                 }
                 EndpointStatus::Dead => {
@@ -185,6 +256,8 @@ impl SwimmerStateMaintainer {
             }
         }
     }
+
+    fn gossip(&mut self) {}
 
     fn broadcast_endpoint_changed(&mut self, endpoint: EndpointWithState) {
         self.next_ready.add_changed_endpoints(endpoint);
