@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime};
 use core::mem;
 use std::borrow::{Borrow, BorrowMut};
 use crate::state::Command::Ping;
+use std::net::Shutdown::Read;
 
 #[derive(Debug)]
 struct JoinEndpoint {
@@ -47,13 +48,15 @@ impl Ready {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct SwimmerStateMaintainer {
     name: String,
     endpoint_group: EndpointGroup,
     next_ready: Ready,
     tick_interval: Duration,
-    alive_timeout: Duration,
+    probe_interval: Duration,
+    probe_timeout: Duration,
+    next_probe_time: SystemTime,
     suspect_timeout: Duration,
 }
 
@@ -68,9 +71,12 @@ impl SwimmerStateMaintainer {
         SwimmerStateMaintainer {
             name,
             endpoint_group,
-            alive_timeout: Duration::from_secs(20),
+            next_probe_time: SystemTime::now() + Duration::from_secs(10),
+            probe_timeout: Duration::from_secs(20),
             suspect_timeout: Duration::from_secs(30),
-            ..Default::default()
+            tick_interval: Duration::from_secs(10),
+            probe_interval: Duration::from_secs(1),
+            next_ready: Ready::default(),
         }
     }
 
@@ -126,7 +132,7 @@ impl SwimmerStateMaintainer {
                         e.set_last_state_change_time(SystemTime::now());
                         self.next_ready.add_output_event(ack);
                     } else {
-                        e.set_ping_req_timeout(SystemTime::now() + self.alive_timeout);
+                        e.set_ping_req_timeout(SystemTime::now() + self.probe_timeout);
                         self.next_ready.add_output_event(Command::Ping(from, target_address))
                     }
                 } else {
@@ -143,6 +149,16 @@ impl SwimmerStateMaintainer {
             _ => {}
         }
         Ok(())
+    }
+
+    pub fn tick(&mut self) {
+        self.probe();
+        self.handle_timeout();
+        self.check_endpoints();
+    }
+
+    pub fn ready(&mut self) -> Ready {
+        mem::take(&mut self.next_ready)
     }
 
     fn merge_endpoints(&mut self, stats_to_merge: Vec<JoinEndpoint>) -> Result<(), String> {
@@ -181,15 +197,6 @@ impl SwimmerStateMaintainer {
         }
     }
 
-    pub fn tick(&mut self) {
-        self.update_endpoint_status();
-        self.check_endpoints();
-    }
-
-    pub fn ready(&mut self) -> Ready {
-        mem::take(&mut self.next_ready)
-    }
-
     pub fn shutdown(&mut self) {
         if let Some(endpoint) = self.endpoint_group.remove_endpoint_from_group(&self.name) {
             self.broadcast_endpoint_changed(endpoint)
@@ -212,15 +219,52 @@ impl SwimmerStateMaintainer {
             .collect()
     }
 
-    fn update_endpoint_status(&mut self) {
+    fn probe(&mut self) {
+        if SystemTime::now().lt(&self.next_probe_time) {
+            return;
+        }
+
+        while let Some(name) = self.endpoint_group.next_endpoint_name_to_probe() {
+            if let Some(endpoint_to_probe) = self.endpoint_group.get_endpoint(&name) {
+                if endpoint_to_probe.get_status() == EndpointStatus::Alive {
+                    let ping = Command::Ping(
+                        endpoint_to_probe.get_endpoint().get_name().clone(),
+                        endpoint_to_probe.get_endpoint().get_address().clone());
+                    self.next_ready.add_output_event(ping);
+                    return;
+                }
+            }
+        }
+    }
+
+    fn handle_timeout(&mut self) {
         let now = SystemTime::now();
         let group = &mut self.endpoint_group;
         for endpoint in group.get_mut_endpoints_iter() {
-            // let inactive_duration = endpoint.get_inactive_duration(&now);
-            // if inactive_duration > self.suspect_timeout {
-            //     endpoint.set_status(EndpointStatus::Dead)
-            // } else if inactive_duration > self.alive_timeout {
-            //     endpoint.set_status(EndpointStatus::Suspect)
+            // match endpoint.get_status() {
+            //     EndpointStatus::Alive => {
+            //         if let Some(timeout) = endpoint.get_ping_timeout() {
+            //             if timeout.duration_since(now).unwrap() > self.probe_timeout {
+            //                 group.add_suspect_endpoint(SuspectEndpoint {
+            //                     incarnation: endpoint.get_incarnation(),
+            //                     name: endpoint.get_endpoint().get_name().clone(),
+            //                     from: self.name.clone(),
+            //                 });
+            //             }
+            //         }
+            //     }
+            //     EndpointStatus::Suspect => {
+            //         if let Some(timeout) = endpoint.get_ping_req_timeout() {
+            //             if timeout.duration_since(now).unwrap() > self.probe_timeout {
+            //                 group.add_dead_endpoint(DeadEndpoint {
+            //                     incarnation: endpoint.get_incarnation(),
+            //                     name: endpoint.get_endpoint().get_name().clone(),
+            //                     from: self.name.clone(),
+            //                 });
+            //             }
+            //         }
+            //     }
+            //     _ => {}
             // }
         }
     }
@@ -230,7 +274,6 @@ impl SwimmerStateMaintainer {
         for (k, v) in self.endpoint_group.classify_endpoints_by_status() {
             match k {
                 EndpointStatus::Alive => {
-                    let known_endpoints = self.clone_endpoints();
                     for endpoint_name in v {
                         // endpoint must be found
                         let e = self.endpoint_group.get_endpoint(&endpoint_name).unwrap();

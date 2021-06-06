@@ -7,6 +7,8 @@ use std::borrow::Borrow;
 use std::fmt;
 use futures::FutureExt;
 use std::fmt::Formatter;
+use rand::thread_rng;
+use rand::seq::SliceRandom;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum EndpointStatus {
@@ -100,7 +102,7 @@ impl EndpointWithState {
             status,
             last_state_change_time: SystemTime::now(),
             ping_timeout: None,
-            ping_req_timeout: None
+            ping_req_timeout: None,
         }
     }
 
@@ -146,6 +148,10 @@ impl EndpointWithState {
         self.ping_timeout = None
     }
 
+    pub fn get_ping_timeout(&self) -> Option<SystemTime> {
+        self.ping_timeout
+    }
+
     pub fn set_ping_req_timeout(&mut self, timeout: SystemTime) {
         self.ping_req_timeout = Some(timeout)
     }
@@ -153,27 +159,26 @@ impl EndpointWithState {
     pub fn clear_ping_req_timeout(&mut self) {
         self.ping_req_timeout = None
     }
+
+    pub fn get_ping_req_timeout(&self) -> Option<SystemTime> {
+        self.ping_req_timeout
+    }
 }
 
 #[derive(Debug, Default)]
 pub struct EndpointGroup {
     group: HashMap<String, EndpointWithState>,
+    probe_index: usize,
+    endpoints_to_probe: Vec<String>,
 }
 
 impl EndpointGroup {
     pub fn new() -> EndpointGroup {
-        EndpointGroup { group: HashMap::new() }
-    }
-
-    pub fn add_endpoint_to_group(&mut self, endpoint: EndpointWithState) -> bool {
-        if self.contains(endpoint.get_endpoint().get_name()) {
-            return false;
+        EndpointGroup {
+            group: HashMap::new(),
+            probe_index: 0,
+            endpoints_to_probe: vec![],
         }
-
-        let group = &mut self.group;
-        let name = endpoint.get_endpoint().get_name();
-        group.insert(name.clone(), endpoint);
-        true
     }
 
     pub fn remove_endpoint_from_group(&mut self, name: &String) -> Option<EndpointWithState> {
@@ -226,6 +231,23 @@ impl EndpointGroup {
         }
     }
 
+    pub fn next_endpoint_name_to_probe(&mut self) -> Option<String> {
+        if self.probe_index >= self.endpoints_to_probe.len() {
+            let mut ends = vec![];
+            for (name, e) in &self.group {
+                if e.get_status() == EndpointStatus::Alive {
+                    ends.push(name.clone())
+                }
+            }
+
+            ends.shuffle(&mut thread_rng());
+            self.endpoints_to_probe = ends;
+            self.probe_index = 0;
+        }
+
+        return self.endpoints_to_probe.get(self.probe_index).map(|name| name.clone());
+    }
+
     pub fn len(&self) -> usize {
         self.group.len()
     }
@@ -238,7 +260,7 @@ impl EndpointGroup {
                 }
 
                 if old_endpoint.status != EndpointStatus::Dead {
-                    return Err(format!("Can't update address for endpoint with state: {:?}", old_endpoint.status))
+                    return Err(format!("Can't update address for endpoint with state: {:?}", old_endpoint.status));
                 }
 
                 old_endpoint.incarnation = alive.incarnation;
@@ -266,7 +288,7 @@ impl EndpointGroup {
         Ok(())
     }
 
-    pub fn add_suspect_endpoint(&mut self, suspect: SuspectEndpoint) -> Result<(), String>{
+    pub fn add_suspect_endpoint(&mut self, suspect: SuspectEndpoint) -> Result<(), String> {
         match self.get_mut_endpoint(&suspect.name) {
             Some(old_endpoint) => {
                 if suspect.incarnation < old_endpoint.incarnation {
@@ -274,7 +296,7 @@ impl EndpointGroup {
                 }
 
                 if old_endpoint.status != EndpointStatus::Alive {
-                    return Ok(())
+                    return Ok(());
                 }
 
                 old_endpoint.incarnation = suspect.incarnation;
@@ -288,6 +310,23 @@ impl EndpointGroup {
     }
 
     pub fn add_dead_endpoint(&mut self, dead: DeadEndpoint) -> Result<(), String> {
+        match self.get_mut_endpoint(&dead.name) {
+            Some(old_endpoint) => {
+                if dead.incarnation < old_endpoint.incarnation {
+                    return Ok(());
+                }
+
+                if old_endpoint.status == EndpointStatus::Dead {
+                    return Ok(());
+                }
+
+                old_endpoint.incarnation = dead.incarnation;
+                old_endpoint.status = EndpointStatus::Dead;
+                old_endpoint.last_state_change_time = SystemTime::now();
+            }
+            None => {}
+        }
+
         Ok(())
     }
 }
