@@ -78,8 +78,6 @@ pub struct EndpointWithState {
     incarnation: u32,
     status: EndpointStatus,
     last_state_change_time: SystemTime,
-    ping_timeout: Option<SystemTime>,
-    ping_req_timeout: Option<SystemTime>,
 }
 
 impl Hash for EndpointWithState {
@@ -101,8 +99,6 @@ impl EndpointWithState {
             incarnation,
             status,
             last_state_change_time: SystemTime::now(),
-            ping_timeout: None,
-            ping_req_timeout: None,
         }
     }
 
@@ -259,8 +255,10 @@ impl EndpointGroup {
                     return Ok(());
                 }
 
-                if old_endpoint.status != EndpointStatus::Dead {
-                    return Err(format!("Can't update address for endpoint with state: {:?}", old_endpoint.status));
+                if old_endpoint.get_endpoint().get_address() != alive.address &&
+                    old_endpoint.status != EndpointStatus::Dead {
+                    return Err(format!("Can't update address for endpoint: {:?} with state: {:?}",
+                                       old_endpoint.get_endpoint(), old_endpoint.status));
                 }
 
                 old_endpoint.incarnation = alive.incarnation;
@@ -278,10 +276,8 @@ impl EndpointGroup {
                     incarnation: alive.incarnation,
                     status: EndpointStatus::Alive,
                     last_state_change_time: SystemTime::now(),
-                    ping_timeout: None,
-                    ping_req_timeout: None,
                 };
-                self.group.insert(name.clone(), new_endpoint);
+                self.group.insert(name, new_endpoint);
             }
         }
 

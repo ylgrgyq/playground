@@ -1,10 +1,11 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use crate::endpoint::{Endpoint, EndpointGroup, EndpointWithState, EndpointStatus, AliveEndpoint, SuspectEndpoint, DeadEndpoint};
 use crate::schedule::{Scheduler};
+use crate::config::{Config};
 use std::time::{Duration, SystemTime};
 use core::mem;
 use std::borrow::{Borrow, BorrowMut};
-use crate::state::Command::Ping;
+use crate::state::Command::{Ping, Suspect};
 use std::net::Shutdown::Read;
 
 #[derive(Debug)]
@@ -36,6 +37,7 @@ enum Command {
 struct Ready {
     event_box: Vec<Command>,
     changed_endpoints: Vec<Endpoint>,
+
 }
 
 impl Ready {
@@ -50,33 +52,30 @@ impl Ready {
 
 #[derive(Debug)]
 struct SwimmerStateMaintainer {
-    name: String,
+    config: Config,
     endpoint_group: EndpointGroup,
     next_ready: Ready,
-    tick_interval: Duration,
-    probe_interval: Duration,
-    probe_timeout: Duration,
     next_probe_time: SystemTime,
-    suspect_timeout: Duration,
+    probe_timeout_map: HashMap<String, SystemTime>,
+    suspect_timeout_map: HashMap<String, SystemTime>,
 }
 
 impl SwimmerStateMaintainer {
-    pub fn new(name: String, address: String, incarnation: u32) -> SwimmerStateMaintainer {
+    pub fn new(config: Config, incarnation: u32) -> SwimmerStateMaintainer {
         let mut endpoint_group = EndpointGroup::new();
         endpoint_group.add_alive_endpoint(AliveEndpoint {
             incarnation,
-            name: name.clone(),
-            address,
+            name: config.get_name(),
+            address: config.get_address(),
         });
+        let next_probe_time = SystemTime::now() + config.get_probe_interval();
         SwimmerStateMaintainer {
-            name,
+            config,
             endpoint_group,
-            next_probe_time: SystemTime::now() + Duration::from_secs(10),
-            probe_timeout: Duration::from_secs(20),
-            suspect_timeout: Duration::from_secs(30),
-            tick_interval: Duration::from_secs(10),
-            probe_interval: Duration::from_secs(1),
+            next_probe_time,
             next_ready: Ready::default(),
+            probe_timeout_map: HashMap::new(),
+            suspect_timeout_map: HashMap::new(),
         }
     }
 
@@ -84,7 +83,7 @@ impl SwimmerStateMaintainer {
         match command {
             // from, target_address, known endpoints
             Command::Join(from, target_Address, other_known_endpoints) => {
-                if from == self.name {
+                if from == self.config.get_name() {
                     return Err(format!("handle invalid command from myself."));
                 }
 
@@ -96,25 +95,25 @@ impl SwimmerStateMaintainer {
                             address: e.get_endpoint().get_address().clone(),
                             incarnation: e.get_incarnation(),
                             status: e.get_status(),
-                            from: self.name.clone(),
+                            from: self.config.get_name(),
                         }
                     })
                     .collect();
-                let resp = Command::JoinResponse(self.name.clone(), my_known_endpoints);
+                let resp = Command::JoinResponse(self.config.get_name(), my_known_endpoints);
                 self.next_ready.add_output_event(resp);
             }
             Command::JoinResponse(from, stats_to_merge) => {
-                if from == self.name {
+                if from == self.config.get_name() {
                     return Err(format!("handle invalid command from myself."));
                 }
                 self.merge_endpoints(stats_to_merge);
             }
             Command::Ping(from, _) => {
-                if from == self.name {
+                if from == self.config.get_name() {
                     return Err(format!("handle invalid command from myself."));
                 }
                 if let Some(e) = self.endpoint_group.get_mut_endpoint(&from) {
-                    let ack = Command::Ack(self.name.clone(), e.get_endpoint().get_address().clone());
+                    let ack = Command::Ack(self.config.get_name(), e.get_endpoint().get_address().clone());
                     e.set_last_state_change_time(SystemTime::now());
                     self.next_ready.add_output_event(ack);
                 } else {
@@ -123,16 +122,16 @@ impl SwimmerStateMaintainer {
             }
             // Todo 是不是挪到上层做，因为这里不改变也不读取状态
             Command::PingReq(from, target_address) => {
-                if from == self.name {
+                if from == self.config.get_name() {
                     return Err(format!("handle invalid command from myself."));
                 }
-                if let Some(e) = self.endpoint_group.get_mut_endpoint(&self.name) {
+                if let Some(e) = self.endpoint_group.get_mut_endpoint(&self.config.get_name()) {
                     if e.get_endpoint().get_address() == &target_address {
-                        let ack = Command::Ack(self.name.clone(), e.get_endpoint().get_address().clone());
+                        let ack = Command::Ack(self.config.get_name(), e.get_endpoint().get_address().clone());
                         e.set_last_state_change_time(SystemTime::now());
                         self.next_ready.add_output_event(ack);
                     } else {
-                        e.set_ping_req_timeout(SystemTime::now() + self.probe_timeout);
+                        e.set_ping_req_timeout(SystemTime::now() + self.config.get_probe_timeout());
                         self.next_ready.add_output_event(Command::Ping(from, target_address))
                     }
                 } else {
@@ -161,28 +160,28 @@ impl SwimmerStateMaintainer {
         mem::take(&mut self.next_ready)
     }
 
-    fn merge_endpoints(&mut self, stats_to_merge: Vec<JoinEndpoint>) -> Result<(), String> {
-        for joined_endpoint in stats_to_merge {
-            match joined_endpoint.status {
+    fn merge_endpoints(&mut self, endpoints_to_merge: Vec<JoinEndpoint>) -> Result<(), String> {
+        for endpoint in endpoints_to_merge {
+            match endpoint.status {
                 EndpointStatus::Alive => {
-                    if self.name == joined_endpoint.name {
-                        return Err(format!("conflict endpoint name: {}", self.name));
+                    if self.config.name == endpoint.name {
+                        return Err(format!("conflict endpoint name: {}", &self.config.name));
                     }
                     self.endpoint_group.add_alive_endpoint(AliveEndpoint {
-                        name: joined_endpoint.name,
-                        incarnation: joined_endpoint.incarnation,
-                        address: joined_endpoint.address,
+                        name: endpoint.name,
+                        incarnation: endpoint.incarnation,
+                        address: endpoint.address,
                     })?
                 }
                 EndpointStatus::Dead | EndpointStatus::Suspect => {
-                    if self.name == joined_endpoint.name {
-                        return Err(format!("refute to suspect, i'm alive: {}", self.name));
+                    if self.config.name == endpoint.name {
+                        return Err(format!("refute to suspect/dead, i'm alive: {}", &self.config.name));
                     }
 
                     self.endpoint_group.add_suspect_endpoint(SuspectEndpoint {
-                        name: joined_endpoint.name,
-                        incarnation: joined_endpoint.incarnation,
-                        from: joined_endpoint.from,
+                        name: endpoint.name,
+                        incarnation: endpoint.incarnation,
+                        from: endpoint.from,
                     })?
                     // 广播 suspect
                 }
@@ -198,7 +197,7 @@ impl SwimmerStateMaintainer {
     }
 
     pub fn shutdown(&mut self) {
-        if let Some(endpoint) = self.endpoint_group.remove_endpoint_from_group(&self.name) {
+        if let Some(endpoint) = self.endpoint_group.remove_endpoint_from_group(&self.config.name) {
             self.broadcast_endpoint_changed(endpoint)
         }
     }
@@ -231,6 +230,8 @@ impl SwimmerStateMaintainer {
                         endpoint_to_probe.get_endpoint().get_name().clone(),
                         endpoint_to_probe.get_endpoint().get_address().clone());
                     self.next_ready.add_output_event(ping);
+                    self.probe_timeout_map.insert(endpoint_to_probe.get_endpoint().get_name().clone(),
+                                                  SystemTime::now() + self.config.get_probe_timeout());
                     return;
                 }
             }
@@ -239,33 +240,23 @@ impl SwimmerStateMaintainer {
 
     fn handle_timeout(&mut self) {
         let now = SystemTime::now();
-        let group = &mut self.endpoint_group;
-        for endpoint in group.get_mut_endpoints_iter() {
-            // match endpoint.get_status() {
-            //     EndpointStatus::Alive => {
-            //         if let Some(timeout) = endpoint.get_ping_timeout() {
-            //             if timeout.duration_since(now).unwrap() > self.probe_timeout {
-            //                 group.add_suspect_endpoint(SuspectEndpoint {
-            //                     incarnation: endpoint.get_incarnation(),
-            //                     name: endpoint.get_endpoint().get_name().clone(),
-            //                     from: self.name.clone(),
-            //                 });
-            //             }
-            //         }
-            //     }
-            //     EndpointStatus::Suspect => {
-            //         if let Some(timeout) = endpoint.get_ping_req_timeout() {
-            //             if timeout.duration_since(now).unwrap() > self.probe_timeout {
-            //                 group.add_dead_endpoint(DeadEndpoint {
-            //                     incarnation: endpoint.get_incarnation(),
-            //                     name: endpoint.get_endpoint().get_name().clone(),
-            //                     from: self.name.clone(),
-            //                 });
-            //             }
-            //         }
-            //     }
-            //     _ => {}
-            // }
+        let mut probing_to_delete = Vec::new();
+        for (name, timeout) in &self.probe_timeout_map {
+            if now.ge(timeout) {
+                let group = &mut self.endpoint_group;
+                if let Some(endpoint) = group.get_endpoint(name) {
+                    group.add_suspect_endpoint(SuspectEndpoint {
+                        incarnation: endpoint.get_incarnation(),
+                        name: endpoint.get_endpoint().get_name().clone(),
+                        from: self.config.name.clone(),
+                    });
+                }
+                self.next_ready.add_output_event(Suspect(self.config.name.clone(), name.clone()));
+                probing_to_delete.push(name.clone());
+            }
+        }
+        for name in probing_to_delete {
+            self.probe_timeout_map.remove(&name);
         }
     }
 
