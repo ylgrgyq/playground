@@ -11,15 +11,14 @@ import (
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
-type NodeEndpoint struct {
-	NodeId string
+type Endpoint struct {
 	IP     string
 	Port   uint16
 }
 
 type RpcClient interface {
-	RequestVote(nodeEndpoint NodeEndpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
-	AppendEntries(nodeEndpoint NodeEndpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
+	RequestVote(nodeEndpoint Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
+	AppendEntries(nodeEndpoint Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
 
 type RpcHandler interface {
@@ -99,7 +98,7 @@ func (h *HttpRpc) Shutdown(context context.Context) error {
 	return h.server.Shutdown(context)
 }
 
-func (h *HttpRpc) RequestVote(nodeEndpoint NodeEndpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+func (h *HttpRpc) RequestVote(nodeEndpoint Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
 	var res protos.RequestVoteResponse
 	err := sendRequest(nodeEndpoint, RequestVoteApi, request, &res)
 	if err != nil {
@@ -109,7 +108,7 @@ func (h *HttpRpc) RequestVote(nodeEndpoint NodeEndpoint, request *protos.Request
 	return &res, nil
 }
 
-func (h *HttpRpc) AppendEntries(nodeEndpoint NodeEndpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+func (h *HttpRpc) AppendEntries(nodeEndpoint Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	var res protos.AppendEntriesResponse
 	err := sendRequest(nodeEndpoint, AppendEntriesApi, request, &res)
 	if err != nil {
@@ -151,7 +150,7 @@ func writeResponse(writer http.ResponseWriter, request *http.Request, response p
 	}
 }
 
-func sendRequest(endpoint NodeEndpoint, api RequestApi, req proto.Message, resp proto.Message) error {
+func sendRequest(endpoint Endpoint, api RequestApi, req proto.Message, resp proto.Message) error {
 	bs, err := proto.Marshal(req)
 	if err != nil {
 		return err
@@ -178,6 +177,6 @@ func sendRequest(endpoint NodeEndpoint, api RequestApi, req proto.Message, resp 
 	return nil
 }
 
-func buildRequestUrl(endpoint NodeEndpoint, api RequestApi) string {
+func buildRequestUrl(endpoint Endpoint, api RequestApi) string {
 	return fmt.Sprintf("http://%s:%d%s", endpoint.IP, endpoint.Port, api)
 }

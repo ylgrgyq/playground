@@ -32,21 +32,18 @@ func (s *Leader) HandleAppendEntries() {
 
 type Meta struct {
 	currentTerm int64
-	votedFor    NodeEndpoint
-}
-
-type Configurations struct {
+	votedFor    Endpoint
 }
 
 type Node struct {
-	nodeEndpoint NodeEndpoint
+	nodeEndpoint Endpoint
 	state        State
 	meta         Meta
 	commitIndex  int64
 	lastApplied  int64
 }
 
-func newNode(endpoint NodeEndpoint) *Node {
+func newNode(endpoint Endpoint) *Node {
 	return &Node{
 		nodeEndpoint: endpoint,
 		state:        &Follower{},
@@ -77,6 +74,13 @@ func (d *DummyRpcHandler) HandleAppendEntries(request *protos.AppendEntriesReque
 func Main() {
 	defaultLogger.EnableDebug()
 
+	config, err := ParseConfig("./etc/config.yml")
+	if err != nil {
+		serverLogger.Fatalf("parse config failed: %s", err)
+	}
+
+	serverLogger.Okf("got config: \n%s", config)
+
 	rpcHandler := DummyRpcHandler{}
 
 	httpRpc := NewHttpRpc("127.0.0.1", 8080, &rpcHandler)
@@ -88,8 +92,7 @@ func Main() {
 		}
 	}()
 
-	selfEndpoint := NodeEndpoint{
-		NodeId: "101",
+	selfEndpoint := Endpoint{
 		IP:     "127.0.0.1",
 		Port:   8080,
 	}
