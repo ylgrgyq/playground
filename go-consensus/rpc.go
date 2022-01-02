@@ -12,44 +12,44 @@ import (
 )
 
 type RequestVoteRequest struct {
-	term         int64
-	candidateId  string
-	lastLogIndex int64
-	lastLogTerm  int64
+	Term         int64  `json:"term"`
+	CandidateId  string `json:"candidateId"`
+	LastLogIndex int64  `json:"lastLogIndex"`
+	LastLogTerm  int64  `json:"lastLogTerm"`
 }
 
 type RequestVoteResponse struct {
-	term        int64
-	voteGranted bool
+	Term        int64 `json:"term"`
+	VoteGranted bool  `json:"voteGranted"`
 }
 
 type AppendEntriesRequest struct {
-	term         int64
-	leaderId     string
-	prevLogIndex int64
-	prevLogTerm  int64
-	entries      []byte
-	leaderCommit int64
+	Term         int64  `json:"term"`
+	LeaderId     string `json:"leaderId"`
+	PrevLogIndex int64  `json:"prevLogIndex"`
+	PrevLogTerm  int64  `json:"prevLogTerm"`
+	Entries      []byte `json:"-"`
+	LeaderCommit int64  `json:"leaderCommit"`
 }
 
 type AppendEntriesResponse struct {
-	term    int64
-	success bool
+	Term    int64 `json:"term"`
+	Success bool  `json:"success"`
 }
 
 type ErrorResponse struct {
-	errorCode    int32
-	errorMessage string
+	ErrorCode    int32
+	ErrorMessage string
 }
 
 func (e *ErrorResponse) Error() string {
-	return fmt.Sprintf("code: %d, message: %s", e.errorCode, e.errorMessage)
+	return fmt.Sprintf("code: %d, message: %s", e.ErrorCode, e.ErrorMessage)
 }
 
 type NodeEndpoint struct {
-	nodeId string
-	ip     string
-	port   uint16
+	NodeId string
+	IP     string
+	Port   uint16
 }
 
 type RpcClient interface {
@@ -58,8 +58,8 @@ type RpcClient interface {
 }
 
 type RpcHandler interface {
-	HandleRequestVote(request RequestVoteRequest) (RequestVoteResponse, error)
-	HandleAppendEntries(request AppendEntriesRequest) (AppendEntriesResponse, error)
+	HandleRequestVote(request RequestVoteRequest) (*RequestVoteResponse, error)
+	HandleAppendEntries(request AppendEntriesRequest) (*AppendEntriesResponse, error)
 }
 
 type HttpRpc struct {
@@ -69,20 +69,23 @@ type HttpRpc struct {
 type RequestApi string
 
 const (
-	RequestVoteApi = "/requestVote"
+	RequestVoteApi   = "/requestVote"
 	AppendEntriesApi = "/appendEntries"
 )
 
-func newHttpRpc(boundIp string, port uint16, rpcHandler RpcHandler) *HttpRpc {
+func NewHttpRpc(boundIp string, port uint16, rpcHandler RpcHandler) *HttpRpc {
 	serverMux := http.NewServeMux()
 	serverMux.HandleFunc(RequestVoteApi, func(writer http.ResponseWriter, request *http.Request) {
 		var req RequestVoteRequest
-		if !decodeRequest(writer, request, req) {
+		if !decodeRequest(writer, request, &req) {
 			return
 		}
 
+		serverLogger.Debugf("receive request vote request: %+v", req)
+
 		res, err := rpcHandler.HandleRequestVote(req)
 		if err != nil {
+			serverLogger.Debugf("handle request vote failed. request: %+v, error: %s", req, err)
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -92,18 +95,22 @@ func newHttpRpc(boundIp string, port uint16, rpcHandler RpcHandler) *HttpRpc {
 
 	serverMux.HandleFunc(AppendEntriesApi, func(writer http.ResponseWriter, request *http.Request) {
 		var req AppendEntriesRequest
-		if !decodeRequest(writer, request, req) {
+		if !decodeRequest(writer, request, &req) {
 			return
 		}
 
+		serverLogger.Debugf("receive append entries request: %+v", req)
+
 		res, err := rpcHandler.HandleAppendEntries(req)
 		if err != nil {
+			serverLogger.Debugf("handle append entries failed. request: %+v, error: %s", req, err)
 			http.Error(writer, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		writeResponse(writer, request, res)
 	})
+
 	serverMux.Handle("/", http.NotFoundHandler())
 
 	addr := fmt.Sprintf("%s:%d", boundIp, port)
@@ -119,13 +126,43 @@ func newHttpRpc(boundIp string, port uint16, rpcHandler RpcHandler) *HttpRpc {
 	return &HttpRpc{server: server}
 }
 
+func (h *HttpRpc) Start() error {
+	return h.server.ListenAndServe()
+}
+
+func (h *HttpRpc) Shutdown(context context.Context) error {
+	return h.server.Shutdown(context)
+}
+
+func (h *HttpRpc) RequestVote(nodeEndpoint NodeEndpoint, request RequestVoteRequest) (*RequestVoteResponse, error) {
+	var res RequestVoteResponse
+	err := sendRequest(nodeEndpoint, RequestVoteApi, request, res)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res, nil
+}
+
+func (h *HttpRpc) AppendEntries(nodeEndpoint NodeEndpoint, request AppendEntriesRequest) (*AppendEntriesResponse, error) {
+	var res AppendEntriesResponse
+	err := sendRequest(nodeEndpoint, AppendEntriesApi, request, res)
+	if err != nil {
+		return nil, err
+	}
+
+	return &res, nil
+
+}
+
 func decodeRequest(writer http.ResponseWriter, request *http.Request, requestDecoded interface{}) bool {
 	err := json.NewDecoder(request.Body).Decode(&requestDecoded)
 	if err != nil {
+		serverLogger.Errorf("request url: %s. decode request failed: %s", request.URL, err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
-		return true
+		return false
 	}
-	return false
+	return true
 }
 
 func writeResponse(writer http.ResponseWriter, request *http.Request, response interface{}) {
@@ -151,6 +188,7 @@ func sendRequest(endpoint NodeEndpoint, api RequestApi, req interface{}, resp in
 
 	err = json.NewDecoder(postResp.Body).Decode(&resp)
 	if err != nil {
+		serverLogger.Errorf("decode response for request: %+v failed. error: %s", req, err)
 		return err
 	}
 
@@ -158,34 +196,5 @@ func sendRequest(endpoint NodeEndpoint, api RequestApi, req interface{}, resp in
 }
 
 func buildRequestUrl(endpoint NodeEndpoint, api RequestApi) string {
-	return fmt.Sprintf("http://%s:%d/%s", endpoint.ip, endpoint.port, api)
-}
-
-func (h *HttpRpc) Start() error {
-	return h.server.ListenAndServe()
-}
-
-func (h *HttpRpc) Shutdown(context context.Context) error {
-	return h.server.Shutdown(context)
-}
-
-func (h *HttpRpc) RequestVote(nodeEndpoint NodeEndpoint, request RequestVoteRequest) (*RequestVoteResponse, error){
-	var res RequestVoteResponse
-	err := sendRequest(nodeEndpoint, RequestVoteApi, request, res)
-	if err != nil {
-		return nil, err
-	}
-
-	return &res, nil
-}
-
-func (h *HttpRpc) AppendEntries(nodeEndpoint NodeEndpoint, request AppendEntriesRequest) (*AppendEntriesResponse, error){
-	var res AppendEntriesResponse
-	err := sendRequest(nodeEndpoint, AppendEntriesApi, request, res)
-	if err != nil {
-		return nil, err
-	}
-
-	return &res, nil
-
+	return fmt.Sprintf("http://%s:%d%s", endpoint.IP, endpoint.Port, api)
 }
