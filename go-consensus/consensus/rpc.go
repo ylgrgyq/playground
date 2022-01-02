@@ -12,11 +12,17 @@ import (
 )
 
 type Endpoint struct {
-	IP     string
-	Port   uint16
+	IP   string
+	Port uint16
 }
 
-type RpcClient interface {
+func (e *Endpoint) String() string {
+	return fmt.Sprintf("%s:%d", e.IP, e.Port)
+}
+
+type RpcService interface {
+	Start() error
+	Shutdown(context context.Context) error
 	RequestVote(nodeEndpoint Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
 	AppendEntries(nodeEndpoint Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
@@ -24,6 +30,15 @@ type RpcClient interface {
 type RpcHandler interface {
 	HandleRequestVote(request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
 	HandleAppendEntries(request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
+}
+
+func NewRpcService(rpcType RpcType, endpoint Endpoint, handler RpcHandler) (RpcService, error) {
+	switch rpcType {
+	case HttpRpcType:
+		return NewHttpRpc(endpoint, handler), nil
+	default:
+		return nil, fmt.Errorf("unsupport rpc type: %s", rpcType)
+	}
 }
 
 type HttpRpc struct {
@@ -37,7 +52,7 @@ const (
 	AppendEntriesApi = "/appendEntries"
 )
 
-func NewHttpRpc(boundIp string, port uint16, rpcHandler RpcHandler) *HttpRpc {
+func NewHttpRpc(selfEndpoint Endpoint, rpcHandler RpcHandler) *HttpRpc {
 	serverMux := http.NewServeMux()
 	serverMux.HandleFunc(RequestVoteApi, func(writer http.ResponseWriter, request *http.Request) {
 		var req protos.RequestVoteRequest
@@ -77,10 +92,8 @@ func NewHttpRpc(boundIp string, port uint16, rpcHandler RpcHandler) *HttpRpc {
 
 	serverMux.Handle("/", http.NotFoundHandler())
 
-	addr := fmt.Sprintf("%s:%d", boundIp, port)
-
 	server := &http.Server{
-		Addr:           addr,
+		Addr:           selfEndpoint.String(),
 		Handler:        serverMux,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,

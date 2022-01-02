@@ -117,16 +117,19 @@ func Main() {
 		serverLogger.Fatalf("parse config failed: %s", err)
 	}
 
-	serverLogger.Okf("got config: \n%s", config)
+	serverLogger.Okf("%s", config)
 
 	rpcHandler := DummyRpcHandler{}
 
-	httpRpc := NewHttpRpc("127.0.0.1", 8080, &rpcHandler)
+	rpcService, err := NewRpcService(config.RpcType,config.SelfEndpoint, &rpcHandler)
+	if err != nil {
+		serverLogger.Fatalf("create rpc service failed: %s", err)
+	}
 
 	go func() {
-		err := httpRpc.Start()
+		err := rpcService.Start()
 		if err != nil {
-			serverLogger.Fatalf("start server failed: %s", err)
+			serverLogger.Fatalf("start rpc service failed: %s", err)
 		}
 	}()
 
@@ -143,7 +146,7 @@ func Main() {
 		Entries:      []byte{},
 		LeaderCommit: 1232,
 	}
-	resp, err := httpRpc.AppendEntries(selfEndpoint, &appendReq)
+	resp, err := rpcService.AppendEntries(selfEndpoint, &appendReq)
 	if err != nil {
 		serverLogger.Fatalf("append failed: %s", err)
 	}
@@ -156,7 +159,7 @@ func Main() {
 		LastLogIndex: 3232,
 		LastLogTerm:  133333,
 	}
-	resp2, err := httpRpc.RequestVote(selfEndpoint, &reqVote)
+	resp2, err := rpcService.RequestVote(selfEndpoint, &reqVote)
 	if err != nil {
 		serverLogger.Fatalf("request vote failed: %s", err)
 	}
