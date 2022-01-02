@@ -1,50 +1,15 @@
-package main
+package consensus
 
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	//"net/http"
-	//"time"
+	"google.golang.org/protobuf/proto"
+	"io/ioutil"
 	"net/http"
 	"time"
+	"ylgrgyq.com/go-consensus/consensus/protos"
 )
-
-type RequestVoteRequest struct {
-	Term         int64  `json:"term"`
-	CandidateId  string `json:"candidateId"`
-	LastLogIndex int64  `json:"lastLogIndex"`
-	LastLogTerm  int64  `json:"lastLogTerm"`
-}
-
-type RequestVoteResponse struct {
-	Term        int64 `json:"term"`
-	VoteGranted bool  `json:"voteGranted"`
-}
-
-type AppendEntriesRequest struct {
-	Term         int64  `json:"term"`
-	LeaderId     string `json:"leaderId"`
-	PrevLogIndex int64  `json:"prevLogIndex"`
-	PrevLogTerm  int64  `json:"prevLogTerm"`
-	Entries      []byte `json:"-"`
-	LeaderCommit int64  `json:"leaderCommit"`
-}
-
-type AppendEntriesResponse struct {
-	Term    int64 `json:"term"`
-	Success bool  `json:"success"`
-}
-
-type ErrorResponse struct {
-	ErrorCode    int32
-	ErrorMessage string
-}
-
-func (e *ErrorResponse) Error() string {
-	return fmt.Sprintf("code: %d, message: %s", e.ErrorCode, e.ErrorMessage)
-}
 
 type NodeEndpoint struct {
 	NodeId string
@@ -53,13 +18,13 @@ type NodeEndpoint struct {
 }
 
 type RpcClient interface {
-	RequestVote(nodeEndpoint NodeEndpoint, request RequestVoteRequest) (*RequestVoteResponse, error)
-	AppendEntries(nodeEndpoint NodeEndpoint, request AppendEntriesRequest) (*AppendEntriesResponse, error)
+	RequestVote(nodeEndpoint NodeEndpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
+	AppendEntries(nodeEndpoint NodeEndpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
 
 type RpcHandler interface {
-	HandleRequestVote(request RequestVoteRequest) (*RequestVoteResponse, error)
-	HandleAppendEntries(request AppendEntriesRequest) (*AppendEntriesResponse, error)
+	HandleRequestVote(request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
+	HandleAppendEntries(request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
 
 type HttpRpc struct {
@@ -76,14 +41,14 @@ const (
 func NewHttpRpc(boundIp string, port uint16, rpcHandler RpcHandler) *HttpRpc {
 	serverMux := http.NewServeMux()
 	serverMux.HandleFunc(RequestVoteApi, func(writer http.ResponseWriter, request *http.Request) {
-		var req RequestVoteRequest
+		var req protos.RequestVoteRequest
 		if !decodeRequest(writer, request, &req) {
 			return
 		}
 
 		serverLogger.Debugf("receive request vote request: %+v", req)
 
-		res, err := rpcHandler.HandleRequestVote(req)
+		res, err := rpcHandler.HandleRequestVote(&req)
 		if err != nil {
 			serverLogger.Debugf("handle request vote failed. request: %+v, error: %s", req, err)
 			http.Error(writer, err.Error(), http.StatusBadRequest)
@@ -94,14 +59,14 @@ func NewHttpRpc(boundIp string, port uint16, rpcHandler RpcHandler) *HttpRpc {
 	})
 
 	serverMux.HandleFunc(AppendEntriesApi, func(writer http.ResponseWriter, request *http.Request) {
-		var req AppendEntriesRequest
+		var req protos.AppendEntriesRequest
 		if !decodeRequest(writer, request, &req) {
 			return
 		}
 
 		serverLogger.Debugf("receive append entries request: %+v", req)
 
-		res, err := rpcHandler.HandleAppendEntries(req)
+		res, err := rpcHandler.HandleAppendEntries(&req)
 		if err != nil {
 			serverLogger.Debugf("handle append entries failed. request: %+v, error: %s", req, err)
 			http.Error(writer, err.Error(), http.StatusBadRequest)
@@ -134,9 +99,9 @@ func (h *HttpRpc) Shutdown(context context.Context) error {
 	return h.server.Shutdown(context)
 }
 
-func (h *HttpRpc) RequestVote(nodeEndpoint NodeEndpoint, request RequestVoteRequest) (*RequestVoteResponse, error) {
-	var res RequestVoteResponse
-	err := sendRequest(nodeEndpoint, RequestVoteApi, request, res)
+func (h *HttpRpc) RequestVote(nodeEndpoint NodeEndpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+	var res protos.RequestVoteResponse
+	err := sendRequest(nodeEndpoint, RequestVoteApi, request, &res)
 	if err != nil {
 		return nil, err
 	}
@@ -144,19 +109,24 @@ func (h *HttpRpc) RequestVote(nodeEndpoint NodeEndpoint, request RequestVoteRequ
 	return &res, nil
 }
 
-func (h *HttpRpc) AppendEntries(nodeEndpoint NodeEndpoint, request AppendEntriesRequest) (*AppendEntriesResponse, error) {
-	var res AppendEntriesResponse
-	err := sendRequest(nodeEndpoint, AppendEntriesApi, request, res)
+func (h *HttpRpc) AppendEntries(nodeEndpoint NodeEndpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+	var res protos.AppendEntriesResponse
+	err := sendRequest(nodeEndpoint, AppendEntriesApi, request, &res)
 	if err != nil {
 		return nil, err
 	}
 
 	return &res, nil
-
 }
 
-func decodeRequest(writer http.ResponseWriter, request *http.Request, requestDecoded interface{}) bool {
-	err := json.NewDecoder(request.Body).Decode(&requestDecoded)
+func decodeRequest(writer http.ResponseWriter, request *http.Request, requestDecoded proto.Message) bool {
+	bs, err := ioutil.ReadAll(request.Body)
+	if err != nil {
+		serverLogger.Errorf("request url: %s. read body failed: %s", request.URL, err)
+		http.Error(writer, err.Error(), http.StatusBadRequest)
+	}
+
+	err = proto.Unmarshal(bs, requestDecoded)
 	if err != nil {
 		serverLogger.Errorf("request url: %s. decode request failed: %s", request.URL, err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
@@ -165,28 +135,41 @@ func decodeRequest(writer http.ResponseWriter, request *http.Request, requestDec
 	return true
 }
 
-func writeResponse(writer http.ResponseWriter, request *http.Request, response interface{}) {
-	err := json.NewEncoder(writer).Encode(response)
+func writeResponse(writer http.ResponseWriter, request *http.Request, response proto.Message) {
+	bs, err := proto.Marshal(response)
 	if err != nil {
-		serverLogger.Errorf("request url: %s. encode response failed: %s", request.URL, err)
+		serverLogger.Errorf("request url: %s. marshall response failed: %s", request.URL, err)
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	_, err = writer.Write(bs)
+	if err != nil {
+		serverLogger.Errorf("request url: %s. write response failed: %s", request.URL, err)
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-func sendRequest(endpoint NodeEndpoint, api RequestApi, req interface{}, resp interface{}) error {
-	jsonBytes, err := json.Marshal(req)
+func sendRequest(endpoint NodeEndpoint, api RequestApi, req proto.Message, resp proto.Message) error {
+	bs, err := proto.Marshal(req)
 	if err != nil {
 		return err
 	}
 
 	url := buildRequestUrl(endpoint, api)
-	postResp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonBytes))
+	postResp, err := http.Post(url, "application/octet-stream", bytes.NewBuffer(bs))
 	if err != nil {
 		return err
 	}
 
-	err = json.NewDecoder(postResp.Body).Decode(&resp)
+	respBs, err := ioutil.ReadAll(postResp.Body)
+	if err != nil {
+		serverLogger.Errorf("read response body for request: %+v failed. error: %s", req, err)
+		return err
+	}
+
+	err = proto.Unmarshal(respBs, resp)
 	if err != nil {
 		serverLogger.Errorf("decode response for request: %+v failed. error: %s", req, err)
 		return err
