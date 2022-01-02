@@ -1,6 +1,8 @@
 package consensus
 
 import (
+	"github.com/jessevdk/go-flags"
+	"os"
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
@@ -71,10 +73,46 @@ func (d *DummyRpcHandler) HandleAppendEntries(request *protos.AppendEntriesReque
 	return &resp, nil
 }
 
+type ApplicationOptions struct {
+	ConfigurationFilePath string `short:"c" long:"config" description:"path to configuration file"`
+}
+
+type CommandLineOptions struct {
+	ApplicationOptions
+}
+
+func parseCommandLineArguments() CommandLineOptions {
+	var appOpts ApplicationOptions
+	parser := flags.NewParser(&appOpts, flags.Default)
+
+	if _, err := parser.Parse(); err != nil {
+		switch flagsErr := err.(type) {
+		case *flags.Error:
+			if flagsErr.Type == flags.ErrHelp {
+				os.Exit(0)
+			}
+
+			parser.WriteHelp(os.Stderr)
+			os.Exit(1)
+		default:
+			parser.WriteHelp(os.Stderr)
+			os.Exit(1)
+		}
+	}
+
+	if appOpts.ConfigurationFilePath == "" {
+		parser.WriteHelp(os.Stderr)
+		os.Exit(1)
+	}
+
+	return CommandLineOptions{appOpts}
+}
+
 func Main() {
+	cliOpts := parseCommandLineArguments()
 	defaultLogger.EnableDebug()
 
-	config, err := ParseConfig("./etc/config.yml")
+	config, err := ParseConfig(cliOpts.ConfigurationFilePath)
 	if err != nil {
 		serverLogger.Fatalf("parse config failed: %s", err)
 	}
@@ -93,8 +131,8 @@ func Main() {
 	}()
 
 	selfEndpoint := Endpoint{
-		IP:     "127.0.0.1",
-		Port:   8080,
+		IP:   "127.0.0.1",
+		Port: 8080,
 	}
 
 	appendReq := protos.AppendEntriesRequest{
