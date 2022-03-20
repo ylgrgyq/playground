@@ -29,7 +29,7 @@ func toValidRpcType(rpcTypeStr string) RpcType {
 }
 
 type RaftConfigurations struct {
-	ElectionTimeoutMs uint32
+	ElectionTimeoutMs int64
 }
 
 type Configurations struct {

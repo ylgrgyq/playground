@@ -20,9 +20,20 @@ func (e *Endpoint) String() string {
 	return fmt.Sprintf("%s:%d", e.IP, e.Port)
 }
 
+type RpcAPI string
+
+const (
+	REQUEST_VOTE = "requestVote"
+)
+
 type RpcService interface {
 	Start() error
 	Shutdown(context context.Context) error
+	RequestVote(nodeEndpoint Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
+	AppendEntries(nodeEndpoint Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
+}
+
+type RpcClient interface {
 	RequestVote(nodeEndpoint Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
 	AppendEntries(nodeEndpoint Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
@@ -48,13 +59,13 @@ type HttpRpc struct {
 type RequestApiUri string
 
 const (
-	RequestVoteApi   = "/requestVote"
-	AppendEntriesApi = "/appendEntries"
+	RequestVoteUri   = "/requestVote"
+	AppendEntriesUri = "/appendEntries"
 )
 
 func NewHttpRpc(selfEndpoint Endpoint, rpcHandler RpcHandler) *HttpRpc {
 	serverMux := http.NewServeMux()
-	serverMux.HandleFunc(RequestVoteApi, func(writer http.ResponseWriter, request *http.Request) {
+	serverMux.HandleFunc(RequestVoteUri, func(writer http.ResponseWriter, request *http.Request) {
 		var req protos.RequestVoteRequest
 		if !decodeRequest(writer, request, &req) {
 			return
@@ -72,7 +83,7 @@ func NewHttpRpc(selfEndpoint Endpoint, rpcHandler RpcHandler) *HttpRpc {
 		writeResponse(writer, request, res)
 	})
 
-	serverMux.HandleFunc(AppendEntriesApi, func(writer http.ResponseWriter, request *http.Request) {
+	serverMux.HandleFunc(AppendEntriesUri, func(writer http.ResponseWriter, request *http.Request) {
 		var req protos.AppendEntriesRequest
 		if !decodeRequest(writer, request, &req) {
 			return
@@ -113,7 +124,7 @@ func (h *HttpRpc) Shutdown(context context.Context) error {
 
 func (h *HttpRpc) RequestVote(nodeEndpoint Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
 	var res protos.RequestVoteResponse
-	err := sendRequest(nodeEndpoint, RequestVoteApi, request, &res)
+	err := sendRequest(nodeEndpoint, RequestVoteUri, request, &res)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +134,7 @@ func (h *HttpRpc) RequestVote(nodeEndpoint Endpoint, request *protos.RequestVote
 
 func (h *HttpRpc) AppendEntries(nodeEndpoint Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	var res protos.AppendEntriesResponse
-	err := sendRequest(nodeEndpoint, AppendEntriesApi, request, &res)
+	err := sendRequest(nodeEndpoint, AppendEntriesUri, request, &res)
 	if err != nil {
 		return nil, err
 	}

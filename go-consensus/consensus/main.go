@@ -1,9 +1,12 @@
 package consensus
 
 import (
+	"context"
 	"fmt"
 	"github.com/jessevdk/go-flags"
+	"math/rand"
 	"os"
+	"time"
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
@@ -42,15 +45,19 @@ type Node struct {
 	meta         MetaStorage
 	commitIndex  Index
 	lastApplied  Index
+	scheduler    Scheduler
+	raftConfigs  RaftConfigurations
 }
 
-func newNode(endpoint Endpoint) *Node {
+func newNode(endpoint Endpoint, raftConfigs RaftConfigurations) *Node {
 	return &Node{
 		nodeEndpoint: endpoint,
 		state:        &Follower{},
 		commitIndex:  0,
 		lastApplied:  0,
 		meta:         NewTestingMeta(),
+		scheduler:    NewScheduler(),
+		raftConfigs:  raftConfigs,
 	}
 }
 
@@ -60,6 +67,12 @@ func (n *Node) Start() error {
 		return fmt.Errorf("start meta failed. %s", err)
 	}
 
+	ctx := context.Background()
+
+	initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
+	n.scheduler.ScheduleOnce(ctx, time.Millisecond * time.Duration(initElectionTimeout), func() {
+		
+	})
 	return nil
 }
 
