@@ -1,10 +1,13 @@
 package consensus
 
-import "context"
+import (
+	"context"
+	"ylgrgyq.com/go-consensus/consensus/protos"
+)
 
 type Meta struct {
 	CurrentTerm Term
-	VoteFor     *Endpoint
+	VoteFor     *protos.Endpoint
 }
 
 type MetaStorage interface {

@@ -5,6 +5,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"strings"
+	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
 type RpcType string
@@ -34,8 +35,8 @@ type RaftConfigurations struct {
 
 type Configurations struct {
 	RpcType            RpcType
-	SelfEndpoint       Endpoint
-	PeerEndpoints      []Endpoint
+	SelfEndpoint       protos.Endpoint
+	PeerEndpoints      []protos.Endpoint
 	RaftConfigurations RaftConfigurations
 }
 
@@ -44,12 +45,12 @@ func (c *Configurations) String() string {
 	b.WriteString("\n")
 	b.WriteString("********************************* Configurations *********************************\n\n")
 	b.WriteString(fmt.Sprintf("RpcType: %s\n", c.RpcType))
-	b.WriteString(fmt.Sprintf("IP: %s\n", c.SelfEndpoint.IP))
+	b.WriteString(fmt.Sprintf("IP: %s\n", c.SelfEndpoint.Ip))
 	b.WriteString(fmt.Sprintf("Port: %d\n", c.SelfEndpoint.Port))
 	b.WriteString("\n")
 	b.WriteString("PeerEndpoints:\n")
 	for _, peer := range c.PeerEndpoints {
-		b.WriteString(fmt.Sprintf("  IP: %s\n", peer.IP))
+		b.WriteString(fmt.Sprintf("  IP: %s\n", peer.Ip))
 		b.WriteString(fmt.Sprintf("  Port: %d\n", peer.Port))
 		b.WriteString("\n")
 	}
@@ -62,7 +63,7 @@ func (c *Configurations) String() string {
 
 type yamlEndpoint struct {
 	IP   string `yaml:"ip"`
-	Port uint16 `yaml:"port"`
+	Port uint32 `yaml:"port"`
 }
 
 type yamlRaftConfigurations struct {
@@ -80,9 +81,9 @@ type yamlConfigurations struct {
 	RaftConfigurations yamlRaftConfigurations `yaml:"raftConfigurations"`
 }
 
-func (ye *yamlEndpoint) toStdEndpoint() Endpoint {
-	return Endpoint{
-		IP:   ye.IP,
+func (ye *yamlEndpoint) toStdEndpoint() protos.Endpoint {
+	return protos.Endpoint{
+		Ip:   ye.IP,
 		Port: ye.Port,
 	}
 }
@@ -91,7 +92,7 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 	if yc.RpcType == UnknownRpcType {
 		return nil, fmt.Errorf("unknown rpc type: %s", yc.RpcType)
 	}
-	peers := make([]Endpoint, 0)
+	peers := make([]protos.Endpoint, 0)
 	for _, peer := range yc.PeerEndpoints {
 		peers = append(peers, peer.toStdEndpoint())
 	}

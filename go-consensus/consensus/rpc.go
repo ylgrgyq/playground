@@ -7,18 +7,10 @@ import (
 	"google.golang.org/protobuf/proto"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
-
-type Endpoint struct {
-	IP   string
-	Port uint16
-}
-
-func (e *Endpoint) String() string {
-	return fmt.Sprintf("%s:%d", e.IP, e.Port)
-}
 
 type RpcAPI int
 
@@ -26,6 +18,10 @@ const (
 	RequestVote RpcAPI = iota + 1
 	AppendEntries
 )
+
+type RpcContextKeyType string
+
+const RawRequestKey RpcContextKeyType = "RawRequest"
 
 type RpcService interface {
 	Start() error
@@ -35,16 +31,16 @@ type RpcService interface {
 }
 
 type RpcClient interface {
-	RequestVote(nodeEndpoint Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
-	AppendEntries(nodeEndpoint Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
+	RequestVote(nodeEndpoint protos.Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
+	AppendEntries(nodeEndpoint protos.Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
 
 type RpcHandler interface {
-	HandleRequestVote(request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
-	HandleAppendEntries(request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
+	HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
+	HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
 
-func NewRpcService(rpcType RpcType, endpoint Endpoint) (RpcService, error) {
+func NewRpcService(rpcType RpcType, endpoint protos.Endpoint) (RpcService, error) {
 	switch rpcType {
 	case HttpRpcType:
 		return NewHttpRpc(endpoint), nil
@@ -61,9 +57,10 @@ const (
 )
 
 type HttpRpcService struct {
-	server      *http.Server
-	apiToUriMap map[RpcAPI]RequestApiUri
-	rpcHandler  RpcHandler
+	server       *http.Server
+	apiToUriMap  map[RpcAPI]RequestApiUri
+	rpcHandler   RpcHandler
+	selfEndpoint protos.Endpoint
 }
 
 func (h *HttpRpcService) GetRpcClient() RpcClient {
@@ -86,18 +83,18 @@ func (h *HttpRpcService) Shutdown(context context.Context) error {
 	return h.server.Shutdown(context)
 }
 
-func (h *HttpRpcService) RequestVote(nodeEndpoint Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+func (h *HttpRpcService) RequestVote(nodeEndpoint protos.Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
 	var res protos.RequestVoteResponse
-	err := h.SendRequest(RequestVote, nodeEndpoint, request, &res)
+	err := h.sendRequest(RequestVote, nodeEndpoint, request, &res)
 	if err != nil {
 		return nil, err
 	}
 	return &res, nil
 }
 
-func (h *HttpRpcService) AppendEntries(nodeEndpoint Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+func (h *HttpRpcService) AppendEntries(nodeEndpoint protos.Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	var res protos.AppendEntriesResponse
-	err := h.SendRequest(AppendEntries, nodeEndpoint, request, &res)
+	err := h.sendRequest(AppendEntries, nodeEndpoint, request, &res)
 	if err != nil {
 		return nil, err
 	}
@@ -105,100 +102,94 @@ func (h *HttpRpcService) AppendEntries(nodeEndpoint Endpoint, request *protos.Ap
 	return &res, nil
 }
 
-func (h *HttpRpcService) SendRequest(api RpcAPI, nodeEndpoint Endpoint, request proto.Message, resp proto.Message) error {
+func (h *HttpRpcService) sendRequest(api RpcAPI, nodeEndpoint protos.Endpoint, requestBody proto.Message, responseBody proto.Message) error {
 	uri, ok := h.apiToUriMap[api]
 	if !ok {
 		return fmt.Errorf("unknown rpc API with code: %d", api)
 	}
 
-	bs, err := proto.Marshal(request)
+	reqInBytes, err := h.encodeRequest(requestBody)
 	if err != nil {
+		serverLogger.Errorf("encode request body failed: %+v failed. error: %s", requestBody, err)
 		return err
 	}
 
-	url := buildRequestUrl(nodeEndpoint, uri)
-	postResp, err := http.Post(url, "application/octet-stream", bytes.NewBuffer(bs))
+	reqUrl := buildRequestUrl(nodeEndpoint, uri)
+	postResp, err := http.Post(reqUrl, "application/octet-stream", bytes.NewBuffer(reqInBytes))
 	if err != nil {
 		return err
 	}
 
 	respBs, err := ioutil.ReadAll(postResp.Body)
 	if err != nil {
-		serverLogger.Errorf("read response body for request: %+v failed. error: %s", request, err)
+		serverLogger.Errorf("read response body for request: %+v failed. error: %s", requestBody, err)
 		return err
 	}
 
-	err = proto.Unmarshal(respBs, resp)
+	var rawResp protos.Response
+	err = proto.Unmarshal(respBs, &rawResp)
 	if err != nil {
-		serverLogger.Errorf("decode response for request: %+v failed. error: %s", request, err)
+		serverLogger.Errorf("decode response for request: %+v failed. error: %s", requestBody, err)
+		return err
+	}
+
+	err = proto.Unmarshal(rawResp.Body, responseBody)
+	if err != nil {
+		serverLogger.Errorf("decode response body for request: %+v failed. error: %s", requestBody, err)
 		return err
 	}
 
 	return nil
 }
 
-func (h *HttpRpcService) assertGetRpcHandler(writer http.ResponseWriter) RpcHandler {
+func (h *HttpRpcService) getRpcHandler() (RpcHandler, bool) {
 	rpcHandler := h.rpcHandler
 	if rpcHandler == nil {
-		serverLogger.Debugf("http rpc service does not register any rpc handler")
-		http.Error(writer, fmt.Sprintf("service not initialized"), http.StatusServiceUnavailable)
-		return nil
+		return nil, false
 	}
-	return rpcHandler
+	return rpcHandler, true
 }
 
-func NewHttpRpc(selfEndpoint Endpoint) *HttpRpcService {
-	var httpRpcService HttpRpcService
+func NewHttpRpc(selfEndpoint protos.Endpoint) *HttpRpcService {
+	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint}
 
 	serverMux := http.NewServeMux()
-	serverMux.HandleFunc(RequestVoteUri, func(writer http.ResponseWriter, request *http.Request) {
-		var req protos.RequestVoteRequest
-		if !decodeRequest(writer, request, &req) {
-			return
+	serverMux.HandleFunc(RequestVoteUri, httpRpcService.wrapRequestHandler(func(ctx context.Context, body []byte) (proto.Message, error) {
+		var reqBody protos.RequestVoteRequest
+		if err := decodeRequestBody(body, &reqBody); err != nil {
+			return nil, err
 		}
 
-		serverLogger.Debugf("receive request vote request: %+v", req)
+		serverLogger.Debugf("receive request vote request: %+v", reqBody)
 
-		rpcHandler := httpRpcService.assertGetRpcHandler(writer)
-		if rpcHandler == nil {
-			return
-		}
-		res, err := rpcHandler.HandleRequestVote(&req)
+		res, err := httpRpcService.rpcHandler.HandleRequestVote(ctx, &reqBody)
 		if err != nil {
-			serverLogger.Debugf("handle request vote failed. request: %+v, error: %s", req, err)
-			http.Error(writer, err.Error(), http.StatusBadRequest)
-			return
+			return nil, err
 		}
 
-		writeResponse(writer, request, res)
-	})
+		return res, nil
+	}))
 
-	serverMux.HandleFunc(AppendEntriesUri, func(writer http.ResponseWriter, request *http.Request) {
-		var req protos.AppendEntriesRequest
-		if !decodeRequest(writer, request, &req) {
-			return
+	serverMux.HandleFunc(AppendEntriesUri, httpRpcService.wrapRequestHandler(func(ctx context.Context, body []byte) (proto.Message, error) {
+		var reqBody protos.AppendEntriesRequest
+		if err := decodeRequestBody(body, &reqBody); err != nil {
+			return nil, err
 		}
 
-		serverLogger.Debugf("receive append entries request: %+v", req)
+		serverLogger.Debugf("receive append entries request: %+v", reqBody)
 
-		rpcHandler := httpRpcService.assertGetRpcHandler(writer)
-		if rpcHandler == nil {
-			return
-		}
-		res, err := rpcHandler.HandleAppendEntries(&req)
+		res, err := httpRpcService.rpcHandler.HandleAppendEntries(ctx, &reqBody)
 		if err != nil {
-			serverLogger.Debugf("handle append entries failed. request: %+v, error: %s", req, err)
-			http.Error(writer, err.Error(), http.StatusBadRequest)
-			return
+			return nil, err
 		}
 
-		writeResponse(writer, request, res)
-	})
+		return res, nil
+	}))
 
 	serverMux.Handle("/", http.NotFoundHandler())
 
 	httpRpcService.server = &http.Server{
-		Addr:           selfEndpoint.String(),
+		Addr:           fmt.Sprintf("%s:%d", selfEndpoint.Ip, selfEndpoint.Port),
 		Handler:        serverMux,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
@@ -209,6 +200,15 @@ func NewHttpRpc(selfEndpoint Endpoint) *HttpRpcService {
 	return &httpRpcService
 }
 
+type httpRpcError struct {
+	message  string
+	httpCode int
+}
+
+func (h *httpRpcError) Error() string {
+	return h.message
+}
+
 func buildApiToUriMap() map[RpcAPI]RequestApiUri {
 	var apiToUriMap = make(map[RpcAPI]RequestApiUri)
 	apiToUriMap[RequestVote] = RequestVoteUri
@@ -216,38 +216,100 @@ func buildApiToUriMap() map[RpcAPI]RequestApiUri {
 	return apiToUriMap
 }
 
-func decodeRequest(writer http.ResponseWriter, request *http.Request, requestDecoded proto.Message) bool {
+func (h *HttpRpcService) encodeRequest(requestBody proto.Message) ([]byte, error) {
+	bs, err := proto.Marshal(requestBody)
+	if err != nil {
+		return nil, err
+	}
+
+	req := protos.Request{Body: bs, From: &h.selfEndpoint, Mid: RandString(8)}
+	bs, err = proto.Marshal(&req)
+	if err != nil {
+		return nil, err
+	}
+	return bs, nil
+}
+
+func decodeRequestBody(body []byte, requestDecoded proto.Message) error {
+	err := proto.Unmarshal(body, requestDecoded)
+	if err != nil {
+		return &httpRpcError{message: fmt.Sprintf("decode request failed: %s", err), httpCode: http.StatusBadRequest}
+	}
+	return nil
+}
+
+type requestHandler func(ctx context.Context, body []byte) (proto.Message, error)
+
+func (h *HttpRpcService) wrapRequestHandler(f requestHandler) func(writer http.ResponseWriter, request *http.Request) {
+	return func(writer http.ResponseWriter, request *http.Request) {
+		if h.rpcHandler == nil {
+			http.Error(writer, "http rpc service does not register any rpc handler", http.StatusServiceUnavailable)
+			return
+		}
+
+		rawReq := decodeRequest(writer, request)
+		if rawReq == nil {
+			return
+		}
+
+		ctx := context.WithValue(request.Context(), RawRequestKey, rawReq)
+		resp, err := f(ctx, rawReq.Body)
+		if err != nil {
+			serverLogger.Errorf("handle request failed. url: %s, error: %s", request.URL, err.Error())
+			code := http.StatusInternalServerError
+			e, ok := err.(*httpRpcError)
+			if ok {
+				code = e.httpCode
+			}
+			http.Error(writer, err.Error(), code)
+			return
+		}
+		writeResponse(writer, request.URL, rawReq.Mid, resp)
+	}
+}
+
+func decodeRequest(writer http.ResponseWriter, request *http.Request) *protos.Request {
 	bs, err := ioutil.ReadAll(request.Body)
 	if err != nil {
 		serverLogger.Errorf("request url: %s. read body failed: %s", request.URL, err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
+		return nil
 	}
 
-	err = proto.Unmarshal(bs, requestDecoded)
+	var req protos.Request
+	err = proto.Unmarshal(bs, &req)
 	if err != nil {
 		serverLogger.Errorf("request url: %s. decode request failed: %s", request.URL, err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
-		return false
+		return nil
 	}
-	return true
+	return &req
 }
 
-func writeResponse(writer http.ResponseWriter, request *http.Request, response proto.Message) {
-	bs, err := proto.Marshal(response)
+func writeResponse(writer http.ResponseWriter, url *url.URL, mid string, responseBody proto.Message) {
+	bs, err := proto.Marshal(responseBody)
 	if err != nil {
-		serverLogger.Errorf("request url: %s. marshall response failed: %s", request.URL, err)
+		serverLogger.Errorf("request url: %s. marshall response body failed: %s", url, err)
+		http.Error(writer, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := protos.Response{Body: bs, Mid: mid}
+	bs, err = proto.Marshal(&resp)
+	if err != nil {
+		serverLogger.Errorf("request url: %s. marshall response failed: %s", url, err)
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	_, err = writer.Write(bs)
 	if err != nil {
-		serverLogger.Errorf("request url: %s. write response failed: %s", request.URL, err)
+		serverLogger.Errorf("request url: %s. write response failed: %s", url, err)
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-func buildRequestUrl(endpoint Endpoint, api RequestApiUri) string {
-	return fmt.Sprintf("http://%s:%d%s", endpoint.IP, endpoint.Port, api)
+func buildRequestUrl(endpoint protos.Endpoint, api RequestApiUri) string {
+	return fmt.Sprintf("http://%s:%d%s", endpoint.Ip, endpoint.Port, api)
 }

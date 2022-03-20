@@ -40,7 +40,8 @@ type Term int64
 type Index int64
 
 type Node struct {
-	nodeEndpoint Endpoint
+	nodeEndpoint protos.Endpoint
+	peers        []protos.Endpoint
 	state        State
 	meta         MetaStorage
 	commitIndex  Index
@@ -50,15 +51,16 @@ type Node struct {
 	rpcClient    RpcClient
 }
 
-func newNode(endpoint Endpoint, raftConfigs RaftConfigurations, rpcClient RpcClient) *Node {
+func newNode(configs Configurations, rpcClient RpcClient) *Node {
 	return &Node{
-		nodeEndpoint: endpoint,
+		nodeEndpoint: configs.SelfEndpoint,
+		peers:        configs.PeerEndpoints,
 		state:        &Follower{},
 		commitIndex:  0,
 		lastApplied:  0,
 		meta:         NewTestingMeta(),
 		scheduler:    NewScheduler(),
-		raftConfigs:  raftConfigs,
+		raftConfigs:  configs.RaftConfigurations,
 		rpcClient:    rpcClient,
 	}
 }
@@ -73,7 +75,7 @@ func (n *Node) Start() error {
 
 	initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
 	n.scheduler.ScheduleOnce(ctx, time.Millisecond*time.Duration(initElectionTimeout), func() {
-		
+
 	})
 	return nil
 }
@@ -81,15 +83,16 @@ func (n *Node) Start() error {
 type DummyRpcHandler struct {
 }
 
-func (d *DummyRpcHandler) HandleRequestVote(request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+func (d *DummyRpcHandler) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
 	resp := protos.RequestVoteResponse{
 		Term:        22222,
 		VoteGranted: true,
 	}
+	serverLogger.Debugf("receive req vote from %s", ctx.Value(RawRequestKey))
 	return &resp, nil
 }
 
-func (d *DummyRpcHandler) HandleAppendEntries(request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+func (d *DummyRpcHandler) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	resp := protos.AppendEntriesResponse{
 		Term:    3321,
 		Success: true,
@@ -162,8 +165,8 @@ func Main() {
 		}
 	}()
 
-	selfEndpoint := Endpoint{
-		IP:   "127.0.0.1",
+	selfEndpoint := protos.Endpoint{
+		Ip:   "127.0.0.1",
 		Port: 8081,
 	}
 
