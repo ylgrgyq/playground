@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"github.com/jessevdk/go-flags"
 	"os"
 	"ylgrgyq.com/go-consensus/consensus/protos"
@@ -32,17 +33,15 @@ func (s *Leader) HandleAppendEntries() {
 
 }
 
-type Meta struct {
-	currentTerm int64
-	votedFor    Endpoint
-}
+type Term int64
+type Index int64
 
 type Node struct {
 	nodeEndpoint Endpoint
 	state        State
-	meta         Meta
-	commitIndex  int64
-	lastApplied  int64
+	meta         MetaStorage
+	commitIndex  Index
+	lastApplied  Index
 }
 
 func newNode(endpoint Endpoint) *Node {
@@ -51,7 +50,17 @@ func newNode(endpoint Endpoint) *Node {
 		state:        &Follower{},
 		commitIndex:  0,
 		lastApplied:  0,
+		meta:         NewTestingMeta(),
 	}
+}
+
+func (n *Node) Start() error {
+	err := n.meta.Start()
+	if err != nil {
+		return fmt.Errorf("start meta failed. %s", err)
+	}
+
+	return nil
 }
 
 type DummyRpcHandler struct {
@@ -121,7 +130,7 @@ func Main() {
 
 	rpcHandler := DummyRpcHandler{}
 
-	rpcService, err := NewRpcService(config.RpcType,config.SelfEndpoint, &rpcHandler)
+	rpcService, err := NewRpcService(config.RpcType, config.SelfEndpoint, &rpcHandler)
 	if err != nil {
 		serverLogger.Fatalf("create rpc service failed: %s", err)
 	}
@@ -135,7 +144,7 @@ func Main() {
 
 	selfEndpoint := Endpoint{
 		IP:   "127.0.0.1",
-		Port: 8080,
+		Port: 8081,
 	}
 
 	appendReq := protos.AppendEntriesRequest{

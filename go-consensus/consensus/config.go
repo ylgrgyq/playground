@@ -28,10 +28,15 @@ func toValidRpcType(rpcTypeStr string) RpcType {
 	return UnknownRpcType
 }
 
+type RaftConfigurations struct {
+	ElectionTimeoutMs uint32
+}
+
 type Configurations struct {
-	RpcType       RpcType
-	SelfEndpoint  Endpoint
-	PeerEndpoints []Endpoint
+	RpcType            RpcType
+	SelfEndpoint       Endpoint
+	PeerEndpoints      []Endpoint
+	RaftConfigurations RaftConfigurations
 }
 
 func (c *Configurations) String() string {
@@ -48,6 +53,9 @@ func (c *Configurations) String() string {
 		b.WriteString(fmt.Sprintf("  Port: %d\n", peer.Port))
 		b.WriteString("\n")
 	}
+	b.WriteString("RaftConfigurations:\n")
+	b.WriteString(fmt.Sprintf("  ElectionTimeout: %dms\n", c.RaftConfigurations.ElectionTimeoutMs))
+	b.WriteString("\n")
 	b.WriteString("**********************************************************************************\n")
 	return b.String()
 }
@@ -57,10 +65,19 @@ type yamlEndpoint struct {
 	Port uint16 `yaml:"port"`
 }
 
+type yamlRaftConfigurations struct {
+	ElectionTimeoutMs uint32 `yaml:"electionTimeoutMs"`
+}
+
+func (yc *yamlRaftConfigurations) toRaftConfigurations() RaftConfigurations {
+	return RaftConfigurations{ElectionTimeoutMs: yc.ElectionTimeoutMs}
+}
+
 type yamlConfigurations struct {
-	RpcType       string         `yaml:"rpcType"`
-	SelfEndpoint  yamlEndpoint   `yaml:"selfEndpoint"`
-	PeerEndpoints []yamlEndpoint `yaml:"peerEndpoints"`
+	RpcType            string                 `yaml:"rpcType"`
+	SelfEndpoint       yamlEndpoint           `yaml:"selfEndpoint"`
+	PeerEndpoints      []yamlEndpoint         `yaml:"peerEndpoints"`
+	RaftConfigurations yamlRaftConfigurations `yaml:"raftConfigurations"`
 }
 
 func (ye *yamlEndpoint) toStdEndpoint() Endpoint {
@@ -79,9 +96,10 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 		peers = append(peers, peer.toStdEndpoint())
 	}
 	return &Configurations{
-		SelfEndpoint:  yc.SelfEndpoint.toStdEndpoint(),
-		RpcType:       toValidRpcType(yc.RpcType),
-		PeerEndpoints: peers,
+		SelfEndpoint:       yc.SelfEndpoint.toStdEndpoint(),
+		RpcType:            toValidRpcType(yc.RpcType),
+		PeerEndpoints:      peers,
+		RaftConfigurations: yc.RaftConfigurations.toRaftConfigurations(),
 	}, nil
 }
 

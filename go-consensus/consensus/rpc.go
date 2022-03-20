@@ -45,7 +45,7 @@ type HttpRpc struct {
 	server *http.Server
 }
 
-type RequestApi string
+type RequestApiUri string
 
 const (
 	RequestVoteApi   = "/requestVote"
@@ -163,7 +163,7 @@ func writeResponse(writer http.ResponseWriter, request *http.Request, response p
 	}
 }
 
-func sendRequest(endpoint Endpoint, api RequestApi, req proto.Message, resp proto.Message) error {
+func sendRequest(endpoint Endpoint, api RequestApiUri, req proto.Message, resp proto.Message) error {
 	bs, err := proto.Marshal(req)
 	if err != nil {
 		return err
@@ -190,6 +190,6 @@ func sendRequest(endpoint Endpoint, api RequestApi, req proto.Message, resp prot
 	return nil
 }
 
-func buildRequestUrl(endpoint Endpoint, api RequestApi) string {
+func buildRequestUrl(endpoint Endpoint, api RequestApiUri) string {
 	return fmt.Sprintf("http://%s:%d%s", endpoint.IP, endpoint.Port, api)
 }

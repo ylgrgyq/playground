@@ -11,3 +11,5 @@ peerEndpoints:
     port: 8083
 
 
+raftConfigurations:
+  electionTimeoutMs: 500
