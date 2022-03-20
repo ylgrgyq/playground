@@ -47,9 +47,10 @@ type Node struct {
 	lastApplied  Index
 	scheduler    Scheduler
 	raftConfigs  RaftConfigurations
+	rpcClient    RpcClient
 }
 
-func newNode(endpoint Endpoint, raftConfigs RaftConfigurations) *Node {
+func newNode(endpoint Endpoint, raftConfigs RaftConfigurations, rpcClient RpcClient) *Node {
 	return &Node{
 		nodeEndpoint: endpoint,
 		state:        &Follower{},
@@ -58,6 +59,7 @@ func newNode(endpoint Endpoint, raftConfigs RaftConfigurations) *Node {
 		meta:         NewTestingMeta(),
 		scheduler:    NewScheduler(),
 		raftConfigs:  raftConfigs,
+		rpcClient:    rpcClient,
 	}
 }
 
@@ -70,7 +72,7 @@ func (n *Node) Start() error {
 	ctx := context.Background()
 
 	initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
-	n.scheduler.ScheduleOnce(ctx, time.Millisecond * time.Duration(initElectionTimeout), func() {
+	n.scheduler.ScheduleOnce(ctx, time.Millisecond*time.Duration(initElectionTimeout), func() {
 		
 	})
 	return nil
@@ -141,12 +143,17 @@ func Main() {
 
 	serverLogger.Okf("%s", config)
 
-	rpcHandler := DummyRpcHandler{}
-
-	rpcService, err := NewRpcService(config.RpcType, config.SelfEndpoint, &rpcHandler)
+	rpcService, err := NewRpcService(config.RpcType, config.SelfEndpoint)
 	if err != nil {
 		serverLogger.Fatalf("create rpc service failed: %s", err)
 	}
+
+	rpcHandler := DummyRpcHandler{}
+	if err = rpcService.RegisterRpcHandler(&rpcHandler); err != nil {
+		serverLogger.Fatalf("create rpc service failed: %s", err)
+	}
+
+	rpcClient := rpcService.GetRpcClient()
 
 	go func() {
 		err := rpcService.Start()
@@ -168,7 +175,7 @@ func Main() {
 		Entries:      []byte{},
 		LeaderCommit: 1232,
 	}
-	resp, err := rpcService.AppendEntries(selfEndpoint, &appendReq)
+	resp, err := rpcClient.AppendEntries(selfEndpoint, &appendReq)
 	if err != nil {
 		serverLogger.Fatalf("append failed: %s", err)
 	}
@@ -181,7 +188,7 @@ func Main() {
 		LastLogIndex: 3232,
 		LastLogTerm:  133333,
 	}
-	resp2, err := rpcService.RequestVote(selfEndpoint, &reqVote)
+	resp2, err := rpcClient.RequestVote(selfEndpoint, &reqVote)
 	if err != nil {
 		serverLogger.Fatalf("request vote failed: %s", err)
 	}

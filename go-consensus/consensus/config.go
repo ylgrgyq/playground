@@ -66,7 +66,7 @@ type yamlEndpoint struct {
 }
 
 type yamlRaftConfigurations struct {
-	ElectionTimeoutMs uint32 `yaml:"electionTimeoutMs"`
+	ElectionTimeoutMs int64 `yaml:"electionTimeoutMs"`
 }
 
 func (yc *yamlRaftConfigurations) toRaftConfigurations() RaftConfigurations {
