@@ -62,6 +62,7 @@ type Node struct {
 	peers        []PeerNode
 	state        State
 	meta         MetaStorage
+	logStorage   LogStorage
 	commitIndex  Index
 	lastApplied  Index
 	scheduler    Scheduler
@@ -94,22 +95,53 @@ func (n *Node) Start() error {
 
 	initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
 	n.scheduler.ScheduleOnce(ctx, time.Millisecond*time.Duration(initElectionTimeout), func() {
-		n.broadcastRequestVote()
+		reqs := n.requestVoteRequests()
+		reps := n.broadcastRequestVote(reqs)
+
+		
+		for peer, res := range reps {
+			if res.VoteGranted {
+
+			}
+		}
 	})
 	return nil
 }
 
-func (n *Node) broadcastRequestVote() {
+func (n *Node) broadcastRequestVote(reqs map[PeerNode]*protos.RequestVoteRequest) map[PeerNode]*protos.RequestVoteResponse{
+	responses := make(map[PeerNode]*protos.RequestVoteResponse)
+	for peer, req := range reqs {
+		res, err := n.rpcClient.RequestVote(peer.Endpoint, req)
+		if err != nil {
+			serverLogger.Okf("request vote for peer: %s failed. %s", peer.Id, err)
+			continue
+		}
+		responses[peer] = res
+	}
+
+	return responses
+}
+
+func (n *Node) requestVoteRequests() map[PeerNode]*protos.RequestVoteRequest {
 	meta, err := n.meta.GetMeta()
 	if err != nil {
 		serverLogger.Fatalf("get meta failed", err)
 	}
 
+	reqs := make(map[PeerNode]*protos.RequestVoteRequest)
+	lastLog := n.logStorage.LastEntry()
 	for _, peer := range n.peers {
-		req := protos.RequestVoteRequest{Term: int64(meta.CurrentTerm), CandidateId: peer.Id, LastLogIndex: n.}
-		n.rpcClient.RequestVote(peer, )
+		req := protos.RequestVoteRequest{
+			Term:         int64(meta.CurrentTerm),
+			CandidateId:  peer.Id,
+			LastLogIndex: lastLog.Index,
+			LastLogTerm:  lastLog.Term,
+		}
+		reqs[peer] = &req
 	}
+	return reqs
 }
+
 
 type DummyRpcHandler struct {
 }
