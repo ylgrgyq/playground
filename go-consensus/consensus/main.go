@@ -36,12 +36,30 @@ func (s *Leader) HandleAppendEntries() {
 
 }
 
+func EndpointId(e protos.Endpoint) string {
+	return fmt.Sprintf("%s:%d", e.Ip, e.Port)
+}
+
+type PeerNode struct {
+	Id       string
+	Endpoint protos.Endpoint
+}
+
+func NewPeerNodes(es []protos.Endpoint) []PeerNode {
+	var peers []PeerNode
+	for _, e := range es {
+		peers = append(peers, PeerNode{Id: EndpointId(e), Endpoint: e})
+	}
+	return peers
+}
+
 type Term int64
 type Index int64
 
 type Node struct {
-	nodeEndpoint protos.Endpoint
-	peers        []protos.Endpoint
+	id           string
+	selfEndpoint protos.Endpoint
+	peers        []PeerNode
 	state        State
 	meta         MetaStorage
 	commitIndex  Index
@@ -53,8 +71,9 @@ type Node struct {
 
 func newNode(configs Configurations, rpcClient RpcClient) *Node {
 	return &Node{
-		nodeEndpoint: configs.SelfEndpoint,
-		peers:        configs.PeerEndpoints,
+		id:           EndpointId(configs.SelfEndpoint),
+		selfEndpoint: configs.SelfEndpoint,
+		peers:        NewPeerNodes(configs.PeerEndpoints),
 		state:        &Follower{},
 		commitIndex:  0,
 		lastApplied:  0,
@@ -75,9 +94,21 @@ func (n *Node) Start() error {
 
 	initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
 	n.scheduler.ScheduleOnce(ctx, time.Millisecond*time.Duration(initElectionTimeout), func() {
-
+		n.broadcastRequestVote()
 	})
 	return nil
+}
+
+func (n *Node) broadcastRequestVote() {
+	meta, err := n.meta.GetMeta()
+	if err != nil {
+		serverLogger.Fatalf("get meta failed", err)
+	}
+
+	for _, peer := range n.peers {
+		req := protos.RequestVoteRequest{Term: int64(meta.CurrentTerm), CandidateId: peer.Id, LastLogIndex: n.}
+		n.rpcClient.RequestVote(peer, )
+	}
 }
 
 type DummyRpcHandler struct {
