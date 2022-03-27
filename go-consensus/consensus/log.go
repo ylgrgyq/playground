@@ -9,3 +9,10 @@ type LogEntry struct {
 type LogStorage interface {
 	LastEntry() LogEntry
 }
+
+type TestingLogStorage struct {
+}
+
+func (l *TestingLogStorage) LastEntry() LogEntry {
+	return LogEntry{}
+}

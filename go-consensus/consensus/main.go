@@ -20,9 +20,10 @@ const (
 
 type State interface {
 	Start()
+	StateType() StateType
 	HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 	HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
-	StateType() StateType
+	HandleElectionTimeout()
 	Stop()
 }
 
@@ -48,14 +49,23 @@ func (s *Leader) HandleAppendEntries(ctx context.Context, request *protos.Append
 	return nil, nil
 }
 
+func (s *Leader) HandleElectionTimeout() {
+
+}
+
 type Follower struct {
-	node *Node
+	node                      *Node
+	leaderId                  string
+	cancelElectionTimeoutFunc context.CancelFunc
+	startElectionTimeout      int64
 }
 
-func (_ *Follower) Start() {
+func (f *Follower) Start() {
+	f.cancelElectionTimeoutFunc = f.node.scheduleElectionTimeout(f.startElectionTimeout)
 }
 
-func (_ *Follower) Stop() {
+func (f *Follower) Stop() {
+	f.cancelElectionTimeoutFunc()
 }
 
 func (f *Follower) StateType() StateType {
@@ -70,14 +80,22 @@ func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.Reques
 	return nil, nil
 }
 
+func (f *Follower) HandleElectionTimeout() {
+	f.node.transferToCandidate()
+}
+
 type Candidate struct {
-	node *Node
+	node                      *Node
+	cancelElectionTimeoutFunc context.CancelFunc
+	startElectionTimeout      int64
 }
 
-func (_ *Candidate) Start() {
+func (c *Candidate) Start() {
+	c.electAsLeader()
 }
 
-func (_ *Candidate) Stop() {
+func (c *Candidate) Stop() {
+	c.cancelElectionTimeoutFunc()
 }
 
 func (_ *Candidate) StateType() StateType {
@@ -92,6 +110,45 @@ func (c *Candidate) HandleRequestVote(ctx context.Context, request *protos.Reque
 	return nil, nil
 }
 
+func (c *Candidate) HandleElectionTimeout() {
+	c.electAsLeader()
+}
+
+func (c *Candidate) electAsLeader() {
+	n := c.node
+	serverLogger.Debugf("%s start elect", n.id)
+	meta := n.meta.GetMeta()
+	meta.CurrentTerm += 1
+	if err := n.meta.SaveMeta(meta); err != nil {
+		serverLogger.Errorf("%s save meta failed. schedule election timeout latter. err=%s", n.id, err)
+		c.cancelElectionTimeoutFunc = n.scheduleElectionTimeout(n.raftConfigs.ElectionTimeoutMs)
+		return
+	}
+
+	reqs := n.buildRequestVoteRequests(meta)
+	reps := n.broadcastRequestVote(reqs)
+
+	var votes int
+	for peerId, res := range reps {
+		if Term(res.Term) > n.meta.GetMeta().CurrentTerm {
+			peer := n.peers[peerId]
+			n.transferToFollower(peer)
+			return
+		}
+
+		if res.VoteGranted {
+			votes += 1
+		}
+	}
+	if votes > (len(n.peers)+1)/2 {
+		n.transferToLeader()
+		return
+	}
+
+	serverLogger.Okf("%s elect as leader failed, try elect leader later", n.id)
+	c.cancelElectionTimeoutFunc = n.scheduleElectionTimeout(n.raftConfigs.ElectionTimeoutMs)
+}
+
 func EndpointId(e protos.Endpoint) string {
 	return fmt.Sprintf("%s:%d", e.Ip, e.Port)
 }
@@ -101,10 +158,12 @@ type PeerNode struct {
 	Endpoint protos.Endpoint
 }
 
-func NewPeerNodes(es []protos.Endpoint) []PeerNode {
-	var peers []PeerNode
+func NewPeerNodes(es []protos.Endpoint) map[string]PeerNode {
+	peers := make(map[string]PeerNode)
 	for _, e := range es {
-		peers = append(peers, PeerNode{Id: EndpointId(e), Endpoint: e})
+		id := EndpointId(e)
+		peer := PeerNode{Id: id, Endpoint: e}
+		peers[id] = peer
 	}
 	return peers
 }
@@ -115,7 +174,7 @@ type Index int64
 type Node struct {
 	id                        string
 	selfEndpoint              protos.Endpoint
-	peers                     []PeerNode
+	peers                     map[string]PeerNode
 	state                     State
 	meta                      MetaStorage
 	logStorage                LogStorage
@@ -125,6 +184,7 @@ type Node struct {
 	raftConfigs               RaftConfigurations
 	rpcClient                 RpcClient
 	cancelElectionTimeoutFunc context.CancelFunc
+	Done                      chan struct{}
 }
 
 func newNode(configs *Configurations, rpcClient RpcClient) *Node {
@@ -139,9 +199,9 @@ func newNode(configs *Configurations, rpcClient RpcClient) *Node {
 		raftConfigs:               configs.RaftConfigurations,
 		rpcClient:                 rpcClient,
 		cancelElectionTimeoutFunc: nil,
+		logStorage:                &TestingLogStorage{},
+		Done:                      make(chan struct{}),
 	}
-
-	node.state = &Follower{node: &node}
 
 	return &node
 }
@@ -154,7 +214,11 @@ func (n *Node) Start() error {
 
 	if len(n.peers) > 0 {
 		initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
-		n.cancelElectionTimeoutFunc = n.scheduleElectionTimeout(initElectionTimeout)
+		n.transferState(&Follower{
+			node:                 n,
+			startElectionTimeout: initElectionTimeout,
+			leaderId:             "",
+		})
 		return nil
 	}
 
@@ -163,69 +227,43 @@ func (n *Node) Start() error {
 }
 
 func (n *Node) scheduleElectionTimeout(electionTime int64) context.CancelFunc {
-	if n.cancelElectionTimeoutFunc != nil {
-		n.cancelElectionTimeoutFunc()
-		n.cancelElectionTimeoutFunc = nil
-	}
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	n.scheduler.ScheduleOnce(ctx, time.Millisecond*time.Duration(electionTime), func() {
-		meta := n.meta.GetMeta()
-		meta.CurrentTerm += 1
-		if err := n.meta.SaveMeta(meta); err != nil {
-			serverLogger.Error("%s save meta failed. schedule election timeout latter. err=%s", n.id, err)
-			n.cancelElectionTimeoutFunc = n.scheduleElectionTimeout(n.raftConfigs.ElectionTimeoutMs)
+		if ctx.Err() != nil {
+			serverLogger.Okf("election timeout canceled. %s", ctx.Err())
 			return
 		}
-
-		reqs := n.buildRequestVoteRequests(meta)
-		reps := n.broadcastRequestVote(reqs)
-
-		var votes int
-		for peer, res := range reps {
-			if Term(res.Term) > n.meta.GetMeta().CurrentTerm {
-				n.transferToFollower(peer)
-				return
-			}
-
-			if res.VoteGranted {
-				votes += 1
-			}
-		}
-		if votes > (len(n.peers)+1)/2 {
-			n.transferToLeader()
-			return
-		}
-
-		n.cancelElectionTimeoutFunc = n.scheduleElectionTimeout(n.raftConfigs.ElectionTimeoutMs)
+		n.state.HandleElectionTimeout()
 	})
 	return cancelFunc
 }
 
-func (n *Node) broadcastRequestVote(reqs map[PeerNode]*protos.RequestVoteRequest) map[PeerNode]*protos.RequestVoteResponse {
-	responses := make(map[PeerNode]*protos.RequestVoteResponse)
-	for peer, req := range reqs {
+func (n *Node) broadcastRequestVote(reqs map[string]*protos.RequestVoteRequest) map[string]*protos.RequestVoteResponse {
+	responses := make(map[string]*protos.RequestVoteResponse)
+	for peerId, req := range reqs {
+		peer := n.peers[peerId]
 		res, err := n.rpcClient.RequestVote(peer.Endpoint, req)
 		if err != nil {
-			serverLogger.Okf("request vote for peer: %s failed. %s", peer.Id, err)
+			serverLogger.Okf("request vote for peer: %s failed. %s", peerId, err)
 			continue
 		}
-		responses[peer] = res
+		responses[peerId] = res
 	}
 
 	return responses
 }
 
-func (n *Node) buildRequestVoteRequests(meta Meta) map[PeerNode]*protos.RequestVoteRequest {
-	reqs := make(map[PeerNode]*protos.RequestVoteRequest)
+func (n *Node) buildRequestVoteRequests(meta Meta) map[string]*protos.RequestVoteRequest {
+	reqs := make(map[string]*protos.RequestVoteRequest)
 	lastLog := n.logStorage.LastEntry()
-	for _, peer := range n.peers {
+	for peerId, peer := range n.peers {
 		req := protos.RequestVoteRequest{
 			Term:         int64(meta.CurrentTerm),
 			CandidateId:  peer.Id,
 			LastLogIndex: lastLog.Index,
 			LastLogTerm:  lastLog.Term,
 		}
-		reqs[peer] = &req
+		reqs[peerId] = &req
 	}
 	return reqs
 }
@@ -245,8 +283,13 @@ func (n *Node) transferToCandidate() {
 }
 
 func (n *Node) transferState(newState State) {
-	serverLogger.Okf("%s transfer state from %s to %s", n.id, n.state.StateType(), newState.StateType())
-	n.state.Stop()
+	if oldState := n.state; oldState != nil {
+		serverLogger.Okf("%s transfer state from %d to %d", n.id, n.state.StateType(), newState.StateType())
+		oldState.Stop()
+	} else {
+		serverLogger.Okf("%s transfer to init state %d", n.id, newState.StateType())
+	}
+
 	n.state = newState
 	n.state.Start()
 }
@@ -327,6 +370,12 @@ func Main() {
 		serverLogger.Fatalf("start node failed: %s", err)
 	}
 
+	for {
+		select {
+		case <-node.Done:
+			serverLogger.Ok("node %s done", node.id)
+		}
+	}
 
 	//selfEndpoint := protos.Endpoint{
 	//	Ip:   "127.0.0.1",

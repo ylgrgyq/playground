@@ -18,10 +18,11 @@ type MetaStorage interface {
 }
 
 type TestingMeta struct {
-	Meta Meta
+	meta Meta
 }
 
 func (t *TestingMeta) Start() error {
+	serverLogger.Debugf("start with meta %+v", t.meta)
 	return nil
 }
 
@@ -30,17 +31,18 @@ func (t *TestingMeta) Shutdown(ctx context.Context) error {
 }
 
 func (t *TestingMeta) SaveMeta(meta Meta) error {
-	t.Meta = meta
+	serverLogger.Debugf("save new meta %+v", meta)
+	t.meta = meta
 	return nil
 }
 
 func (t *TestingMeta) GetMeta() Meta {
-	return t.Meta
+	return t.meta
 }
 
 func NewTestingMeta() MetaStorage {
 	meta := Meta{1, nil}
-	return &TestingMeta{Meta: meta}
+	return &TestingMeta{meta: meta}
 }
 
 
