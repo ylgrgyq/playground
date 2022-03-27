@@ -30,6 +30,7 @@ func toValidRpcType(rpcTypeStr string) RpcType {
 }
 
 type RaftConfigurations struct {
+	PingTimeoutMs     int64
 	ElectionTimeoutMs int64
 }
 
@@ -55,6 +56,7 @@ func (c *Configurations) String() string {
 		b.WriteString("\n")
 	}
 	b.WriteString("RaftConfigurations:\n")
+	b.WriteString(fmt.Sprintf("  PingTimeoutMs: %dms\n", c.RaftConfigurations.PingTimeoutMs))
 	b.WriteString(fmt.Sprintf("  ElectionTimeout: %dms\n", c.RaftConfigurations.ElectionTimeoutMs))
 	b.WriteString("\n")
 	b.WriteString("**********************************************************************************\n")
@@ -68,10 +70,14 @@ type yamlEndpoint struct {
 
 type yamlRaftConfigurations struct {
 	ElectionTimeoutMs int64 `yaml:"electionTimeoutMs"`
+	PingTimeoutMs     int64 `yaml:"pingTimeoutMs"`
 }
 
 func (yc *yamlRaftConfigurations) toRaftConfigurations() RaftConfigurations {
-	return RaftConfigurations{ElectionTimeoutMs: yc.ElectionTimeoutMs}
+	return RaftConfigurations{
+		ElectionTimeoutMs: yc.ElectionTimeoutMs,
+		PingTimeoutMs: yc.PingTimeoutMs,
+	}
 }
 
 type yamlConfigurations struct {

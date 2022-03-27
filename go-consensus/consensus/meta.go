@@ -2,12 +2,11 @@ package consensus
 
 import (
 	"context"
-	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
 type Meta struct {
 	CurrentTerm Term
-	VoteFor     *protos.Endpoint
+	VoteFor     string
 }
 
 type MetaStorage interface {
@@ -41,7 +40,7 @@ func (t *TestingMeta) GetMeta() Meta {
 }
 
 func NewTestingMeta() MetaStorage {
-	meta := Meta{1, nil}
+	meta := Meta{1, ""}
 	return &TestingMeta{meta: meta}
 }
 

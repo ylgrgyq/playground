@@ -12,4 +12,5 @@ peerEndpoints:
 
 
 raftConfigurations:
+  pingTimeoutMs: 1000
   electionTimeoutMs: 5000
