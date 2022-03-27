@@ -3,6 +3,7 @@ package consensus
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"google.golang.org/protobuf/proto"
 	"io/ioutil"
@@ -76,7 +77,10 @@ func (h *HttpRpcService) RegisterRpcHandler(handler RpcHandler) error {
 }
 
 func (h *HttpRpcService) Start() error {
-	return h.server.ListenAndServe()
+	if h.rpcHandler == nil {
+		return errors.New("Http Rpc Service start before register any rpc handlers")
+	}
+ 	return h.server.ListenAndServe()
 }
 
 func (h *HttpRpcService) Shutdown(context context.Context) error {

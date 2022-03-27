@@ -10,30 +10,86 @@ import (
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
+type StateType int
+
+const (
+	LeaderState = iota + 1
+	FollowerState
+	CandidateState
+)
+
 type State interface {
-	HandleAppendEntries()
-	HandleRequestVote()
+	Start()
+	HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
+	HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
+	StateType() StateType
+	Stop()
 }
 
 type Leader struct {
+	node *Node
+}
+
+func (_ *Leader) Start() {
+}
+
+func (_ *Leader) Stop() {
+}
+
+func (_ *Leader) StateType() StateType {
+	return LeaderState
+}
+
+func (s *Leader) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+	return nil, nil
+}
+
+func (s *Leader) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+	return nil, nil
 }
 
 type Follower struct {
+	node *Node
 }
 
-func (f *Follower) HandleAppendEntries() {
-
+func (_ *Follower) Start() {
 }
 
-func (f *Follower) HandleRequestVote() {
+func (_ *Follower) Stop() {
+}
 
+func (f *Follower) StateType() StateType {
+	return FollowerState
+}
+
+func (f *Follower) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+	return nil, nil
+}
+
+func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+	return nil, nil
 }
 
 type Candidate struct {
+	node *Node
 }
 
-func (s *Leader) HandleAppendEntries() {
+func (_ *Candidate) Start() {
+}
 
+func (_ *Candidate) Stop() {
+}
+
+func (_ *Candidate) StateType() StateType {
+	return CandidateState
+}
+
+func (c *Candidate) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+	return nil, nil
+}
+
+func (c *Candidate) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+	return nil, nil
 }
 
 func EndpointId(e protos.Endpoint) string {
@@ -57,32 +113,37 @@ type Term int64
 type Index int64
 
 type Node struct {
-	id           string
-	selfEndpoint protos.Endpoint
-	peers        []PeerNode
-	state        State
-	meta         MetaStorage
-	logStorage   LogStorage
-	commitIndex  Index
-	lastApplied  Index
-	scheduler    Scheduler
-	raftConfigs  RaftConfigurations
-	rpcClient    RpcClient
+	id                        string
+	selfEndpoint              protos.Endpoint
+	peers                     []PeerNode
+	state                     State
+	meta                      MetaStorage
+	logStorage                LogStorage
+	commitIndex               Index
+	lastApplied               Index
+	scheduler                 Scheduler
+	raftConfigs               RaftConfigurations
+	rpcClient                 RpcClient
+	cancelElectionTimeoutFunc context.CancelFunc
 }
 
-func newNode(configs Configurations, rpcClient RpcClient) *Node {
-	return &Node{
-		id:           EndpointId(configs.SelfEndpoint),
-		selfEndpoint: configs.SelfEndpoint,
-		peers:        NewPeerNodes(configs.PeerEndpoints),
-		state:        &Follower{},
-		commitIndex:  0,
-		lastApplied:  0,
-		meta:         NewTestingMeta(),
-		scheduler:    NewScheduler(),
-		raftConfigs:  configs.RaftConfigurations,
-		rpcClient:    rpcClient,
+func newNode(configs *Configurations, rpcClient RpcClient) *Node {
+	node := Node{
+		id:                        EndpointId(configs.SelfEndpoint),
+		selfEndpoint:              configs.SelfEndpoint,
+		peers:                     NewPeerNodes(configs.PeerEndpoints),
+		commitIndex:               0,
+		lastApplied:               0,
+		meta:                      NewTestingMeta(),
+		scheduler:                 NewScheduler(),
+		raftConfigs:               configs.RaftConfigurations,
+		rpcClient:                 rpcClient,
+		cancelElectionTimeoutFunc: nil,
 	}
+
+	node.state = &Follower{node: &node}
+
+	return &node
 }
 
 func (n *Node) Start() error {
@@ -91,24 +152,56 @@ func (n *Node) Start() error {
 		return fmt.Errorf("start meta failed. %s", err)
 	}
 
-	ctx := context.Background()
+	if len(n.peers) > 0 {
+		initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
+		n.cancelElectionTimeoutFunc = n.scheduleElectionTimeout(initElectionTimeout)
+		return nil
+	}
 
-	initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
-	n.scheduler.ScheduleOnce(ctx, time.Millisecond*time.Duration(initElectionTimeout), func() {
-		reqs := n.requestVoteRequests()
-		reps := n.broadcastRequestVote(reqs)
-
-		
-		for peer, res := range reps {
-			if res.VoteGranted {
-
-			}
-		}
-	})
+	n.transferToLeader()
 	return nil
 }
 
-func (n *Node) broadcastRequestVote(reqs map[PeerNode]*protos.RequestVoteRequest) map[PeerNode]*protos.RequestVoteResponse{
+func (n *Node) scheduleElectionTimeout(electionTime int64) context.CancelFunc {
+	if n.cancelElectionTimeoutFunc != nil {
+		n.cancelElectionTimeoutFunc()
+		n.cancelElectionTimeoutFunc = nil
+	}
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	n.scheduler.ScheduleOnce(ctx, time.Millisecond*time.Duration(electionTime), func() {
+		meta := n.meta.GetMeta()
+		meta.CurrentTerm += 1
+		if err := n.meta.SaveMeta(meta); err != nil {
+			serverLogger.Error("%s save meta failed. schedule election timeout latter. err=%s", n.id, err)
+			n.cancelElectionTimeoutFunc = n.scheduleElectionTimeout(n.raftConfigs.ElectionTimeoutMs)
+			return
+		}
+
+		reqs := n.buildRequestVoteRequests(meta)
+		reps := n.broadcastRequestVote(reqs)
+
+		var votes int
+		for peer, res := range reps {
+			if Term(res.Term) > n.meta.GetMeta().CurrentTerm {
+				n.transferToFollower(peer)
+				return
+			}
+
+			if res.VoteGranted {
+				votes += 1
+			}
+		}
+		if votes > (len(n.peers)+1)/2 {
+			n.transferToLeader()
+			return
+		}
+
+		n.cancelElectionTimeoutFunc = n.scheduleElectionTimeout(n.raftConfigs.ElectionTimeoutMs)
+	})
+	return cancelFunc
+}
+
+func (n *Node) broadcastRequestVote(reqs map[PeerNode]*protos.RequestVoteRequest) map[PeerNode]*protos.RequestVoteResponse {
 	responses := make(map[PeerNode]*protos.RequestVoteResponse)
 	for peer, req := range reqs {
 		res, err := n.rpcClient.RequestVote(peer.Endpoint, req)
@@ -122,12 +215,7 @@ func (n *Node) broadcastRequestVote(reqs map[PeerNode]*protos.RequestVoteRequest
 	return responses
 }
 
-func (n *Node) requestVoteRequests() map[PeerNode]*protos.RequestVoteRequest {
-	meta, err := n.meta.GetMeta()
-	if err != nil {
-		serverLogger.Fatalf("get meta failed", err)
-	}
-
+func (n *Node) buildRequestVoteRequests(meta Meta) map[PeerNode]*protos.RequestVoteRequest {
 	reqs := make(map[PeerNode]*protos.RequestVoteRequest)
 	lastLog := n.logStorage.LastEntry()
 	for _, peer := range n.peers {
@@ -142,25 +230,33 @@ func (n *Node) requestVoteRequests() map[PeerNode]*protos.RequestVoteRequest {
 	return reqs
 }
 
-
-type DummyRpcHandler struct {
+func (n *Node) transferToLeader() {
+	serverLogger.Okf("change self to leader")
+	n.transferState(&Leader{node: n})
 }
 
-func (d *DummyRpcHandler) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	resp := protos.RequestVoteResponse{
-		Term:        22222,
-		VoteGranted: true,
-	}
-	serverLogger.Debugf("receive req vote from %s", ctx.Value(RawRequestKey))
-	return &resp, nil
+func (n *Node) transferToFollower(peer PeerNode) {
+	serverLogger.Okf("choose %s as leader", peer.Id)
+	n.transferState(&Follower{node: n})
 }
 
-func (d *DummyRpcHandler) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
-	resp := protos.AppendEntriesResponse{
-		Term:    3321,
-		Success: true,
-	}
-	return &resp, nil
+func (n *Node) transferToCandidate() {
+	n.transferState(&Candidate{node: n})
+}
+
+func (n *Node) transferState(newState State) {
+	serverLogger.Okf("%s transfer state from %s to %s", n.id, n.state.StateType(), newState.StateType())
+	n.state.Stop()
+	n.state = newState
+	n.state.Start()
+}
+
+func (n *Node) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+	return n.state.HandleRequestVote(ctx, request)
+}
+
+func (n *Node) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+	return n.state.HandleAppendEntries(ctx, request)
 }
 
 type ApplicationOptions struct {
@@ -214,52 +310,56 @@ func Main() {
 		serverLogger.Fatalf("create rpc service failed: %s", err)
 	}
 
-	rpcHandler := DummyRpcHandler{}
-	if err = rpcService.RegisterRpcHandler(&rpcHandler); err != nil {
+	rpcClient := rpcService.GetRpcClient()
+	node := newNode(config, rpcClient)
+
+	if err = rpcService.RegisterRpcHandler(node); err != nil {
 		serverLogger.Fatalf("create rpc service failed: %s", err)
 	}
 
-	rpcClient := rpcService.GetRpcClient()
-
 	go func() {
-		err := rpcService.Start()
-		if err != nil {
+		if err := rpcService.Start(); err != nil {
 			serverLogger.Fatalf("start rpc service failed: %s", err)
 		}
 	}()
 
-	selfEndpoint := protos.Endpoint{
-		Ip:   "127.0.0.1",
-		Port: 8081,
+	if err = node.Start(); err != nil {
+		serverLogger.Fatalf("start node failed: %s", err)
 	}
 
-	appendReq := protos.AppendEntriesRequest{
-		Term:         121,
-		LeaderId:     "101",
-		PrevLogIndex: 1222,
-		PrevLogTerm:  1223,
-		Entries:      []byte{},
-		LeaderCommit: 1232,
-	}
-	resp, err := rpcClient.AppendEntries(selfEndpoint, &appendReq)
-	if err != nil {
-		serverLogger.Fatalf("append failed: %s", err)
-	}
 
-	serverLogger.Okf("Append Response: %+v", resp)
-
-	reqVote := protos.RequestVoteRequest{
-		Term:         2121,
-		CandidateId:  "2323",
-		LastLogIndex: 3232,
-		LastLogTerm:  133333,
-	}
-	resp2, err := rpcClient.RequestVote(selfEndpoint, &reqVote)
-	if err != nil {
-		serverLogger.Fatalf("request vote failed: %s", err)
-	}
-
-	serverLogger.Okf("Request vote Response: %+v", resp2)
-
-	serverLogger.Ok("Ok")
+	//selfEndpoint := protos.Endpoint{
+	//	Ip:   "127.0.0.1",
+	//	Port: 8081,
+	//}
+	//
+	//appendReq := protos.AppendEntriesRequest{
+	//	Term:         121,
+	//	LeaderId:     "101",
+	//	PrevLogIndex: 1222,
+	//	PrevLogTerm:  1223,
+	//	Entries:      []byte{},
+	//	LeaderCommit: 1232,
+	//}
+	//resp, err := rpcClient.AppendEntries(selfEndpoint, &appendReq)
+	//if err != nil {
+	//	serverLogger.Fatalf("append failed: %s", err)
+	//}
+	//
+	//serverLogger.Okf("Append Response: %+v", resp)
+	//
+	//reqVote := protos.RequestVoteRequest{
+	//	Term:         2121,
+	//	CandidateId:  "2323",
+	//	LastLogIndex: 3232,
+	//	LastLogTerm:  133333,
+	//}
+	//resp2, err := rpcClient.RequestVote(selfEndpoint, &reqVote)
+	//if err != nil {
+	//	serverLogger.Fatalf("request vote failed: %s", err)
+	//}
+	//
+	//serverLogger.Okf("Request vote Response: %+v", resp2)
+	//
+	//serverLogger.Ok("Ok")
 }

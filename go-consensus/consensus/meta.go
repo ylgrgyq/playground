@@ -14,7 +14,7 @@ type MetaStorage interface {
 	Start() error
 	Shutdown(ctx context.Context) error
 	SaveMeta(meta Meta) error
-	GetMeta() (Meta, error)
+	GetMeta() Meta
 }
 
 type TestingMeta struct {
@@ -31,10 +31,11 @@ func (t *TestingMeta) Shutdown(ctx context.Context) error {
 
 func (t *TestingMeta) SaveMeta(meta Meta) error {
 	t.Meta = meta
+	return nil
 }
 
-func (t *TestingMeta) GetMeta() (Meta, error) {
-	return t.Meta, nil
+func (t *TestingMeta) GetMeta() Meta {
+	return t.Meta
 }
 
 func NewTestingMeta() MetaStorage {
