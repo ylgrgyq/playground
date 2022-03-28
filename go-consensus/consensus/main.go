@@ -92,11 +92,16 @@ type Follower struct {
 }
 
 func (f *Follower) Start() {
-	f.cancelElectionTimeoutFunc = f.node.scheduleOnce(f.startElectionTimeout, func() { f.node.transferToCandidate() })
+	f.cancelElectionTimeoutFunc = f.node.scheduleOnce(f.startElectionTimeout, func() {
+		f.node.lock.Lock()
+		defer f.node.lock.Unlock()
+		f.node.transferToCandidate()
+	})
 }
 
 func (f *Follower) Stop() {
 	f.cancelElectionTimeoutFunc()
+	f.cancelElectionTimeoutFunc = nil
 }
 
 func (f *Follower) StateType() StateType {
@@ -108,6 +113,9 @@ func (f *Follower) HandleAppendEntries(ctx context.Context, request *protos.Appe
 }
 
 func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+	f.node.lock.Lock()
+	defer f.node.lock.Unlock()
+
 	meta := f.node.meta.GetMeta()
 	reqTerm := Term(request.Term)
 	if reqTerm < meta.CurrentTerm {
@@ -126,11 +134,8 @@ func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.Reques
 		}
 	}
 
-	rawReq := ctx.Value(RawRequestKey).(*protos.Request)
-	fromPeerId := EndpointId(rawReq.From)
-	peer := f.node.peers[fromPeerId]
-
-	meta = Meta{CurrentTerm: reqTerm, VoteFor: fromPeerId}
+	peer := f.node.peers[request.CandidateId]
+	meta = Meta{CurrentTerm: reqTerm, VoteFor: request.CandidateId}
 	if err := f.node.meta.SaveMeta(meta); err != nil {
 		return nil, err
 	}
@@ -164,29 +169,49 @@ func (c *Candidate) HandleAppendEntries(ctx context.Context, request *protos.App
 }
 
 func (c *Candidate) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	//meta := c.node.meta.GetMeta()
-	////if request.Term > meta.CurrentTerm {
-	////
-	////}
-	////protos.RequestVoteResponse{
-	////
-	////}
-	return nil, nil
+	c.node.lock.Lock()
+	defer c.node.lock.Unlock()
+
+	meta := c.node.meta.GetMeta()
+	reqTerm := Term(request.Term)
+	if reqTerm < meta.CurrentTerm {
+		return &protos.RequestVoteResponse{
+			Term:        int64(meta.CurrentTerm),
+			VoteGranted: false,
+		}, nil
+	}
+
+	if reqTerm == meta.CurrentTerm {
+		return &protos.RequestVoteResponse{
+			Term:        int64(meta.CurrentTerm),
+			VoteGranted: false,
+		}, nil
+	}
+
+	peer := c.node.peers[request.CandidateId]
+	meta = Meta{CurrentTerm: reqTerm, VoteFor: request.CandidateId}
+	if err := c.node.meta.SaveMeta(meta); err != nil {
+		return nil, err
+	}
+	c.node.transferToFollower(peer, c.node.raftConfigs.ElectionTimeoutMs)
+	return &protos.RequestVoteResponse{
+		Term:        int64(meta.CurrentTerm),
+		VoteGranted: true,
+	}, nil
 }
 
 func (c *Candidate) electAsLeader() {
 	n := c.node
 	serverLogger.Debugf("%s start elect", n.id)
-	meta := n.meta.GetMeta()
-	meta.VoteFor = c.node.id
-	meta.CurrentTerm += 1
-	if err := n.meta.SaveMeta(meta); err != nil {
-		c.cancelElectionTimeoutFunc = n.scheduleOnce(n.raftConfigs.ElectionTimeoutMs, c.electAsLeader)
-		return
-	}
 
-	req := c.buildRequestVoteRequest(meta)
+	req, err := c.buildRequestVoteRequest()
+	if err != nil {
+		c.cancelElectionTimeoutFunc = n.scheduleOnce(n.raftConfigs.ElectionTimeoutMs, c.electAsLeader)
+	}
 	reps := c.broadcastRequestVote(req)
+
+	n.lock.Lock()
+	defer n.lock.Unlock()
 
 	var votes int
 	for peerId, res := range reps {
@@ -209,21 +234,31 @@ func (c *Candidate) electAsLeader() {
 	c.cancelElectionTimeoutFunc = n.scheduleOnce(n.raftConfigs.ElectionTimeoutMs, c.electAsLeader)
 }
 
-func (c *Candidate) buildRequestVoteRequest(meta Meta) protos.RequestVoteRequest {
+func (c *Candidate) buildRequestVoteRequest() (*protos.RequestVoteRequest, error) {
 	n := c.node
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	meta := n.meta.GetMeta()
+	meta.VoteFor = c.node.id
+	meta.CurrentTerm += 1
+	if err := n.meta.SaveMeta(meta); err != nil {
+		return nil, err
+	}
+
 	lastLog := n.logStorage.LastEntry()
-	return protos.RequestVoteRequest{
+	return &protos.RequestVoteRequest{
 		Term:         int64(meta.CurrentTerm),
 		CandidateId:  n.id,
 		LastLogIndex: lastLog.Index,
 		LastLogTerm:  lastLog.Term,
-	}
+	}, nil
 }
 
-func (c *Candidate) broadcastRequestVote(req protos.RequestVoteRequest) map[string]*protos.RequestVoteResponse {
+func (c *Candidate) broadcastRequestVote(req *protos.RequestVoteRequest) map[string]*protos.RequestVoteResponse {
 	responses := make(map[string]*protos.RequestVoteResponse)
 	for peerId, peer := range c.node.peers {
-		res, err := c.node.rpcClient.RequestVote(peer.Endpoint, &req)
+		res, err := c.node.rpcClient.RequestVote(peer.Endpoint, req)
 		if err != nil {
 			serverLogger.Okf("request vote for peer: %s failed. %s", peerId, err)
 			continue
