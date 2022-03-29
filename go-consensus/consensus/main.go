@@ -11,12 +11,12 @@ import (
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
-type StateType int
+type StateType string
 
 const (
-	LeaderState = iota + 1
-	FollowerState
-	CandidateState
+	LeaderState = "Leader"
+	FollowerState = "Follower"
+	CandidateState = "Candidate"
 )
 
 type State interface {
@@ -34,19 +34,20 @@ type Leader struct {
 }
 
 func (l *Leader) Start() {
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	l.scheduler.SchedulePeriod(ctx, 0, time.Millisecond*time.Duration(l.node.raftConfigs.PingTimeoutMs), func() {
-		if ctx.Err() != nil {
-			serverLogger.Okf("ping timeout canceled. %s", ctx.Err())
-			return
-		}
+	l.cancelPingTimeoutFunc = l.node.schedulePeriod(
+		0,
+		l.node.raftConfigs.PingTimeoutMs,
+		func() {
+			l.broadcastAppendEntries()
+		})
 
-		l.broadcastAppendEntries()
-	})
-	l.cancelPingTimeoutFunc = cancelFunc
 }
 
-func (_ *Leader) Stop() {
+func (l *Leader) Stop() {
+	if l.cancelPingTimeoutFunc != nil {
+		l.cancelPingTimeoutFunc()
+		l.cancelPingTimeoutFunc = nil
+	}
 }
 
 func (_ *Leader) StateType() StateType {
@@ -54,27 +55,58 @@ func (_ *Leader) StateType() StateType {
 }
 
 func (l *Leader) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	return nil, nil
+	l.node.lock.Lock()
+	defer l.node.lock.Unlock()
+
+	meta := l.node.meta.GetMeta()
+	reqTerm := request.Term
+	if reqTerm < meta.CurrentTerm {
+		return &protos.RequestVoteResponse{
+			Term:        int64(meta.CurrentTerm),
+			VoteGranted: false,
+		}, nil
+	}
+
+	if reqTerm == meta.CurrentTerm {
+		return &protos.RequestVoteResponse{
+			Term:        int64(meta.CurrentTerm),
+			VoteGranted: false,
+		}, nil
+	}
+
+	lastEntry := l.node.logStorage.LastEntry()
+	if !lastEntry.IsAtLeastUpToDateThanMe(request.LastLogTerm, request.LastLogIndex) {
+		return &protos.RequestVoteResponse{
+			Term:        int64(meta.CurrentTerm),
+			VoteGranted: false,
+		}, nil
+	}
+
+	peer := l.node.peers[request.CandidateId]
+	meta = Meta{CurrentTerm: reqTerm, VoteFor: request.CandidateId}
+	if err := l.node.meta.SaveMeta(meta); err != nil {
+		return nil, err
+	}
+	l.node.transferToFollower(peer, l.node.raftConfigs.ElectionTimeoutMs)
+	return &protos.RequestVoteResponse{
+		Term:        int64(meta.CurrentTerm),
+		VoteGranted: true,
+	}, nil
 }
 
 func (l *Leader) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
-	return nil, nil
+	l.node.lock.Lock()
+	defer l.node.lock.Unlock()
+
+	meta := l.node.meta.GetMeta()
+	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
 }
 
 func (l *Leader) broadcastAppendEntries() {
-	meta := l.node.meta.GetMeta()
-
-	heartbeat := protos.AppendEntriesRequest{
-		Term:         int64(meta.CurrentTerm),
-		LeaderId:     l.node.id,
-		PrevLogIndex: 100,
-		PrevLogTerm:  100,
-		Entries:      []byte{},
-		LeaderCommit: 100,
-	}
+	heartbeat := l.buildHeartbeat()
 
 	for peerId, peer := range l.node.peers {
-		_, err := l.node.rpcClient.AppendEntries(peer.Endpoint, &heartbeat)
+		_, err := l.node.rpcClient.AppendEntries(peer.Endpoint, heartbeat)
 		if err != nil {
 			serverLogger.Okf("append entries to peer: %s failed. %s", peerId, err)
 			continue
@@ -82,6 +114,22 @@ func (l *Leader) broadcastAppendEntries() {
 		// todo handle heartbeat response
 	}
 
+}
+
+func (l *Leader) buildHeartbeat() *protos.AppendEntriesRequest{
+	l.node.lock.Lock()
+	defer l.node.lock.Unlock()
+
+	meta := l.node.meta.GetMeta()
+
+	return &protos.AppendEntriesRequest{
+		Term:         int64(meta.CurrentTerm),
+		LeaderId:     l.node.id,
+		PrevLogIndex: 100,
+		PrevLogTerm:  100,
+		Entries:      []byte{},
+		LeaderCommit: 100,
+	}
 }
 
 type Follower struct {
@@ -100,8 +148,10 @@ func (f *Follower) Start() {
 }
 
 func (f *Follower) Stop() {
-	f.cancelElectionTimeoutFunc()
-	f.cancelElectionTimeoutFunc = nil
+	if f.cancelElectionTimeoutFunc != nil {
+		f.cancelElectionTimeoutFunc()
+		f.cancelElectionTimeoutFunc = nil
+	}
 }
 
 func (f *Follower) StateType() StateType {
@@ -109,7 +159,11 @@ func (f *Follower) StateType() StateType {
 }
 
 func (f *Follower) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
-	return nil, nil
+	f.node.lock.Lock()
+	defer f.node.lock.Unlock()
+
+	meta := f.node.meta.GetMeta()
+	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
 }
 
 func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
@@ -117,10 +171,18 @@ func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.Reques
 	defer f.node.lock.Unlock()
 
 	meta := f.node.meta.GetMeta()
-	reqTerm := Term(request.Term)
+	reqTerm := request.Term
 	if reqTerm < meta.CurrentTerm {
 		return &protos.RequestVoteResponse{
-			Term:        int64(meta.CurrentTerm),
+			Term:        meta.CurrentTerm,
+			VoteGranted: false,
+		}, nil
+	}
+
+	lastEntry := f.node.logStorage.LastEntry()
+	if !lastEntry.IsAtLeastUpToDateThanMe(request.LastLogTerm, request.LastLogIndex) {
+		return &protos.RequestVoteResponse{
+			Term:        meta.CurrentTerm,
 			VoteGranted: false,
 		}, nil
 	}
@@ -128,7 +190,7 @@ func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.Reques
 	if reqTerm == meta.CurrentTerm {
 		if len(meta.VoteFor) > 0 && meta.VoteFor != request.CandidateId {
 			return &protos.RequestVoteResponse{
-				Term:        int64(meta.CurrentTerm),
+				Term:        meta.CurrentTerm,
 				VoteGranted: false,
 			}, nil
 		}
@@ -141,7 +203,7 @@ func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.Reques
 	}
 	f.node.transferToFollower(peer, f.node.raftConfigs.ElectionTimeoutMs)
 	return &protos.RequestVoteResponse{
-		Term:        int64(meta.CurrentTerm),
+		Term:        meta.CurrentTerm,
 		VoteGranted: true,
 	}, nil
 }
@@ -153,11 +215,16 @@ type Candidate struct {
 }
 
 func (c *Candidate) Start() {
-	c.electAsLeader()
+	go func() {
+		c.electAsLeader()
+	}()
 }
 
 func (c *Candidate) Stop() {
-	c.cancelElectionTimeoutFunc()
+	if c.cancelElectionTimeoutFunc != nil {
+		c.cancelElectionTimeoutFunc()
+		c.cancelElectionTimeoutFunc = nil
+	}
 }
 
 func (_ *Candidate) StateType() StateType {
@@ -165,7 +232,11 @@ func (_ *Candidate) StateType() StateType {
 }
 
 func (c *Candidate) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
-	return nil, nil
+	c.node.lock.Lock()
+	defer c.node.lock.Unlock()
+
+	meta := c.node.meta.GetMeta()
+	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
 }
 
 func (c *Candidate) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
@@ -173,17 +244,25 @@ func (c *Candidate) HandleRequestVote(ctx context.Context, request *protos.Reque
 	defer c.node.lock.Unlock()
 
 	meta := c.node.meta.GetMeta()
-	reqTerm := Term(request.Term)
+	reqTerm := request.Term
 	if reqTerm < meta.CurrentTerm {
 		return &protos.RequestVoteResponse{
-			Term:        int64(meta.CurrentTerm),
+			Term:        meta.CurrentTerm,
 			VoteGranted: false,
 		}, nil
 	}
 
 	if reqTerm == meta.CurrentTerm {
 		return &protos.RequestVoteResponse{
-			Term:        int64(meta.CurrentTerm),
+			Term:        meta.CurrentTerm,
+			VoteGranted: false,
+		}, nil
+	}
+
+	lastEntry := c.node.logStorage.LastEntry()
+	if !lastEntry.IsAtLeastUpToDateThanMe(request.LastLogTerm, request.LastLogIndex) {
+		return &protos.RequestVoteResponse{
+			Term:        meta.CurrentTerm,
 			VoteGranted: false,
 		}, nil
 	}
@@ -202,11 +281,12 @@ func (c *Candidate) HandleRequestVote(ctx context.Context, request *protos.Reque
 
 func (c *Candidate) electAsLeader() {
 	n := c.node
-	serverLogger.Debugf("%s start elect", n.id)
+	serverLogger.Debugf("%s start election", n.id)
 
 	req, err := c.buildRequestVoteRequest()
 	if err != nil {
 		c.cancelElectionTimeoutFunc = n.scheduleOnce(n.raftConfigs.ElectionTimeoutMs, c.electAsLeader)
+		return
 	}
 	reps := c.broadcastRequestVote(req)
 
@@ -215,7 +295,7 @@ func (c *Candidate) electAsLeader() {
 
 	var votes int
 	for peerId, res := range reps {
-		if Term(res.Term) > n.meta.GetMeta().CurrentTerm {
+		if res.Term > n.meta.GetMeta().CurrentTerm {
 			peer := n.peers[peerId]
 			n.transferToFollower(peer, n.raftConfigs.ElectionTimeoutMs)
 			return
@@ -288,50 +368,45 @@ func NewPeerNodes(es []protos.Endpoint) map[string]PeerNode {
 	return peers
 }
 
-type Term int64
-type Index int64
-
 type Node struct {
-	id                        string
-	selfEndpoint              protos.Endpoint
-	peers                     map[string]PeerNode
-	state                     State
-	meta                      MetaStorage
-	logStorage                LogStorage
-	commitIndex               Index
-	lastApplied               Index
-	scheduler                 Scheduler
-	raftConfigs               RaftConfigurations
-	rpcClient                 RpcClient
-	cancelElectionTimeoutFunc context.CancelFunc
-	Done                      chan struct{}
-	lock                      sync.Mutex
+	id           string
+	selfEndpoint protos.Endpoint
+	peers        map[string]PeerNode
+	state        State
+	meta         MetaStorage
+	logStorage   LogStorage
+	commitIndex  int64
+	lastApplied  int64
+	scheduler    Scheduler
+	raftConfigs  RaftConfigurations
+	rpcClient    RpcClient
+	Done         chan struct{}
+	lock         sync.Mutex
 }
 
-func newNode(configs *Configurations, rpcClient RpcClient) *Node {
+func NewNode(configs *Configurations, rpcClient RpcClient) *Node {
 	node := Node{
-		id:                        EndpointId(&configs.SelfEndpoint),
-		selfEndpoint:              configs.SelfEndpoint,
-		peers:                     NewPeerNodes(configs.PeerEndpoints),
-		commitIndex:               0,
-		lastApplied:               0,
-		meta:                      NewTestingMeta(),
-		scheduler:                 NewScheduler(),
-		raftConfigs:               configs.RaftConfigurations,
-		rpcClient:                 rpcClient,
-		cancelElectionTimeoutFunc: nil,
-		logStorage:                &TestingLogStorage{},
-		Done:                      make(chan struct{}),
-		lock:                      sync.Mutex{},
+		id:           EndpointId(&configs.SelfEndpoint),
+		selfEndpoint: configs.SelfEndpoint,
+		peers:        NewPeerNodes(configs.PeerEndpoints),
+		commitIndex:  -1,
+		lastApplied:  -1,
+		meta:         NewTestingMeta(),
+		scheduler:    NewScheduler(),
+		raftConfigs:  configs.RaftConfigurations,
+		rpcClient:    rpcClient,
+		logStorage:   &TestingLogStorage{},
+		Done:         make(chan struct{}),
+		lock:         sync.Mutex{},
 	}
 
 	return &node
 }
 
 func (n *Node) Start() error {
-	err := n.meta.Start()
+	err := n.meta.LoadMeta()
 	if err != nil {
-		return fmt.Errorf("start meta failed. %s", err)
+		return fmt.Errorf("load meta failed. %s", err)
 	}
 
 	n.lock.Lock()
@@ -390,7 +465,7 @@ func (n *Node) transferToFollower(peer PeerNode, electionTimeoutMs int64) {
 }
 
 func (n *Node) transferToInitState(electionTimeoutMs int64) {
-	serverLogger.Okf("transfer to init state")
+	serverLogger.Ok("transfer to init state")
 	n.transferState(&Follower{
 		node:                 n,
 		startElectionTimeout: electionTimeoutMs,
@@ -404,12 +479,11 @@ func (n *Node) transferToCandidate() {
 
 func (n *Node) transferState(newState State) {
 	if oldState := n.state; oldState != nil {
-		serverLogger.Okf("%s transfer state from %d to %d", n.id, n.state.StateType(), newState.StateType())
+		serverLogger.Okf("%s transfer state from %s to %s", n.id, n.state.StateType(), newState.StateType())
 		oldState.Stop()
 	} else {
-		serverLogger.Okf("%s transfer to init state %d", n.id, newState.StateType())
+		serverLogger.Okf("%s transfer state to %s", n.id, newState.StateType())
 	}
-
 	n.state = newState
 	n.state.Start()
 }
@@ -474,7 +548,7 @@ func Main() {
 	}
 
 	rpcClient := rpcService.GetRpcClient()
-	node := newNode(config, rpcClient)
+	node := NewNode(config, rpcClient)
 
 	if err = rpcService.RegisterRpcHandler(node); err != nil {
 		serverLogger.Fatalf("create rpc service failed: %s", err)

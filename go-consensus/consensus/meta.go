@@ -5,12 +5,12 @@ import (
 )
 
 type Meta struct {
-	CurrentTerm Term
+	CurrentTerm int64
 	VoteFor     string
 }
 
 type MetaStorage interface {
-	Start() error
+	LoadMeta() error
 	Shutdown(ctx context.Context) error
 	SaveMeta(meta Meta) error
 	GetMeta() Meta
@@ -20,7 +20,7 @@ type TestingMeta struct {
 	meta Meta
 }
 
-func (t *TestingMeta) Start() error {
+func (t *TestingMeta) LoadMeta() error {
 	serverLogger.Debugf("start with meta %+v", t.meta)
 	return nil
 }
