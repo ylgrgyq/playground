@@ -55,9 +55,6 @@ func (_ *Leader) StateType() StateType {
 }
 
 func (l *Leader) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	l.node.lock.Lock()
-	defer l.node.lock.Unlock()
-
 	meta := l.node.meta.GetMeta()
 	reqTerm := request.Term
 	if reqTerm < meta.CurrentTerm {
@@ -95,9 +92,6 @@ func (l *Leader) HandleRequestVote(ctx context.Context, request *protos.RequestV
 }
 
 func (l *Leader) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
-	l.node.lock.Lock()
-	defer l.node.lock.Unlock()
-
 	meta := l.node.meta.GetMeta()
 	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
 }
@@ -117,9 +111,6 @@ func (l *Leader) broadcastAppendEntries() {
 }
 
 func (l *Leader) buildHeartbeat() *protos.AppendEntriesRequest{
-	l.node.lock.Lock()
-	defer l.node.lock.Unlock()
-
 	meta := l.node.meta.GetMeta()
 
 	return &protos.AppendEntriesRequest{
@@ -155,9 +146,6 @@ func (f *Follower) StateType() StateType {
 }
 
 func (f *Follower) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
-	f.node.lock.Lock()
-	defer f.node.lock.Unlock()
-
 	meta := f.node.meta.GetMeta()
 	f.cancelElectionTimeoutFunc()
 	f.scheduleElectionTimeout(f.node.raftConfigs.ElectionTimeoutMs)
@@ -165,9 +153,6 @@ func (f *Follower) HandleAppendEntries(ctx context.Context, request *protos.Appe
 }
 
 func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	f.node.lock.Lock()
-	defer f.node.lock.Unlock()
-
 	meta := f.node.meta.GetMeta()
 	reqTerm := request.Term
 	if reqTerm < meta.CurrentTerm {
@@ -208,8 +193,6 @@ func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.Reques
 
 func (f *Follower) scheduleElectionTimeout(timeout int64) {
 	f.cancelElectionTimeoutFunc = f.node.scheduleOnce(timeout, func() {
-		f.node.lock.Lock()
-		defer f.node.lock.Unlock()
 		f.node.transferToCandidate()
 	})
 }
@@ -221,9 +204,7 @@ type Candidate struct {
 }
 
 func (c *Candidate) Start() {
-	go func() {
-		c.electAsLeader()
-	}()
+	c.electAsLeader()
 }
 
 func (c *Candidate) Stop() {
@@ -238,17 +219,11 @@ func (_ *Candidate) StateType() StateType {
 }
 
 func (c *Candidate) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
-	c.node.lock.Lock()
-	defer c.node.lock.Unlock()
-
 	meta := c.node.meta.GetMeta()
 	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
 }
 
 func (c *Candidate) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	c.node.lock.Lock()
-	defer c.node.lock.Unlock()
-
 	meta := c.node.meta.GetMeta()
 	reqTerm := request.Term
 	if reqTerm < meta.CurrentTerm {
@@ -296,9 +271,6 @@ func (c *Candidate) electAsLeader() {
 	}
 	reps := c.broadcastRequestVote(req)
 
-	n.lock.Lock()
-	defer n.lock.Unlock()
-
 	var votes int
 	for peerId, res := range reps {
 		if res.Term > n.meta.GetMeta().CurrentTerm {
@@ -317,13 +289,12 @@ func (c *Candidate) electAsLeader() {
 	}
 
 	serverLogger.Okf("%s elect as leader failed, try elect leader later", n.id)
-	c.cancelElectionTimeoutFunc = n.scheduleOnce(n.raftConfigs.ElectionTimeoutMs, c.electAsLeader)
+	initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
+	c.cancelElectionTimeoutFunc = n.scheduleOnce(initElectionTimeout, c.electAsLeader)
 }
 
 func (c *Candidate) buildRequestVoteRequest() (*protos.RequestVoteRequest, error) {
 	n := c.node
-	n.lock.Lock()
-	defer n.lock.Unlock()
 
 	meta := n.meta.GetMeta()
 	meta.VoteFor = c.node.id
@@ -435,6 +406,8 @@ func (n *Node) scheduleOnce(timeoutMs int64, run func()) context.CancelFunc {
 			serverLogger.Okf("scheduled job canceled. %s", ctx.Err())
 			return
 		}
+		n.lock.Lock()
+		defer n.lock.Unlock()
 		run()
 	})
 	return cancelFunc
@@ -451,6 +424,8 @@ func (n *Node) schedulePeriod(initialDelayMs int64, intervalMs int64, run func()
 				serverLogger.Okf("scheduled period job canceled. %s", ctx.Err())
 				return
 			}
+			n.lock.Lock()
+			defer n.lock.Unlock()
 			run()
 		})
 	return cancelFunc
@@ -495,10 +470,18 @@ func (n *Node) transferState(newState State) {
 }
 
 func (n *Node) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+	if !n.lock.TryLock() {
+		return nil, fmt.Errorf("node is busy, retry later")
+	}
+	defer n.lock.Unlock()
 	return n.state.HandleRequestVote(ctx, request)
 }
 
 func (n *Node) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+	if !n.lock.TryLock() {
+		return nil, fmt.Errorf("node is busy, retry later")
+	}
+	defer n.lock.Unlock()
 	return n.state.HandleAppendEntries(ctx, request)
 }
 
