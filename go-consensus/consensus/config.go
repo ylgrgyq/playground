@@ -98,10 +98,17 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 	if yc.RpcType == UnknownRpcType {
 		return nil, fmt.Errorf("unknown rpc type: %s", yc.RpcType)
 	}
+	selfEndpoint := yc.SelfEndpoint.toStdEndpoint()
 	peers := make([]protos.Endpoint, 0)
 	for _, peer := range yc.PeerEndpoints {
+		peerEndpoint := peer.toStdEndpoint()
+		if selfEndpoint.Ip == peerEndpoint.Ip && selfEndpoint.Port == peerEndpoint.Port {
+			return nil, fmt.Errorf("self endpoint can't in peer endpoints")
+		}
+
 		peers = append(peers, peer.toStdEndpoint())
 	}
+
 	return &Configurations{
 		SelfEndpoint:       yc.SelfEndpoint.toStdEndpoint(),
 		RpcType:            toValidRpcType(yc.RpcType),

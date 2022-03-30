@@ -5,6 +5,7 @@ import (
 	"github.com/fatih/color"
 	"os"
 	"sync"
+	"time"
 )
 
 type Logger interface {
@@ -115,24 +116,26 @@ func (l *DefaultLogger) Fatalf(format string, v ...interface{}) {
 	os.Exit(1)
 }
 
-func trailingNewLine(msg string) string {
-	return fmt.Sprintf("%s\n", msg)
-}
-
 func printConsole(c *color.Color, v ...interface{}) {
-	if _, err := c.Print(v...); err != nil {
+	dt := time.Now()
+	logStr := fmt.Sprintf("%s", v...)
+	if _, err := c.Print(fmt.Sprintf("%s %s\n", dt.Format(time.RFC3339), logStr)); err != nil {
 		panic(err)
 	}
 }
 
 func printConsoleln(c *color.Color, v ...interface{}) {
-	if _, err := c.Println(v...); err != nil {
+	dt := time.Now()
+	logStr := fmt.Sprintf("%s", v...)
+	if _, err := c.Println(fmt.Sprintf("%s %s\n", dt.Format(time.RFC3339), logStr)); err != nil {
 		panic(err)
 	}
 }
 
 func printConsolelnf(c *color.Color, format string, v ...interface{}) {
-	if _, err := c.Printf(trailingNewLine(fmt.Sprintf(format, v...))); err != nil {
+	dt := time.Now()
+	logStr := fmt.Sprintf(format, v...)
+	if _, err := c.Printf(fmt.Sprintf("%s %s\n", dt.Format(time.RFC3339), logStr)); err != nil {
 		panic(err)
 	}
 }

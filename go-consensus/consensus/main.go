@@ -140,11 +140,7 @@ type Follower struct {
 }
 
 func (f *Follower) Start() {
-	f.cancelElectionTimeoutFunc = f.node.scheduleOnce(f.startElectionTimeout, func() {
-		f.node.lock.Lock()
-		defer f.node.lock.Unlock()
-		f.node.transferToCandidate()
-	})
+	f.scheduleElectionTimeout(f.startElectionTimeout)
 }
 
 func (f *Follower) Stop() {
@@ -163,6 +159,8 @@ func (f *Follower) HandleAppendEntries(ctx context.Context, request *protos.Appe
 	defer f.node.lock.Unlock()
 
 	meta := f.node.meta.GetMeta()
+	f.cancelElectionTimeoutFunc()
+	f.scheduleElectionTimeout(f.node.raftConfigs.ElectionTimeoutMs)
 	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
 }
 
@@ -206,6 +204,14 @@ func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.Reques
 		Term:        meta.CurrentTerm,
 		VoteGranted: true,
 	}, nil
+}
+
+func (f *Follower) scheduleElectionTimeout(timeout int64) {
+	f.cancelElectionTimeoutFunc = f.node.scheduleOnce(timeout, func() {
+		f.node.lock.Lock()
+		defer f.node.lock.Unlock()
+		f.node.transferToCandidate()
+	})
 }
 
 type Candidate struct {
@@ -305,7 +311,7 @@ func (c *Candidate) electAsLeader() {
 			votes += 1
 		}
 	}
-	if votes > (len(n.peers)+1)/2 {
+	if votes >= (len(n.peers)+1)/2 {
 		n.transferToLeader()
 		return
 	}
