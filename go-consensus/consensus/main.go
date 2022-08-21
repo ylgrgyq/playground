@@ -14,8 +14,8 @@ import (
 type StateType string
 
 const (
-	LeaderState = "Leader"
-	FollowerState = "Follower"
+	LeaderState    = "Leader"
+	FollowerState  = "Follower"
 	CandidateState = "Candidate"
 )
 
@@ -110,7 +110,7 @@ func (l *Leader) broadcastAppendEntries() {
 
 }
 
-func (l *Leader) buildHeartbeat() *protos.AppendEntriesRequest{
+func (l *Leader) buildHeartbeat() *protos.AppendEntriesRequest {
 	meta := l.node.meta.GetMeta()
 
 	return &protos.AppendEntriesRequest{
@@ -193,6 +193,9 @@ func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.Reques
 
 func (f *Follower) scheduleElectionTimeout(timeout int64) {
 	f.cancelElectionTimeoutFunc = f.node.scheduleOnce(timeout, func() {
+		// todo 收到 append entries 后不要 cancel election timeout
+		// 而是等 election timeout 后检查最后一次收到心跳的时间有没有超时
+		// 从而避免所有 node 最后 election timeout 的时间都一样，leader 已断开大家都在相同的时间开始 election
 		f.node.transferToCandidate()
 	})
 }
@@ -487,6 +490,7 @@ func (n *Node) HandleAppendEntries(ctx context.Context, request *protos.AppendEn
 
 type ApplicationOptions struct {
 	ConfigurationFilePath string `short:"c" long:"config" description:"path to configuration file"`
+	EnableDebug           bool   `long:"debug" description:"enable debug log"`
 }
 
 type CommandLineOptions struct {
@@ -522,7 +526,9 @@ func parseCommandLineArguments() CommandLineOptions {
 
 func Main() {
 	cliOpts := parseCommandLineArguments()
-	defaultLogger.EnableDebug()
+	if cliOpts.EnableDebug {
+		defaultLogger.EnableDebug()
+	}
 
 	config, err := ParseConfig(cliOpts.ConfigurationFilePath)
 	if err != nil {

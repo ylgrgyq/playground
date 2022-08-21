@@ -87,30 +87,42 @@ type yamlConfigurations struct {
 	RaftConfigurations yamlRaftConfigurations `yaml:"raftConfigurations"`
 }
 
-func (ye *yamlEndpoint) toStdEndpoint() protos.Endpoint {
-	return protos.Endpoint{
+func (ye *yamlEndpoint) toStdEndpoint() (*protos.Endpoint, error) {
+	if len(ye.IP) == 0 {
+		return nil, fmt.Errorf("invalid empty IP")
+	}
+	if ye.Port <= 0 {
+		return nil, fmt.Errorf("invalid port: %d", ye.Port)
+	}
+	return &protos.Endpoint{
 		Ip:   ye.IP,
 		Port: ye.Port,
-	}
+	}, nil
 }
 
 func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 	if yc.RpcType == UnknownRpcType {
 		return nil, fmt.Errorf("unknown rpc type: %s", yc.RpcType)
 	}
-	selfEndpoint := yc.SelfEndpoint.toStdEndpoint()
+	selfEndpoint, err := yc.SelfEndpoint.toStdEndpoint()
+	if err != nil {
+		return nil, fmt.Errorf("SelfEndpoint, %s", err.Error())
+	}
 	peers := make([]protos.Endpoint, 0)
 	for _, peer := range yc.PeerEndpoints {
-		peerEndpoint := peer.toStdEndpoint()
+		peerEndpoint, err := peer.toStdEndpoint()
+		if err != nil {
+			return nil, fmt.Errorf("PeerEndpoint, %s", err.Error())
+		}
 		if selfEndpoint.Ip == peerEndpoint.Ip && selfEndpoint.Port == peerEndpoint.Port {
 			return nil, fmt.Errorf("self endpoint can't in peer endpoints")
 		}
 
-		peers = append(peers, peer.toStdEndpoint())
+		peers = append(peers, *peerEndpoint)
 	}
 
 	return &Configurations{
-		SelfEndpoint:       yc.SelfEndpoint.toStdEndpoint(),
+		SelfEndpoint:       *selfEndpoint,
 		RpcType:            toValidRpcType(yc.RpcType),
 		PeerEndpoints:      peers,
 		RaftConfigurations: yc.RaftConfigurations.toRaftConfigurations(),
