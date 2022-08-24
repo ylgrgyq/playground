@@ -114,8 +114,9 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 		if err != nil {
 			return nil, fmt.Errorf("PeerEndpoint, %s", err.Error())
 		}
+
 		if selfEndpoint.Ip == peerEndpoint.Ip && selfEndpoint.Port == peerEndpoint.Port {
-			return nil, fmt.Errorf("self endpoint can't in peer endpoints")
+			return nil, fmt.Errorf("SelfEndpoint can't in peer endpoints")
 		}
 
 		peers = append(peers, *peerEndpoint)

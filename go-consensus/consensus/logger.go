@@ -15,11 +15,6 @@ type Logger interface {
 	Ok(v ...interface{})
 	Okf(format string, v ...interface{})
 
-	ReceiveMessage(v ...interface{})
-	ReceiveMessagef(format string, v ...interface{})
-
-	SendMessage(v ...interface{})
-
 	Error(v ...interface{})
 	Errorf(format string, v ...interface{})
 
@@ -78,24 +73,12 @@ func (l *DefaultLogger) Debugf(format string, v ...interface{}) {
 	}
 }
 
-func (l *DefaultLogger) ReceiveMessage(v ...interface{}) {
-	printConsoleln(l.receiveColor, v...)
-}
-
-func (l *DefaultLogger) ReceiveMessagef(format string, v ...interface{}) {
-	printConsolelnf(l.receiveColor, format, v...)
-}
-
 func (l *DefaultLogger) Ok(v ...interface{}) {
 	printConsoleln(l.okColor, v...)
 }
 
 func (l *DefaultLogger) Okf(format string, v ...interface{}) {
 	printConsolelnf(l.okColor, format, v...)
-}
-
-func (l *DefaultLogger) SendMessage(v ...interface{}) {
-	printConsole(l.sendColor, v...)
 }
 
 func (l *DefaultLogger) Error(v ...interface{}) {

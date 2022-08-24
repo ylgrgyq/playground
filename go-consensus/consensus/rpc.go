@@ -58,10 +58,11 @@ const (
 )
 
 type HttpRpcService struct {
-	server       *http.Server
-	apiToUriMap  map[RpcAPI]RequestApiUri
-	rpcHandler   RpcHandler
-	selfEndpoint protos.Endpoint
+	server         *http.Server
+	apiToUriMap    map[RpcAPI]RequestApiUri
+	rpcHandler     RpcHandler
+	selfEndpoint   protos.Endpoint
+	selfEndpointId string
 }
 
 func (h *HttpRpcService) GetRpcClient() RpcClient {
@@ -78,7 +79,7 @@ func (h *HttpRpcService) RegisterRpcHandler(handler RpcHandler) error {
 
 func (h *HttpRpcService) Start() error {
 	if h.rpcHandler == nil {
-		return errors.New("Http Rpc Service start before register any rpc handlers")
+		return errors.New("http Rpc Service start before register any rpc handlers")
 	}
 	return h.server.ListenAndServe()
 }
@@ -117,7 +118,8 @@ func (h *HttpRpcService) AppendEntries(nodeEndpoint protos.Endpoint, request *pr
 	if err != nil {
 		return nil, err
 	}
-	serverLogger.Okf("receive append entries response. Term: %d, Success: %t from %s", res.Term, res.Success, EndpointId(&nodeEndpoint))
+	serverLogger.Okf("receive append entries response. Term: %d, Success: %t from %s",
+		res.Term, res.Success, EndpointId(&nodeEndpoint))
 	return &res, nil
 }
 
@@ -170,7 +172,8 @@ func (h *HttpRpcService) getRpcHandler() (RpcHandler, bool) {
 }
 
 func NewHttpRpc(selfEndpoint protos.Endpoint) *HttpRpcService {
-	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint}
+	selfEndpointId := EndpointId(&selfEndpoint)
+	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, selfEndpointId: selfEndpointId}
 
 	serverMux := http.NewServeMux()
 	serverMux.HandleFunc(RequestVoteUri, httpRpcService.wrapRequestHandler(
@@ -228,7 +231,7 @@ func NewHttpRpc(selfEndpoint protos.Endpoint) *HttpRpcService {
 			return res, nil
 		}))
 
-	serverMux.Handle("/", http.NotFoundHandler())
+	serverMux.Handle("/*", http.NotFoundHandler())
 
 	httpRpcService.server = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", selfEndpoint.Ip, selfEndpoint.Port),
