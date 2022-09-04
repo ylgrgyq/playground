@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"context"
+	"log"
 )
 
 type Meta struct {
@@ -17,11 +18,12 @@ type MetaStorage interface {
 }
 
 type TestingMeta struct {
-	meta Meta
+	meta   Meta
+	logger *log.Logger
 }
 
 func (t *TestingMeta) LoadMeta() error {
-	serverLogger.Debugf("start with meta %+v", t.meta)
+	t.logger.Printf("start with meta %+v", t.meta)
 	return nil
 }
 
@@ -30,7 +32,7 @@ func (t *TestingMeta) Shutdown(ctx context.Context) error {
 }
 
 func (t *TestingMeta) SaveMeta(meta Meta) error {
-	serverLogger.Debugf("save new meta %+v", meta)
+	t.logger.Printf("save new meta %+v", meta)
 	t.meta = meta
 	return nil
 }
@@ -39,9 +41,7 @@ func (t *TestingMeta) GetMeta() Meta {
 	return t.meta
 }
 
-func NewTestingMeta() MetaStorage {
+func NewTestingMeta(logger *log.Logger) MetaStorage {
 	meta := Meta{1, ""}
-	return &TestingMeta{meta: meta}
+	return &TestingMeta{meta: meta, logger: log.New(logger.Writer(), "[Meta]", logger.Flags())}
 }
-
-

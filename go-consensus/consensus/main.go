@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/jessevdk/go-flags"
+	"log"
 	"math/rand"
 	"os"
 	"sync"
@@ -102,7 +103,7 @@ func (l *Leader) broadcastAppendEntries() {
 	for peerId, peer := range l.node.peers {
 		_, err := l.node.rpcClient.AppendEntries(peer.Endpoint, heartbeat)
 		if err != nil {
-			serverLogger.Okf("append entries to peer: %s failed. %s", peerId, err)
+			l.node.logger.Printf("append entries to peer: %s failed. %s", peerId, err)
 			continue
 		}
 		// todo handle heartbeat response
@@ -265,7 +266,7 @@ func (c *Candidate) HandleRequestVote(ctx context.Context, request *protos.Reque
 
 func (c *Candidate) electAsLeader() {
 	n := c.node
-	serverLogger.Debugf("%s start election", n.id)
+	c.node.logger.Printf("%s start election", n.id)
 
 	req, err := c.buildRequestVoteRequest()
 	if err != nil {
@@ -291,7 +292,7 @@ func (c *Candidate) electAsLeader() {
 		return
 	}
 
-	serverLogger.Okf("%s elect as leader failed, try elect leader later", n.id)
+	c.node.logger.Printf("%s elect as leader failed, try elect leader later", n.id)
 	initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
 	c.cancelElectionTimeoutFunc = n.scheduleOnce(initElectionTimeout, c.electAsLeader)
 }
@@ -320,7 +321,7 @@ func (c *Candidate) broadcastRequestVote(req *protos.RequestVoteRequest) map[str
 	for peerId, peer := range c.node.peers {
 		res, err := c.node.rpcClient.RequestVote(peer.Endpoint, req)
 		if err != nil {
-			serverLogger.Okf("request vote for peer: %s failed. %s", peerId, err)
+			c.node.logger.Printf("request vote for peer: %s failed. %s", peerId, err)
 			continue
 		}
 		responses[peerId] = res
@@ -362,22 +363,25 @@ type Node struct {
 	rpcClient    RpcClient
 	Done         chan struct{}
 	lock         sync.Mutex
+	logger       *log.Logger
 }
 
-func NewNode(configs *Configurations, rpcClient RpcClient) *Node {
+func NewNode(configs *Configurations, rpcClient RpcClient, logger *log.Logger) *Node {
+	nodeLogger := log.New(logger.Writer(), "[Node]", logger.Flags())
 	node := Node{
 		id:           EndpointId(&configs.SelfEndpoint),
 		selfEndpoint: configs.SelfEndpoint,
 		peers:        NewPeerNodes(configs.PeerEndpoints),
 		commitIndex:  -1,
 		lastApplied:  -1,
-		meta:         NewTestingMeta(),
+		meta:         NewTestingMeta(logger),
 		scheduler:    NewScheduler(),
 		raftConfigs:  configs.RaftConfigurations,
 		rpcClient:    rpcClient,
 		logStorage:   &TestingLogStorage{},
 		Done:         make(chan struct{}),
 		lock:         sync.Mutex{},
+		logger:       nodeLogger,
 	}
 
 	return &node
@@ -406,7 +410,7 @@ func (n *Node) scheduleOnce(timeoutMs int64, run func()) context.CancelFunc {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	n.scheduler.ScheduleOnce(ctx, time.Millisecond*time.Duration(timeoutMs), func() {
 		if ctx.Err() != nil {
-			serverLogger.Okf("scheduled job canceled. %s", ctx.Err())
+			n.logger.Printf("scheduled job canceled. %s", ctx.Err())
 			return
 		}
 		n.lock.Lock()
@@ -424,7 +428,7 @@ func (n *Node) schedulePeriod(initialDelayMs int64, intervalMs int64, run func()
 		time.Millisecond*time.Duration(intervalMs),
 		func() {
 			if ctx.Err() != nil {
-				serverLogger.Okf("scheduled period job canceled. %s", ctx.Err())
+				n.logger.Printf("scheduled period job canceled. %s", ctx.Err())
 				return
 			}
 			n.lock.Lock()
@@ -435,12 +439,12 @@ func (n *Node) schedulePeriod(initialDelayMs int64, intervalMs int64, run func()
 }
 
 func (n *Node) transferToLeader() {
-	serverLogger.Okf("change self to leader")
+	n.logger.Printf("change self to leader")
 	n.transferState(&Leader{node: n})
 }
 
 func (n *Node) transferToFollower(peer PeerNode, electionTimeoutMs int64) {
-	serverLogger.Okf("choose %s as leader", peer.Id)
+	n.logger.Printf("choose %s as leader", peer.Id)
 	n.transferState(&Follower{
 		node:                 n,
 		startElectionTimeout: electionTimeoutMs,
@@ -449,7 +453,7 @@ func (n *Node) transferToFollower(peer PeerNode, electionTimeoutMs int64) {
 }
 
 func (n *Node) transferToInitState(electionTimeoutMs int64) {
-	serverLogger.Ok("transfer to init state")
+	n.logger.Printf("transfer to init state")
 	n.transferState(&Follower{
 		node:                 n,
 		startElectionTimeout: electionTimeoutMs,
@@ -463,10 +467,10 @@ func (n *Node) transferToCandidate() {
 
 func (n *Node) transferState(newState State) {
 	if oldState := n.state; oldState != nil {
-		serverLogger.Okf("%s transfer state from %s to %s", n.id, n.state.StateType(), newState.StateType())
+		n.logger.Printf("%s transfer state from %s to %s", n.id, n.state.StateType(), newState.StateType())
 		oldState.Stop()
 	} else {
-		serverLogger.Okf("%s transfer state to %s", n.id, newState.StateType())
+		n.logger.Printf("%s transfer state to %s", n.id, newState.StateType())
 	}
 	n.state = newState
 	n.state.Start()
@@ -525,44 +529,43 @@ func parseCommandLineArguments() CommandLineOptions {
 }
 
 func Main() {
+	logger := log.New(log.Writer(), "[main]", log.LstdFlags|log.Lshortfile|log.Lmsgprefix)
 	cliOpts := parseCommandLineArguments()
-	if cliOpts.EnableDebug {
-		defaultLogger.EnableDebug()
-	}
 
 	config, err := ParseConfig(cliOpts.ConfigurationFilePath)
 	if err != nil {
-		serverLogger.Fatalf("parse config failed: %s", err)
+		logger.Fatalf("parse config failed: %s", err)
 	}
 
-	serverLogger.Okf("%s", config)
 
-	rpcService, err := NewRpcService(config.RpcType, config.SelfEndpoint)
+	logger.Printf("%s", config)
+
+	rpcService, err := NewRpcService(logger, config.RpcType, config.SelfEndpoint)
 	if err != nil {
-		serverLogger.Fatalf("create rpc service failed: %s", err)
+		logger.Fatalf("create rpc service failed: %s", err)
 	}
 
 	rpcClient := rpcService.GetRpcClient()
-	node := NewNode(config, rpcClient)
+	node := NewNode(config, rpcClient, logger)
 
 	if err = rpcService.RegisterRpcHandler(node); err != nil {
-		serverLogger.Fatalf("create rpc service failed: %s", err)
+		logger.Fatalf("create rpc service failed: %s", err)
 	}
 
 	go func() {
 		if err := rpcService.Start(); err != nil {
-			serverLogger.Fatalf("start rpc service failed: %s", err)
+			logger.Fatalf("start rpc service failed: %s", err)
 		}
 	}()
 
 	if err = node.Start(); err != nil {
-		serverLogger.Fatalf("start node failed: %s", err)
+		logger.Fatalf("start node failed: %s", err)
 	}
 
 	for {
 		select {
 		case <-node.Done:
-			serverLogger.Ok("node %s done", node.id)
+			logger.Printf("node %s done", node.id)
 		}
 	}
 }

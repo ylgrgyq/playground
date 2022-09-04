@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"google.golang.org/protobuf/proto"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
@@ -41,10 +42,10 @@ type RpcHandler interface {
 	HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
 
-func NewRpcService(rpcType RpcType, endpoint protos.Endpoint) (RpcService, error) {
+func NewRpcService(logger *log.Logger, rpcType RpcType, endpoint protos.Endpoint) (RpcService, error) {
 	switch rpcType {
 	case HttpRpcType:
-		return NewHttpRpc(endpoint), nil
+		return NewHttpRpc(endpoint, logger), nil
 	default:
 		return nil, fmt.Errorf("unsupport rpc type: %s", rpcType)
 	}
@@ -63,6 +64,7 @@ type HttpRpcService struct {
 	rpcHandler     RpcHandler
 	selfEndpoint   protos.Endpoint
 	selfEndpointId string
+	logger         log.Logger
 }
 
 func (h *HttpRpcService) GetRpcClient() RpcClient {
@@ -89,7 +91,7 @@ func (h *HttpRpcService) Shutdown(context context.Context) error {
 }
 
 func (h *HttpRpcService) RequestVote(nodeEndpoint protos.Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	serverLogger.Okf("send request vote. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d to %s",
+	h.logger.Printf("send request vote. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d to %s",
 		request.Term,
 		request.CandidateId,
 		request.LastLogTerm,
@@ -100,7 +102,7 @@ func (h *HttpRpcService) RequestVote(nodeEndpoint protos.Endpoint, request *prot
 	if err != nil {
 		return nil, err
 	}
-	serverLogger.Okf("receive request vote response. Term: %d, VoteGranted: %t from %s",
+	h.logger.Printf("receive request vote response. Term: %d, VoteGranted: %t from %s",
 		res.Term,
 		res.VoteGranted,
 		EndpointId(&nodeEndpoint))
@@ -108,7 +110,7 @@ func (h *HttpRpcService) RequestVote(nodeEndpoint protos.Endpoint, request *prot
 }
 
 func (h *HttpRpcService) AppendEntries(nodeEndpoint protos.Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
-	serverLogger.Okf("send append entries. Term: %d, LeaderId: \"%s\", LeaderCommit: %d to %s",
+	h.logger.Printf("send append entries. Term: %d, LeaderId: \"%s\", LeaderCommit: %d to %s",
 		request.Term,
 		request.LeaderId,
 		request.LeaderCommit,
@@ -118,7 +120,7 @@ func (h *HttpRpcService) AppendEntries(nodeEndpoint protos.Endpoint, request *pr
 	if err != nil {
 		return nil, err
 	}
-	serverLogger.Okf("receive append entries response. Term: %d, Success: %t from %s",
+	h.logger.Printf("receive append entries response. Term: %d, Success: %t from %s",
 		res.Term, res.Success, EndpointId(&nodeEndpoint))
 	return &res, nil
 }
@@ -131,7 +133,7 @@ func (h *HttpRpcService) sendRequest(api RpcAPI, nodeEndpoint protos.Endpoint, r
 
 	reqInBytes, err := h.encodeRequest(requestBody)
 	if err != nil {
-		serverLogger.Errorf("encode request body failed: %+v failed. error: %s", requestBody, err)
+		h.logger.Printf("encode request body failed: %+v failed. error: %s", requestBody, err)
 		return err
 	}
 
@@ -143,20 +145,20 @@ func (h *HttpRpcService) sendRequest(api RpcAPI, nodeEndpoint protos.Endpoint, r
 
 	respBs, err := ioutil.ReadAll(postResp.Body)
 	if err != nil {
-		serverLogger.Errorf("read response body for request: %+v failed. error: %s", requestBody, err)
+		h.logger.Printf("read response body for request: %+v failed. error: %s", requestBody, err)
 		return err
 	}
 
 	var rawResp protos.Response
 	err = proto.Unmarshal(respBs, &rawResp)
 	if err != nil {
-		serverLogger.Errorf("decode response for request: %+v failed. error: %s", requestBody, err)
+		h.logger.Printf("decode response for request: %+v failed. error: %s", requestBody, err)
 		return err
 	}
 
 	err = proto.Unmarshal(rawResp.Body, responseBody)
 	if err != nil {
-		serverLogger.Errorf("decode response body for request: %+v failed. error: %s", requestBody, err)
+		h.logger.Printf("decode response body for request: %+v failed. error: %s", requestBody, err)
 		return err
 	}
 
@@ -171,9 +173,10 @@ func (h *HttpRpcService) getRpcHandler() (RpcHandler, bool) {
 	return rpcHandler, true
 }
 
-func NewHttpRpc(selfEndpoint protos.Endpoint) *HttpRpcService {
+func NewHttpRpc(selfEndpoint protos.Endpoint, logger *log.Logger) *HttpRpcService {
 	selfEndpointId := EndpointId(&selfEndpoint)
-	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, selfEndpointId: selfEndpointId}
+	httpRpcServiceLogger := log.New(logger.Writer(), "[HttpRpc]", logger.Flags())
+	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, selfEndpointId: selfEndpointId, logger: *httpRpcServiceLogger}
 
 	serverMux := http.NewServeMux()
 	serverMux.HandleFunc(RequestVoteUri, httpRpcService.wrapRequestHandler(
@@ -184,7 +187,7 @@ func NewHttpRpc(selfEndpoint protos.Endpoint) *HttpRpcService {
 			}
 
 			from := EndpointId(rawReq.From)
-			serverLogger.Okf("receive request vote. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d from %s",
+			httpRpcServiceLogger.Printf("receive request vote. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d from %s",
 				reqBody.Term,
 				reqBody.CandidateId,
 				reqBody.LastLogTerm,
@@ -196,7 +199,7 @@ func NewHttpRpc(selfEndpoint protos.Endpoint) *HttpRpcService {
 				return nil, err
 			}
 
-			serverLogger.Okf("send request vote response. Term: %d, VoteGranted: %t to %s",
+			httpRpcServiceLogger.Printf("send request vote response. Term: %d, VoteGranted: %t to %s",
 				res.Term,
 				res.VoteGranted,
 				from)
@@ -212,7 +215,7 @@ func NewHttpRpc(selfEndpoint protos.Endpoint) *HttpRpcService {
 			}
 
 			from := EndpointId(rawReq.From)
-			serverLogger.Okf("receive append entries. Term: %d, LeaderId: \"%s\", LeaderCommit: %d from %s",
+			httpRpcServiceLogger.Printf("receive append entries. Term: %d, LeaderId: \"%s\", LeaderCommit: %d from %s",
 				reqBody.Term,
 				reqBody.LeaderId,
 				reqBody.LeaderCommit,
@@ -223,7 +226,7 @@ func NewHttpRpc(selfEndpoint protos.Endpoint) *HttpRpcService {
 				return nil, err
 			}
 
-			serverLogger.Okf("send append entries response. Term: %d, Success: %t to %s",
+			httpRpcServiceLogger.Printf("send append entries response. Term: %d, Success: %t to %s",
 				res.Term,
 				res.Success,
 				from)
@@ -292,15 +295,16 @@ func (h *HttpRpcService) wrapRequestHandler(f requestHandler) func(writer http.R
 			return
 		}
 
-		rawReq := decodeRequest(writer, request)
-		if rawReq == nil {
+		rawReq, err:= decodeRequest(writer, request)
+		if err != nil {
+			h.logger.Printf("decode request failed. url: %s, error: %s", request.URL, err.Error())
 			return
 		}
 
 		ctx := context.WithValue(request.Context(), RawRequestKey, rawReq)
 		resp, err := f(ctx, rawReq, rawReq.Body)
 		if err != nil {
-			serverLogger.Errorf("handle request failed. url: %s, error: %s", request.URL, err.Error())
+			h.logger.Printf("handle request failed. url: %s, error: %s", request.URL, err.Error())
 			code := http.StatusInternalServerError
 			e, ok := err.(*httpRpcError)
 			if ok {
@@ -309,50 +313,49 @@ func (h *HttpRpcService) wrapRequestHandler(f requestHandler) func(writer http.R
 			http.Error(writer, err.Error(), code)
 			return
 		}
-		writeResponse(writer, request.URL, rawReq.Mid, resp)
+		err = writeResponse(writer, request.URL, rawReq.Mid, resp)
+		if err != nil {
+			h.logger.Printf("write response failed. url: %s, error: %s", request.URL, err.Error())
+		}
 	}
 }
 
-func decodeRequest(writer http.ResponseWriter, request *http.Request) *protos.Request {
+func decodeRequest(writer http.ResponseWriter, request *http.Request) (*protos.Request, error) {
 	bs, err := ioutil.ReadAll(request.Body)
 	if err != nil {
-		serverLogger.Errorf("request url: %s. read body failed: %s", request.URL, err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
-		return nil
+		return nil, fmt.Errorf("request url: %s. read body failed: %s", request.URL, err)
 	}
 
 	var req protos.Request
 	err = proto.Unmarshal(bs, &req)
 	if err != nil {
-		serverLogger.Errorf("request url: %s. decode request failed: %s", request.URL, err)
 		http.Error(writer, err.Error(), http.StatusBadRequest)
-		return nil
+		return nil, fmt.Errorf("request url: %s. decode request failed: %s", request.URL, err)
 	}
-	return &req
+	return &req, nil
 }
 
-func writeResponse(writer http.ResponseWriter, url *url.URL, mid string, responseBody proto.Message) {
+func writeResponse(writer http.ResponseWriter, url *url.URL, mid string, responseBody proto.Message) error {
 	bs, err := proto.Marshal(responseBody)
 	if err != nil {
-		serverLogger.Errorf("request url: %s. marshall response body failed: %s", url, err)
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
-		return
+		return fmt.Errorf("request url: %s. marshall response body failed: %s", url, err)
 	}
 
 	resp := protos.Response{Body: bs, Mid: mid}
 	bs, err = proto.Marshal(&resp)
 	if err != nil {
-		serverLogger.Errorf("request url: %s. marshall response failed: %s", url, err)
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
-		return
+		return fmt.Errorf("request url: %s. marshall response failed: %s", url, err)
 	}
 
 	_, err = writer.Write(bs)
 	if err != nil {
-		serverLogger.Errorf("request url: %s. write response failed: %s", url, err)
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
-		return
+		return fmt.Errorf("request url: %s. write response failed: %s", url, err)
 	}
+	return nil
 }
 
 func buildRequestUrl(endpoint protos.Endpoint, api RequestApiUri) string {
