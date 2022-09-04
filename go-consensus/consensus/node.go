@@ -18,6 +18,19 @@ const (
 	CandidateState = "Candidate"
 )
 
+type Ballot struct {
+	peerSize int
+	vote     int
+}
+
+func (b *Ballot) Vote() {
+	b.vote += 1
+}
+
+func (b *Ballot) Pass() bool {
+	return b.vote >= (b.peerSize+1)/2
+}
+
 type State interface {
 	Start()
 	StateType() StateType
@@ -82,7 +95,7 @@ func (l *Leader) HandleRequestVote(ctx context.Context, request *protos.RequestV
 	if err := l.node.meta.SaveMeta(meta); err != nil {
 		return nil, err
 	}
-	l.node.transferToFollower(peer, l.node.raftConfigs.ElectionTimeoutMs)
+	l.node.transferToFollowerWithLeader(peer, l.node.raftConfigs.ElectionTimeoutMs)
 	return &protos.RequestVoteResponse{
 		Term:        int64(meta.CurrentTerm),
 		VoteGranted: true,
@@ -182,7 +195,7 @@ func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.Reques
 	if err := f.node.meta.SaveMeta(meta); err != nil {
 		return nil, err
 	}
-	f.node.transferToFollower(peer, f.node.raftConfigs.ElectionTimeoutMs)
+	f.node.transferToFollowerWithLeader(peer, f.node.raftConfigs.ElectionTimeoutMs)
 	return &protos.RequestVoteResponse{
 		Term:        meta.CurrentTerm,
 		VoteGranted: true,
@@ -254,7 +267,7 @@ func (c *Candidate) HandleRequestVote(ctx context.Context, request *protos.Reque
 	if err := c.node.meta.SaveMeta(meta); err != nil {
 		return nil, err
 	}
-	c.node.transferToFollower(peer, c.node.raftConfigs.ElectionTimeoutMs)
+	c.node.transferToFollowerWithLeader(peer, c.node.raftConfigs.ElectionTimeoutMs)
 	return &protos.RequestVoteResponse{
 		Term:        int64(meta.CurrentTerm),
 		VoteGranted: true,
@@ -266,33 +279,29 @@ func (c *Candidate) electAsLeader() {
 	c.node.logger.Printf("%s start election", n.id)
 
 	req, err := c.buildRequestVoteRequest()
-	if err != nil {
-		timeout := calculateElectionTimeout(n.raftConfigs)
-		c.cancelElectionTimeoutFunc = n.scheduleOnce(timeout, c.electAsLeader)
-		return
-	}
-	reps := c.broadcastRequestVote(req)
+	if err == nil {
+		reps := c.broadcastRequestVote(req)
 
-	var votes int
-	for peerId, res := range reps {
-		if res.Term > n.meta.GetMeta().CurrentTerm {
-			peer := n.peers[peerId]
-			n.transferToFollower(peer, n.raftConfigs.ElectionTimeoutMs)
+		ballot := Ballot{peerSize: len(c.node.peers)}
+		for _, res := range reps {
+			if res.Term > n.meta.GetMeta().CurrentTerm {
+				n.transferToFollower()
+				return
+			}
+
+			if res.VoteGranted {
+				ballot.Vote()
+			}
+		}
+		if ballot.Pass() {
+			n.transferToLeader()
 			return
 		}
-
-		if res.VoteGranted {
-			votes += 1
-		}
-	}
-	if votes >= (len(n.peers)+1)/2 {
-		n.transferToLeader()
-		return
 	}
 
-	c.node.logger.Printf("%s elect as leader failed, try elect leader later", n.id)
-	initElectionTimeout := calculateElectionTimeout(n.raftConfigs)
-	c.cancelElectionTimeoutFunc = n.scheduleOnce(initElectionTimeout, c.electAsLeader)
+	c.node.logger.Printf("%s elect as leader failed, try elect leader later. error :%s", n.id, err)
+	timeout := calculateElectionTimeout(n.raftConfigs)
+	c.cancelElectionTimeoutFunc = n.scheduleOnce(timeout, c.electAsLeader)
 }
 
 func (c *Candidate) buildRequestVoteRequest() (*protos.RequestVoteRequest, error) {
@@ -316,9 +325,9 @@ func (c *Candidate) buildRequestVoteRequest() (*protos.RequestVoteRequest, error
 
 func (c *Candidate) broadcastRequestVote(req *protos.RequestVoteRequest) map[string]*protos.RequestVoteResponse {
 	type BroadcastResponse struct {
-		peerId string
+		peerId   string
 		response *protos.RequestVoteResponse
-		err error
+		err      error
 	}
 	responseChan := make(chan BroadcastResponse, len(c.node.peers))
 	for peerId, peer := range c.node.peers {
@@ -411,8 +420,7 @@ func (n *Node) Start() error {
 	defer n.lock.Unlock()
 
 	if len(n.peers) > 0 {
-		initElectionTimeout := calculateElectionTimeout(n.raftConfigs)
-		n.transferToInitState(initElectionTimeout)
+		n.transferToFollower()
 		return nil
 	}
 
@@ -478,15 +486,15 @@ func (n *Node) transferToLeader() {
 	n.transferState(&Leader{node: n})
 }
 
-func (n *Node) transferToFollower(peer PeerNode, electionTimeoutMs int64) {
-	n.logger.Printf("choose %s as leader", peer.Id)
+func (n *Node) transferToFollowerWithLeader(leader PeerNode, electionTimeoutMs int64) {
+	n.logger.Printf("choose %s as leader", leader.Id)
 	n.transferState(&Follower{
 		node:     n,
-		leaderId: peer.Id,
+		leaderId: leader.Id,
 	})
 }
 
-func (n *Node) transferToInitState(electionTimeoutMs int64) {
+func (n *Node) transferToFollower() {
 	n.transferState(&Follower{
 		node:     n,
 		leaderId: "",
