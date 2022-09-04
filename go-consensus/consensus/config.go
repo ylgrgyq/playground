@@ -154,7 +154,7 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 		SelfEndpoint:       *selfEndpoint,
 		RpcType:            toValidRpcType(yc.RpcType),
 		PeerEndpoints:      peers,
-		RaftConfigurations: config,
+		RaftConfigurations: *config,
 	}, nil
 }
 

@@ -315,14 +315,26 @@ func (c *Candidate) buildRequestVoteRequest() (*protos.RequestVoteRequest, error
 }
 
 func (c *Candidate) broadcastRequestVote(req *protos.RequestVoteRequest) map[string]*protos.RequestVoteResponse {
-	responses := make(map[string]*protos.RequestVoteResponse)
+	type BroadcastResponse struct {
+		peerId string
+		response *protos.RequestVoteResponse
+		err error
+	}
+	responseChan := make(chan BroadcastResponse, len(c.node.peers))
 	for peerId, peer := range c.node.peers {
-		res, err := c.node.rpcClient.RequestVote(c.node.id, peer.Endpoint, req)
-		if err != nil {
-			c.node.logger.Printf("request vote for peer: %s failed. %s", peerId, err)
+		go func() {
+			res, err := c.node.rpcClient.RequestVote(c.node.id, peer.Endpoint, req)
+			responseChan <- BroadcastResponse{peerId: peerId, response: res, err: err}
+		}()
+	}
+
+	responses := make(map[string]*protos.RequestVoteResponse)
+	for res := range responseChan {
+		if res.err != nil {
+			c.node.logger.Printf("request vote for peer: %s failed. %s", res.peerId, res.err)
 			continue
 		}
-		responses[peerId] = res
+		responses[res.peerId] = res.response
 	}
 
 	return responses
