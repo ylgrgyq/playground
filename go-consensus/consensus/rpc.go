@@ -37,8 +37,8 @@ type RpcClient interface {
 }
 
 type RpcHandler interface {
-	HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
-	HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
+	HandleRequestVote(ctx context.Context, from string, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
+	HandleAppendEntries(ctx context.Context, from string, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
 
 func NewRpcService(logger *log.Logger, rpcType RpcType, endpoint protos.Endpoint) (RpcService, error) {
@@ -59,6 +59,7 @@ const (
 
 type HttpRpcService struct {
 	server         *http.Server
+	client         *http.Client
 	apiToUriMap    map[RpcAPI]RequestApiUri
 	rpcHandlers    map[string]RpcHandler
 	selfEndpoint   protos.Endpoint
@@ -139,7 +140,7 @@ func (h *HttpRpcService) sendRequest(api RpcAPI, fromNodeId string, toNodeEndpoi
 	}
 
 	reqUrl := buildRequestUrl(toNodeEndpoint, uri)
-	postResp, err := http.Post(reqUrl, "application/octet-stream", bytes.NewBuffer(reqInBytes))
+	postResp, err := h.client.Post(reqUrl, "application/octet-stream", bytes.NewBuffer(reqInBytes))
 	if err != nil {
 		return err
 	}
@@ -169,7 +170,10 @@ func (h *HttpRpcService) sendRequest(api RpcAPI, fromNodeId string, toNodeEndpoi
 func NewHttpRpc(selfEndpoint protos.Endpoint, logger *log.Logger) *HttpRpcService {
 	selfEndpointId := EndpointId(&selfEndpoint)
 	httpRpcServiceLogger := log.New(logger.Writer(), "[HttpRpc]", logger.Flags())
-	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, selfEndpointId: selfEndpointId, logger: *httpRpcServiceLogger}
+	httpClient := http.Client{
+		Timeout: 10 * time.Second,
+	}
+	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, selfEndpointId: selfEndpointId, logger: *httpRpcServiceLogger, client: &httpClient}
 
 	serverMux := http.NewServeMux()
 	serverMux.HandleFunc(RequestVoteUri, httpRpcService.wrapRequestHandler(
@@ -187,7 +191,7 @@ func NewHttpRpc(selfEndpoint protos.Endpoint, logger *log.Logger) *HttpRpcServic
 				reqBody.LastLogTerm,
 				reqBody.LastLogIndex)
 
-			res, err := handler.HandleRequestVote(ctx, &reqBody)
+			res, err := handler.HandleRequestVote(ctx, rawReq.From, &reqBody)
 			if err != nil {
 				return nil, err
 			}
@@ -215,7 +219,7 @@ func NewHttpRpc(selfEndpoint protos.Endpoint, logger *log.Logger) *HttpRpcServic
 				reqBody.LeaderId,
 				reqBody.LeaderCommit)
 
-			res, err := handler.HandleAppendEntries(ctx, &reqBody)
+			res, err := handler.HandleAppendEntries(ctx, rawReq.From, &reqBody)
 			if err != nil {
 				return nil, err
 			}
@@ -285,7 +289,7 @@ type requestHandler func(ctx context.Context, rawRequest *protos.Request, handle
 
 func (h *HttpRpcService) wrapRequestHandler(f requestHandler) func(writer http.ResponseWriter, request *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
-		rawReq, err:= decodeRequest(writer, request)
+		rawReq, err := decodeRequest(writer, request)
 		if err != nil {
 			h.logger.Printf("decode request failed. url: %s, error: %s", request.URL, err.Error())
 			return

@@ -78,11 +78,22 @@ type yamlRaftConfigurations struct {
 	PingTimeoutMs     int64 `yaml:"pingTimeoutMs"`
 }
 
-func (yc *yamlRaftConfigurations) toRaftConfigurations() RaftConfigurations {
-	return RaftConfigurations{
+func (yc *yamlRaftConfigurations) toRaftConfigurations() (*RaftConfigurations, error) {
+	if yc.PingTimeoutMs <= 0 {
+		return nil, fmt.Errorf("invalid PingTimeoutMs: %d", yc.PingTimeoutMs)
+	}
+	if yc.ElectionTimeoutMs <= 0 {
+		return nil, fmt.Errorf("invalid ElectionTimeoutMs: %d", yc.ElectionTimeoutMs)
+	}
+
+	if yc.ElectionTimeoutMs < 2 * yc.PingTimeoutMs {
+		return nil, fmt.Errorf("invalid ElectionTimeoutMs: %d. ElectionTimeoutMs is at least twice as large as PingTimeoutMs", yc.ElectionTimeoutMs)
+	}
+
+	return &RaftConfigurations{
 		ElectionTimeoutMs: yc.ElectionTimeoutMs,
 		PingTimeoutMs:     yc.PingTimeoutMs,
-	}
+	}, nil
 }
 
 type yamlConfigurations struct {
@@ -134,12 +145,16 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 
 		peers = append(peers, *peerEndpoint)
 	}
+	config, err := yc.RaftConfigurations.toRaftConfigurations()
+	if err != nil {
+		return nil, fmt.Errorf("invalid raft configuration, %s", err.Error())
+	}
 
 	return &Configurations{
 		SelfEndpoint:       *selfEndpoint,
 		RpcType:            toValidRpcType(yc.RpcType),
 		PeerEndpoints:      peers,
-		RaftConfigurations: yc.RaftConfigurations.toRaftConfigurations(),
+		RaftConfigurations: config,
 	}, nil
 }
 

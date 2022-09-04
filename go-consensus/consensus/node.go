@@ -125,11 +125,11 @@ type Follower struct {
 	node                      *Node
 	leaderId                  string
 	cancelElectionTimeoutFunc context.CancelFunc
-	startElectionTimeout      int64
 }
 
 func (f *Follower) Start() {
-	f.scheduleElectionTimeout(f.startElectionTimeout)
+	startElectionTimeout := calculateElectionTimeout(f.node.raftConfigs)
+	f.scheduleElectionTimeout(startElectionTimeout)
 }
 
 func (f *Follower) Stop() {
@@ -267,7 +267,8 @@ func (c *Candidate) electAsLeader() {
 
 	req, err := c.buildRequestVoteRequest()
 	if err != nil {
-		c.cancelElectionTimeoutFunc = n.scheduleOnce(n.raftConfigs.ElectionTimeoutMs, c.electAsLeader)
+		timeout := calculateElectionTimeout(n.raftConfigs)
+		c.cancelElectionTimeoutFunc = n.scheduleOnce(timeout, c.electAsLeader)
 		return
 	}
 	reps := c.broadcastRequestVote(req)
@@ -290,7 +291,7 @@ func (c *Candidate) electAsLeader() {
 	}
 
 	c.node.logger.Printf("%s elect as leader failed, try elect leader later", n.id)
-	initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
+	initElectionTimeout := calculateElectionTimeout(n.raftConfigs)
 	c.cancelElectionTimeoutFunc = n.scheduleOnce(initElectionTimeout, c.electAsLeader)
 }
 
@@ -339,7 +340,7 @@ type PeerNode struct {
 func NewPeerNodes(es []protos.Endpoint) map[string]PeerNode {
 	peers := make(map[string]PeerNode)
 	for _, e := range es {
-		id := EndpointId(&e)
+		id := e.NodeId
 		peer := PeerNode{Id: id, Endpoint: e}
 		peers[id] = peer
 	}
@@ -398,7 +399,7 @@ func (n *Node) Start() error {
 	defer n.lock.Unlock()
 
 	if len(n.peers) > 0 {
-		initElectionTimeout := rand.Int63n(n.raftConfigs.ElectionTimeoutMs)
+		initElectionTimeout := calculateElectionTimeout(n.raftConfigs)
 		n.transferToInitState(initElectionTimeout)
 		return nil
 	}
@@ -407,19 +408,25 @@ func (n *Node) Start() error {
 	return nil
 }
 
-func (n *Node) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+func (n *Node) HandleRequestVote(ctx context.Context, fromNodeId string, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
 	if !n.lock.TryLock() {
 		return nil, fmt.Errorf("node is busy, retry later")
 	}
 	defer n.lock.Unlock()
+	if _, ok := n.peers[fromNodeId]; !ok {
+		return nil, fmt.Errorf("unknown peer node: %s", fromNodeId)
+	}
 	return n.state.HandleRequestVote(ctx, request)
 }
 
-func (n *Node) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+func (n *Node) HandleAppendEntries(ctx context.Context, fromNodeId string, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	if !n.lock.TryLock() {
 		return nil, fmt.Errorf("node is busy, retry later")
 	}
 	defer n.lock.Unlock()
+	if _, ok := n.peers[fromNodeId]; !ok {
+		return nil, fmt.Errorf("unknown peer node: %s", fromNodeId)
+	}
 	return n.state.HandleAppendEntries(ctx, request)
 }
 
@@ -462,17 +469,15 @@ func (n *Node) transferToLeader() {
 func (n *Node) transferToFollower(peer PeerNode, electionTimeoutMs int64) {
 	n.logger.Printf("choose %s as leader", peer.Id)
 	n.transferState(&Follower{
-		node:                 n,
-		startElectionTimeout: electionTimeoutMs,
-		leaderId:             peer.Id,
+		node:     n,
+		leaderId: peer.Id,
 	})
 }
 
 func (n *Node) transferToInitState(electionTimeoutMs int64) {
 	n.transferState(&Follower{
-		node:                 n,
-		startElectionTimeout: electionTimeoutMs,
-		leaderId:             "",
+		node:     n,
+		leaderId: "",
 	})
 }
 
@@ -489,4 +494,13 @@ func (n *Node) transferState(newState State) {
 	}
 	n.state = newState
 	n.state.Start()
+}
+
+func calculateElectionTimeout(config RaftConfigurations) int64 {
+	for {
+		timeout := rand.Int63n(config.ElectionTimeoutMs)
+		if timeout > config.PingTimeoutMs {
+			return timeout
+		}
+	}
 }
