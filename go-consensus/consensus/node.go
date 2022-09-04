@@ -19,16 +19,18 @@ const (
 )
 
 type Ballot struct {
-	peerSize int
-	vote     int
+	peers map[string]PeerNode
+	vote  int
 }
 
-func (b *Ballot) Vote() {
-	b.vote += 1
+func (b *Ballot) CountVoteFrom(peerNodeId string) {
+	if _, ok:= b.peers[peerNodeId]; ok {
+		b.vote += 1
+	}
 }
 
 func (b *Ballot) Pass() bool {
-	return b.vote >= (b.peerSize+1)/2
+	return b.vote >= (len(b.peers)+1)/2
 }
 
 type State interface {
@@ -167,16 +169,15 @@ func (c *Candidate) electAsLeader() {
 	req, err := c.buildRequestVoteRequest()
 	if err == nil {
 		reps := c.broadcastRequestVote(req)
-
-		ballot := Ballot{peerSize: len(c.node.peers)}
-		for _, res := range reps {
+		ballot := Ballot{peers: c.node.peers}
+		for peerId, res := range reps {
 			if res.Term > n.meta.GetMeta().CurrentTerm {
 				n.transferToFollower()
 				return
 			}
 
 			if res.VoteGranted {
-				ballot.Vote()
+				ballot.CountVoteFrom(peerId)
 			}
 		}
 		if ballot.Pass() {
@@ -210,18 +211,28 @@ func (c *Candidate) buildRequestVoteRequest() (*protos.RequestVoteRequest, error
 }
 
 func (c *Candidate) broadcastRequestVote(req *protos.RequestVoteRequest) map[string]*protos.RequestVoteResponse {
+	c.node.lock.Unlock()
+	defer c.node.lock.Lock()
 	type BroadcastResponse struct {
 		peerId   string
 		response *protos.RequestVoteResponse
 		err      error
 	}
+	group := sync.WaitGroup{}
+	group.Add(len(c.node.peers))
 	responseChan := make(chan BroadcastResponse, len(c.node.peers))
 	for peerId, peer := range c.node.peers {
-		go func() {
+		go func(peerId string, peer PeerNode) {
+			defer group.Done()
 			res, err := c.node.rpcClient.RequestVote(c.node.id, peer.Endpoint, req)
 			responseChan <- BroadcastResponse{peerId: peerId, response: res, err: err}
-		}()
+		}(peerId, peer)
 	}
+
+	go func() {
+		group.Wait()
+		close(responseChan)
+	}()
 
 	responses := make(map[string]*protos.RequestVoteResponse)
 	for res := range responseChan {
@@ -233,10 +244,6 @@ func (c *Candidate) broadcastRequestVote(req *protos.RequestVoteRequest) map[str
 	}
 
 	return responses
-}
-
-func EndpointId(e *protos.Endpoint) string {
-	return fmt.Sprintf("%s:%d", e.Ip, e.Port)
 }
 
 type PeerNode struct {
@@ -315,9 +322,7 @@ func (n *Node) Start() error {
 }
 
 func (n *Node) HandleRequestVote(ctx context.Context, fromNodeId string, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	if !n.lock.TryLock() {
-		return nil, fmt.Errorf("node is busy, retry later")
-	}
+	n.lock.Lock()
 	defer n.lock.Unlock()
 	if _, ok := n.peers[fromNodeId]; !ok {
 		return nil, fmt.Errorf("unknown peer node: %s", fromNodeId)
@@ -361,9 +366,7 @@ func (n *Node) HandleRequestVote(ctx context.Context, fromNodeId string, request
 }
 
 func (n *Node) HandleAppendEntries(ctx context.Context, fromNodeId string, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
-	if !n.lock.TryLock() {
-		return nil, fmt.Errorf("node is busy, retry later")
-	}
+	n.lock.Lock()
 	defer n.lock.Unlock()
 	if _, ok := n.peers[fromNodeId]; !ok {
 		return nil, fmt.Errorf("unknown peer node: %s", fromNodeId)

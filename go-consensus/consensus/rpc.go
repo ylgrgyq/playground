@@ -93,37 +93,43 @@ func (h *HttpRpcService) Shutdown(context context.Context) error {
 }
 
 func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint protos.Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	h.logger.Printf("send request vote. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d to %s",
+	h.logger.Printf("send RequestVote from %s to %s. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d",
+		fromNodeId,
+		nodeEndpoint.NodeId,
 		request.Term,
 		request.CandidateId,
 		request.LastLogTerm,
-		request.LastLogIndex,
-		EndpointId(&nodeEndpoint))
+		request.LastLogIndex)
 	var res protos.RequestVoteResponse
 	err := h.sendRequest(RequestVote, fromNodeId, nodeEndpoint, request, &res)
 	if err != nil {
 		return nil, err
 	}
-	h.logger.Printf("receive request vote response. Term: %d, VoteGranted: %t from %s",
+	h.logger.Printf("receive RequestVote response from %s to %s. Term: %d, VoteGranted: %t",
+		nodeEndpoint.NodeId,
+		fromNodeId,
 		res.Term,
-		res.VoteGranted,
-		EndpointId(&nodeEndpoint))
+		res.VoteGranted)
 	return &res, nil
 }
 
 func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint protos.Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
-	h.logger.Printf("send append entries. Term: %d, LeaderId: \"%s\", LeaderCommit: %d to %s",
+	h.logger.Printf("send AppendEntries from %s to %s. Term: %d, LeaderId: \"%s\", LeaderCommit: %d",
+		fromNodeId,
+		nodeEndpoint.NodeId,
 		request.Term,
 		request.LeaderId,
-		request.LeaderCommit,
-		EndpointId(&nodeEndpoint))
+		request.LeaderCommit)
 	var res protos.AppendEntriesResponse
 	err := h.sendRequest(AppendEntries, fromNodeId, nodeEndpoint, request, &res)
 	if err != nil {
 		return nil, err
 	}
-	h.logger.Printf("receive append entries response. Term: %d, Success: %t from %s",
-		res.Term, res.Success, EndpointId(&nodeEndpoint))
+	h.logger.Printf("receive AppendEntries response from %s to %s. Term: %d, Success: %t",
+		nodeEndpoint.NodeId,
+		fromNodeId,
+		res.Term,
+		res.Success)
 	return &res, nil
 }
 
@@ -168,12 +174,11 @@ func (h *HttpRpcService) sendRequest(api RpcAPI, fromNodeId string, toNodeEndpoi
 }
 
 func NewHttpRpc(selfEndpoint protos.Endpoint, logger *log.Logger) *HttpRpcService {
-	selfEndpointId := EndpointId(&selfEndpoint)
 	httpRpcServiceLogger := log.New(logger.Writer(), "[HttpRpc]", logger.Flags())
 	httpClient := http.Client{
 		Timeout: 10 * time.Second,
 	}
-	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, selfEndpointId: selfEndpointId, logger: *httpRpcServiceLogger, client: &httpClient}
+	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, logger: *httpRpcServiceLogger, client: &httpClient}
 
 	serverMux := http.NewServeMux()
 	serverMux.HandleFunc(RequestVoteUri, httpRpcService.wrapRequestHandler(
@@ -183,7 +188,7 @@ func NewHttpRpc(selfEndpoint protos.Endpoint, logger *log.Logger) *HttpRpcServic
 				return nil, err
 			}
 
-			httpRpcServiceLogger.Printf("receive request vote from %s, to %s. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d",
+			httpRpcServiceLogger.Printf("receive RequestVote from %s, to %s. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d",
 				rawReq.From,
 				rawReq.To,
 				reqBody.Term,
@@ -196,9 +201,9 @@ func NewHttpRpc(selfEndpoint protos.Endpoint, logger *log.Logger) *HttpRpcServic
 				return nil, err
 			}
 
-			httpRpcServiceLogger.Printf("send request vote response from: %s, to: %s. Term: %d, VoteGranted: %t",
-				rawReq.To,
+			httpRpcServiceLogger.Printf("process RequestVote from: %s, to: %s done. Term: %d, VoteGranted: %t",
 				rawReq.From,
+				rawReq.To,
 				res.Term,
 				res.VoteGranted)
 
@@ -212,7 +217,7 @@ func NewHttpRpc(selfEndpoint protos.Endpoint, logger *log.Logger) *HttpRpcServic
 				return nil, err
 			}
 
-			httpRpcServiceLogger.Printf("receive append entries from %s, to %s. Term: %d, LeaderId: \"%s\", LeaderCommit: %d",
+			httpRpcServiceLogger.Printf("receive AppendEntriesRequest from %s, to %s. Term: %d, LeaderId: \"%s\", LeaderCommit: %d",
 				rawReq.From,
 				rawReq.To,
 				reqBody.Term,
@@ -224,9 +229,9 @@ func NewHttpRpc(selfEndpoint protos.Endpoint, logger *log.Logger) *HttpRpcServic
 				return nil, err
 			}
 
-			httpRpcServiceLogger.Printf("send append entries response from: %s, to: %s. Term: %d, Success: %t",
-				rawReq.To,
+			httpRpcServiceLogger.Printf("process AppendEntriesRequest from: %s, to: %s done. Term: %d, Success: %t",
 				rawReq.From,
+				rawReq.To,
 				res.Term,
 				res.Success)
 

@@ -44,7 +44,7 @@ func parseCommandLineArguments() CommandLineOptions {
 }
 
 func Main() {
-	logger := log.New(log.Writer(), "[Main]", log.LstdFlags|log.Lshortfile|log.Lmsgprefix)
+	logger := log.New(log.Writer(), "[Main]", log.LstdFlags|log.Lshortfile|log.Lmsgprefix|log.Lmicroseconds)
 	cliOpts := parseCommandLineArguments()
 
 	config, err := ParseConfig(cliOpts.ConfigurationFilePath)
