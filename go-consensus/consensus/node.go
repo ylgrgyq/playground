@@ -35,7 +35,6 @@ type State interface {
 	Start()
 	StateType() StateType
 	HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
-	HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
 	Stop()
 }
 
@@ -63,43 +62,6 @@ func (l *Leader) Stop() {
 
 func (_ *Leader) StateType() StateType {
 	return LeaderState
-}
-
-func (l *Leader) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	meta := l.node.meta.GetMeta()
-	reqTerm := request.Term
-	if reqTerm < meta.CurrentTerm {
-		return &protos.RequestVoteResponse{
-			Term:        int64(meta.CurrentTerm),
-			VoteGranted: false,
-		}, nil
-	}
-
-	if reqTerm == meta.CurrentTerm {
-		return &protos.RequestVoteResponse{
-			Term:        int64(meta.CurrentTerm),
-			VoteGranted: false,
-		}, nil
-	}
-
-	lastEntry := l.node.logStorage.LastEntry()
-	if !lastEntry.IsAtLeastUpToDateThanMe(request.LastLogTerm, request.LastLogIndex) {
-		return &protos.RequestVoteResponse{
-			Term:        int64(meta.CurrentTerm),
-			VoteGranted: false,
-		}, nil
-	}
-
-	peer := l.node.peers[request.CandidateId]
-	meta = Meta{CurrentTerm: reqTerm, VoteFor: request.CandidateId}
-	if err := l.node.meta.SaveMeta(meta); err != nil {
-		return nil, err
-	}
-	l.node.transferToFollowerWithLeader(peer, l.node.raftConfigs.ElectionTimeoutMs)
-	return &protos.RequestVoteResponse{
-		Term:        int64(meta.CurrentTerm),
-		VoteGranted: true,
-	}, nil
 }
 
 func (l *Leader) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
@@ -163,45 +125,6 @@ func (f *Follower) HandleAppendEntries(ctx context.Context, request *protos.Appe
 	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
 }
 
-func (f *Follower) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	meta := f.node.meta.GetMeta()
-	reqTerm := request.Term
-	if reqTerm < meta.CurrentTerm {
-		return &protos.RequestVoteResponse{
-			Term:        meta.CurrentTerm,
-			VoteGranted: false,
-		}, nil
-	}
-
-	lastEntry := f.node.logStorage.LastEntry()
-	if !lastEntry.IsAtLeastUpToDateThanMe(request.LastLogTerm, request.LastLogIndex) {
-		return &protos.RequestVoteResponse{
-			Term:        meta.CurrentTerm,
-			VoteGranted: false,
-		}, nil
-	}
-
-	if reqTerm == meta.CurrentTerm {
-		if len(meta.VoteFor) > 0 && meta.VoteFor != request.CandidateId {
-			return &protos.RequestVoteResponse{
-				Term:        meta.CurrentTerm,
-				VoteGranted: false,
-			}, nil
-		}
-	}
-
-	peer := f.node.peers[request.CandidateId]
-	meta = Meta{CurrentTerm: reqTerm, VoteFor: request.CandidateId}
-	if err := f.node.meta.SaveMeta(meta); err != nil {
-		return nil, err
-	}
-	f.node.transferToFollowerWithLeader(peer, f.node.raftConfigs.ElectionTimeoutMs)
-	return &protos.RequestVoteResponse{
-		Term:        meta.CurrentTerm,
-		VoteGranted: true,
-	}, nil
-}
-
 func (f *Follower) scheduleElectionTimeout(timeout int64) {
 	f.cancelElectionTimeoutFunc = f.node.scheduleOnce(timeout, func() {
 		// todo 收到 append entries 后不要 cancel election timeout
@@ -235,43 +158,6 @@ func (_ *Candidate) StateType() StateType {
 func (c *Candidate) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	meta := c.node.meta.GetMeta()
 	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
-}
-
-func (c *Candidate) HandleRequestVote(ctx context.Context, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
-	meta := c.node.meta.GetMeta()
-	reqTerm := request.Term
-	if reqTerm < meta.CurrentTerm {
-		return &protos.RequestVoteResponse{
-			Term:        meta.CurrentTerm,
-			VoteGranted: false,
-		}, nil
-	}
-
-	if reqTerm == meta.CurrentTerm {
-		return &protos.RequestVoteResponse{
-			Term:        meta.CurrentTerm,
-			VoteGranted: false,
-		}, nil
-	}
-
-	lastEntry := c.node.logStorage.LastEntry()
-	if !lastEntry.IsAtLeastUpToDateThanMe(request.LastLogTerm, request.LastLogIndex) {
-		return &protos.RequestVoteResponse{
-			Term:        meta.CurrentTerm,
-			VoteGranted: false,
-		}, nil
-	}
-
-	peer := c.node.peers[request.CandidateId]
-	meta = Meta{CurrentTerm: reqTerm, VoteFor: request.CandidateId}
-	if err := c.node.meta.SaveMeta(meta); err != nil {
-		return nil, err
-	}
-	c.node.transferToFollowerWithLeader(peer, c.node.raftConfigs.ElectionTimeoutMs)
-	return &protos.RequestVoteResponse{
-		Term:        int64(meta.CurrentTerm),
-		VoteGranted: true,
-	}, nil
 }
 
 func (c *Candidate) electAsLeader() {
@@ -436,7 +322,42 @@ func (n *Node) HandleRequestVote(ctx context.Context, fromNodeId string, request
 	if _, ok := n.peers[fromNodeId]; !ok {
 		return nil, fmt.Errorf("unknown peer node: %s", fromNodeId)
 	}
-	return n.state.HandleRequestVote(ctx, request)
+	meta := n.meta.GetMeta()
+	reqTerm := request.Term
+	if reqTerm < meta.CurrentTerm {
+		return &protos.RequestVoteResponse{
+			Term:        int64(meta.CurrentTerm),
+			VoteGranted: false,
+		}, nil
+	}
+
+	if reqTerm == meta.CurrentTerm {
+		if len(meta.VoteFor) > 0 && meta.VoteFor != request.CandidateId {
+			return &protos.RequestVoteResponse{
+				Term:        meta.CurrentTerm,
+				VoteGranted: false,
+			}, nil
+		}
+
+		lastEntry := n.logStorage.LastEntry()
+		if !lastEntry.IsAtLeastUpToDateThanMe(request.LastLogTerm, request.LastLogIndex) {
+			return &protos.RequestVoteResponse{
+				Term:        meta.CurrentTerm,
+				VoteGranted: false,
+			}, nil
+		}
+	}
+
+	peer := n.peers[request.CandidateId]
+	meta = Meta{CurrentTerm: reqTerm, VoteFor: request.CandidateId}
+	if err := n.meta.SaveMeta(meta); err != nil {
+		return nil, err
+	}
+	n.transferToFollowerWithLeader(peer)
+	return &protos.RequestVoteResponse{
+		Term:        int64(meta.CurrentTerm),
+		VoteGranted: true,
+	}, nil
 }
 
 func (n *Node) HandleAppendEntries(ctx context.Context, fromNodeId string, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
@@ -447,6 +368,7 @@ func (n *Node) HandleAppendEntries(ctx context.Context, fromNodeId string, reque
 	if _, ok := n.peers[fromNodeId]; !ok {
 		return nil, fmt.Errorf("unknown peer node: %s", fromNodeId)
 	}
+
 	return n.state.HandleAppendEntries(ctx, request)
 }
 
@@ -486,7 +408,7 @@ func (n *Node) transferToLeader() {
 	n.transferState(&Leader{node: n})
 }
 
-func (n *Node) transferToFollowerWithLeader(leader PeerNode, electionTimeoutMs int64) {
+func (n *Node) transferToFollowerWithLeader(leader PeerNode) {
 	n.logger.Printf("choose %s as leader", leader.Id)
 	n.transferState(&Follower{
 		node:     n,
