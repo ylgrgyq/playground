@@ -1,13 +1,16 @@
 rpcType: "http"
 
 selfEndpoint:
+  nodeId: node1
   ip: "127.0.0.1"
   port: 8081
 
 peerEndpoints:
-  - ip: "127.0.0.1"
+  - nodeId: node2
+    ip: "127.0.0.1"
     port: 8082
-  - ip: "127.0.0.1"
+  - nodeId: node3
+    ip: "127.0.0.1"
     port: 8083
 
 

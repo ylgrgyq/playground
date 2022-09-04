@@ -366,15 +366,16 @@ type Node struct {
 	logger       *log.Logger
 }
 
-func NewNode(configs *Configurations, rpcClient RpcClient, logger *log.Logger) *Node {
-	nodeLogger := log.New(logger.Writer(), "[Node]", logger.Flags())
+func NewNode(configs *Configurations, rpcService RpcService, logger *log.Logger) *Node {
+	nodeLogger := log.New(logger.Writer(), fmt.Sprintf("[Node-%s]", configs.SelfEndpoint.NodeId), logger.Flags())
+	rpcClient := rpcService.GetRpcClient()
 	node := Node{
-		id:           EndpointId(&configs.SelfEndpoint),
+		id:           configs.SelfEndpoint.NodeId,
 		selfEndpoint: configs.SelfEndpoint,
 		peers:        NewPeerNodes(configs.PeerEndpoints),
 		commitIndex:  -1,
 		lastApplied:  -1,
-		meta:         NewTestingMeta(logger),
+		meta:         NewTestingMeta(configs.SelfEndpoint.NodeId, logger),
 		scheduler:    NewScheduler(),
 		raftConfigs:  configs.RaftConfigurations,
 		rpcClient:    rpcClient,
@@ -382,6 +383,9 @@ func NewNode(configs *Configurations, rpcClient RpcClient, logger *log.Logger) *
 		Done:         make(chan struct{}),
 		lock:         sync.Mutex{},
 		logger:       nodeLogger,
+	}
+	if err := rpcService.RegisterRpcHandler(&node); err != nil {
+		logger.Fatalf("register node: %s to rpc service failed: %s", node.id, err)
 	}
 
 	return &node
@@ -537,7 +541,6 @@ func Main() {
 		logger.Fatalf("parse config failed: %s", err)
 	}
 
-
 	logger.Printf("%s", config)
 
 	rpcService, err := NewRpcService(logger, config.RpcType, config.SelfEndpoint)
@@ -545,12 +548,7 @@ func Main() {
 		logger.Fatalf("create rpc service failed: %s", err)
 	}
 
-	rpcClient := rpcService.GetRpcClient()
-	node := NewNode(config, rpcClient, logger)
-
-	if err = rpcService.RegisterRpcHandler(node); err != nil {
-		logger.Fatalf("create rpc service failed: %s", err)
-	}
+	node := NewNode(config, rpcService, logger)
 
 	go func() {
 		if err := rpcService.Start(); err != nil {

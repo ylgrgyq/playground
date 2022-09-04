@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"context"
+	"fmt"
 	"log"
 )
 
@@ -41,7 +42,7 @@ func (t *TestingMeta) GetMeta() Meta {
 	return t.meta
 }
 
-func NewTestingMeta(logger *log.Logger) MetaStorage {
+func NewTestingMeta(nodeId string, logger *log.Logger) MetaStorage {
 	meta := Meta{1, ""}
-	return &TestingMeta{meta: meta, logger: log.New(logger.Writer(), "[Meta]", logger.Flags())}
+	return &TestingMeta{meta: meta, logger: log.New(logger.Writer(), fmt.Sprintf("[Meta-%s]", nodeId), logger.Flags())}
 }

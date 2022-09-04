@@ -45,12 +45,15 @@ func (c *Configurations) String() string {
 	b := strings.Builder{}
 	b.WriteString("\n")
 	b.WriteString("********************************* Configurations *********************************\n\n")
+	b.WriteString(fmt.Sprintf("NodeId: %s\n", c.SelfEndpoint.NodeId))
+	b.WriteString("\n")
 	b.WriteString(fmt.Sprintf("RpcType: %s\n", c.RpcType))
 	b.WriteString(fmt.Sprintf("IP: %s\n", c.SelfEndpoint.Ip))
 	b.WriteString(fmt.Sprintf("Port: %d\n", c.SelfEndpoint.Port))
 	b.WriteString("\n")
 	b.WriteString("PeerEndpoints:\n")
 	for _, peer := range c.PeerEndpoints {
+		b.WriteString(fmt.Sprintf("  NodeId: %s\n", peer.NodeId))
 		b.WriteString(fmt.Sprintf("  IP: %s\n", peer.Ip))
 		b.WriteString(fmt.Sprintf("  Port: %d\n", peer.Port))
 		b.WriteString("\n")
@@ -64,8 +67,9 @@ func (c *Configurations) String() string {
 }
 
 type yamlEndpoint struct {
-	IP   string `yaml:"ip"`
-	Port uint32 `yaml:"port"`
+	NodeId string `yaml:"nodeId"`
+	IP     string `yaml:"ip"`
+	Port   uint32 `yaml:"port"`
 }
 
 type yamlRaftConfigurations struct {
@@ -76,7 +80,7 @@ type yamlRaftConfigurations struct {
 func (yc *yamlRaftConfigurations) toRaftConfigurations() RaftConfigurations {
 	return RaftConfigurations{
 		ElectionTimeoutMs: yc.ElectionTimeoutMs,
-		PingTimeoutMs: yc.PingTimeoutMs,
+		PingTimeoutMs:     yc.PingTimeoutMs,
 	}
 }
 
@@ -95,6 +99,7 @@ func (ye *yamlEndpoint) toStdEndpoint() (*protos.Endpoint, error) {
 		return nil, fmt.Errorf("invalid port: %d", ye.Port)
 	}
 	return &protos.Endpoint{
+		NodeId: ye.NodeId,
 		Ip:   ye.IP,
 		Port: ye.Port,
 	}, nil
@@ -115,7 +120,7 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 			return nil, fmt.Errorf("PeerEndpoint, %s", err.Error())
 		}
 
-		if selfEndpoint.Ip == peerEndpoint.Ip && selfEndpoint.Port == peerEndpoint.Port {
+		if selfEndpoint.NodeId == peerEndpoint.NodeId {
 			return nil, fmt.Errorf("SelfEndpoint can't in peer endpoints")
 		}
 

@@ -5,8 +5,9 @@ package consensus.protos;
 option go_package = "./consensus/protos";
 
 message Endpoint {
-    string ip = 1;
-    uint32 port = 2;
+    string nodeId = 1;
+    string ip = 2;
+    uint32 port = 3;
 }
 message RequestVoteRequest {
 	int64 term = 1;
