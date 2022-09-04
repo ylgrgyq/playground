@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"regexp"
 	"strings"
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
@@ -92,6 +93,13 @@ type yamlConfigurations struct {
 }
 
 func (ye *yamlEndpoint) toStdEndpoint() (*protos.Endpoint, error) {
+	if len(ye.NodeId) == 0 {
+		return nil, fmt.Errorf("invalid empty NodeId")
+	}
+	if !regexp.MustCompile(`^[a-zA-Z0-9]*$`).MatchString(ye.NodeId) {
+		return nil, fmt.Errorf("nodeId must be an alphanumeric string")
+	}
+
 	if len(ye.IP) == 0 {
 		return nil, fmt.Errorf("invalid empty IP")
 	}

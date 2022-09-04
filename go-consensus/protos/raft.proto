@@ -42,8 +42,9 @@ message ErrorResponse {
 
 message Request {
     string mid = 1;
-    Endpoint from = 2;
-    bytes body = 3;
+    string from = 2;
+    string to = 3;
+    bytes body = 4;
 }
 
 message Response {
