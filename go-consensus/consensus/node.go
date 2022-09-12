@@ -19,12 +19,12 @@ const (
 )
 
 type Ballot struct {
-	peers map[string]PeerNode
+	peers map[string]*PeerNode
 	vote  int
 }
 
 func (b *Ballot) CountVoteFrom(peerNodeId string) {
-	if _, ok:= b.peers[peerNodeId]; ok {
+	if _, ok := b.peers[peerNodeId]; ok {
 		b.vote += 1
 	}
 }
@@ -47,11 +47,33 @@ type Leader struct {
 }
 
 func (l *Leader) Start() {
+	for _, peer := range l.node.peers {
+		peer.initialize(l.node.logStorage)
+	}
 	l.cancelPingTimeoutFunc = l.node.schedulePeriod(
 		0,
 		l.node.raftConfigs.PingTimeoutMs,
 		func() {
-			l.broadcastAppendEntries()
+			l.node.lock.Lock()
+			defer l.node.lock.Unlock()
+			heartbeats := make(map[string]*protos.AppendEntriesRequest)
+			for _, peer := range l.node.peers {
+				heartbeats[peer.Id] = l.buildAppendEntries(peer)
+			}
+			resps := l.broadcastAppendEntries(heartbeats)
+			if l.node.state != l {
+				return
+			}
+			meta := l.node.meta.GetMeta()
+			for peerId, resp := range resps {
+				peer := l.node.peers[peerId]
+				req := heartbeats[peerId]
+				if resp.Term > meta.CurrentTerm {
+					l.node.transferToFollower()
+					return
+				}
+				l.handleAppendEntriesResponse(peer, req, resp)
+			}
 		})
 }
 
@@ -68,34 +90,79 @@ func (_ *Leader) StateType() StateType {
 
 func (l *Leader) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	meta := l.node.meta.GetMeta()
-	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
+	l.node.logger.Printf("leader: %s receive append entries request from: %s with term %d.", l.node.Id, request.LeaderId, request.Term)
+	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: false}, nil
 }
 
-func (l *Leader) broadcastAppendEntries() {
-	heartbeat := l.buildHeartbeat()
-
-	for peerId, peer := range l.node.peers {
-		_, err := l.node.rpcClient.AppendEntries(l.node.id, peer.Endpoint, heartbeat)
-		if err != nil {
-			l.node.logger.Printf("append entries to peer: %s failed. %s", peerId, err)
-			continue
-		}
-		// todo handle heartbeat response
+func (l *Leader) broadcastAppendEntries(requests map[string]*protos.AppendEntriesRequest) map[string]*protos.AppendEntriesResponse {
+	l.node.lock.Unlock()
+	defer l.node.lock.Lock()
+	type BroadcastResponse struct {
+		peerId   string
+		response *protos.AppendEntriesResponse
+		err      error
+	}
+	group := sync.WaitGroup{}
+	group.Add(len(l.node.peers))
+	responseChan := make(chan BroadcastResponse, len(l.node.peers))
+	for peerId, req := range requests{
+		go func(peerId string, req *protos.AppendEntriesRequest) {
+			defer group.Done()
+			peer := l.node.peers[peerId]
+			res, err := l.node.rpcClient.AppendEntries(l.node.Id, peer.Endpoint, req)
+			responseChan <- BroadcastResponse{peerId: peerId, response: res, err: err}
+		}(peerId, req)
 	}
 
+	go func() {
+		group.Wait()
+		close(responseChan)
+	}()
+
+	responses := make(map[string]*protos.AppendEntriesResponse)
+	for res := range responseChan {
+		if res.err != nil {
+			l.node.logger.Printf("append entries request for peer: %s failed. %s", res.peerId, res.err)
+			continue
+		}
+		responses[res.peerId] = res.response
+	}
+	return responses
 }
 
-func (l *Leader) buildHeartbeat() *protos.AppendEntriesRequest {
+func (l *Leader) buildAppendEntries(peer *PeerNode) *protos.AppendEntriesRequest {
 	meta := l.node.meta.GetMeta()
+
+	nextIndex := peer.nextIndex
+	prevLog := l.node.logStorage.GetEntry(nextIndex - 1)
+	entries := l.node.logStorage.GetEntries(nextIndex)
 
 	return &protos.AppendEntriesRequest{
 		Term:         int64(meta.CurrentTerm),
-		LeaderId:     l.node.id,
-		PrevLogIndex: 100,
-		PrevLogTerm:  100,
-		Entries:      []byte{},
-		LeaderCommit: 100,
+		LeaderId:     l.node.Id,
+		PrevLogIndex: prevLog.Index,
+		PrevLogTerm:  prevLog.Term,
+		Entries:      entries,
+		LeaderCommit: l.node.commitIndex,
 	}
+}
+
+func (l *Leader) handleAppendEntriesResponse(peer *PeerNode, req *protos.AppendEntriesRequest, resp *protos.AppendEntriesResponse)  {
+    if resp.Success {
+    	if len(req.Entries) > 0 {
+			lastEntry := req.Entries[len(req.Entries) - 1]
+			peer.matchIndex = lastEntry.Index
+			peer.nextIndex = lastEntry.Index + 1
+		}
+    	return
+	}
+
+	if len(req.Entries) == 0 {
+		l.node.logger.Printf("append empty entries failed on peer: %s. prevIndex: %d", peer.Id, req.PrevLogIndex)
+		return
+	}
+
+    peer.nextIndex = peer.nextIndex - 1
 }
 
 type Follower struct {
@@ -129,6 +196,8 @@ func (f *Follower) HandleAppendEntries(ctx context.Context, request *protos.Appe
 
 func (f *Follower) scheduleElectionTimeout(timeout int64) {
 	f.cancelElectionTimeoutFunc = f.node.scheduleOnce(timeout, func() {
+		f.node.lock.Lock()
+		defer f.node.lock.Unlock()
 		// todo 收到 append entries 后不要 cancel election timeout
 		// 而是等 election timeout 后检查最后一次收到心跳的时间有没有超时
 		// 从而避免所有 node 最后 election timeout 的时间都一样，leader 已断开大家都在相同的时间开始 election
@@ -159,16 +228,23 @@ func (_ *Candidate) StateType() StateType {
 
 func (c *Candidate) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	meta := c.node.meta.GetMeta()
-	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
+	c.node.logger.Printf("candidate: %s receive append entries request from: %s with term %d.", c.node.Id, request.LeaderId, request.Term)
+	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: false}, nil
 }
 
 func (c *Candidate) electAsLeader() {
+	c.node.lock.Lock()
+	defer c.node.lock.Unlock()
+
 	n := c.node
-	c.node.logger.Printf("%s start election", n.id)
+	c.node.logger.Printf("%s start election", n.Id)
 
 	req, err := c.buildRequestVoteRequest()
 	if err == nil {
 		reps := c.broadcastRequestVote(req)
+		if c.node.state != c {
+			return
+		}
 		ballot := Ballot{peers: c.node.peers}
 		for peerId, res := range reps {
 			if res.Term > n.meta.GetMeta().CurrentTerm {
@@ -186,7 +262,7 @@ func (c *Candidate) electAsLeader() {
 		}
 	}
 
-	c.node.logger.Printf("%s elect as leader failed, try elect leader later. error :%s", n.id, err)
+	c.node.logger.Printf("%s elect as leader failed, try elect leader later. error :%s", n.Id, err)
 	timeout := calculateElectionTimeout(n.raftConfigs)
 	c.cancelElectionTimeoutFunc = n.scheduleOnce(timeout, c.electAsLeader)
 }
@@ -195,7 +271,7 @@ func (c *Candidate) buildRequestVoteRequest() (*protos.RequestVoteRequest, error
 	n := c.node
 
 	meta := n.meta.GetMeta()
-	meta.VoteFor = c.node.id
+	meta.VoteFor = c.node.Id
 	meta.CurrentTerm += 1
 	if err := n.meta.SaveMeta(meta); err != nil {
 		return nil, err
@@ -204,7 +280,7 @@ func (c *Candidate) buildRequestVoteRequest() (*protos.RequestVoteRequest, error
 	lastLog := n.logStorage.LastEntry()
 	return &protos.RequestVoteRequest{
 		Term:         int64(meta.CurrentTerm),
-		CandidateId:  n.id,
+		CandidateId:  n.Id,
 		LastLogIndex: lastLog.Index,
 		LastLogTerm:  lastLog.Term,
 	}, nil
@@ -222,9 +298,9 @@ func (c *Candidate) broadcastRequestVote(req *protos.RequestVoteRequest) map[str
 	group.Add(len(c.node.peers))
 	responseChan := make(chan BroadcastResponse, len(c.node.peers))
 	for peerId, peer := range c.node.peers {
-		go func(peerId string, peer PeerNode) {
+		go func(peerId string, peer *PeerNode) {
 			defer group.Done()
-			res, err := c.node.rpcClient.RequestVote(c.node.id, peer.Endpoint, req)
+			res, err := c.node.rpcClient.RequestVote(c.node.Id, peer.Endpoint, req)
 			responseChan <- BroadcastResponse{peerId: peerId, response: res, err: err}
 		}(peerId, peer)
 	}
@@ -247,24 +323,32 @@ func (c *Candidate) broadcastRequestVote(req *protos.RequestVoteRequest) map[str
 }
 
 type PeerNode struct {
-	Id       string
-	Endpoint protos.Endpoint
+	Id         string
+	Endpoint   protos.Endpoint
+	nextIndex  int64
+	matchIndex int64
 }
 
-func NewPeerNodes(es []protos.Endpoint) map[string]PeerNode {
-	peers := make(map[string]PeerNode)
+func NewPeerNodes(es []protos.Endpoint) map[string]*PeerNode {
+	peers := make(map[string]*PeerNode)
 	for _, e := range es {
 		id := e.NodeId
-		peer := PeerNode{Id: id, Endpoint: e}
-		peers[id] = peer
+		peer := PeerNode{Id: id, Endpoint: e, nextIndex: 1, matchIndex: 0}
+		peers[id] = &peer
 	}
 	return peers
 }
 
+func (p *PeerNode) initialize(storage LogStorage) {
+	lastEntry := storage.LastEntry()
+	p.nextIndex = lastEntry.Index
+	p.matchIndex = 0
+}
+
 type Node struct {
-	id           string
+	Id           string
 	selfEndpoint protos.Endpoint
-	peers        map[string]PeerNode
+	peers        map[string]*PeerNode
 	state        State
 	meta         MetaStorage
 	logStorage   LogStorage
@@ -282,7 +366,7 @@ func NewNode(configs *Configurations, rpcService RpcService, logger *log.Logger)
 	nodeLogger := log.New(logger.Writer(), fmt.Sprintf("[Node-%s]", configs.SelfEndpoint.NodeId), logger.Flags())
 	rpcClient := rpcService.GetRpcClient()
 	node := Node{
-		id:           configs.SelfEndpoint.NodeId,
+		Id:           configs.SelfEndpoint.NodeId,
 		selfEndpoint: configs.SelfEndpoint,
 		peers:        NewPeerNodes(configs.PeerEndpoints),
 		commitIndex:  -1,
@@ -296,8 +380,8 @@ func NewNode(configs *Configurations, rpcService RpcService, logger *log.Logger)
 		lock:         sync.Mutex{},
 		logger:       nodeLogger,
 	}
-	if err := rpcService.RegisterRpcHandler(node.id, &node); err != nil {
-		logger.Fatalf("register node: %s to rpc service failed: %s", node.id, err)
+	if err := rpcService.RegisterRpcHandler(node.Id, &node); err != nil {
+		logger.Fatalf("register node: %s to rpc service failed: %s", node.Id, err)
 	}
 
 	return &node
@@ -344,8 +428,7 @@ func (n *Node) HandleRequestVote(ctx context.Context, fromNodeId string, request
 			}, nil
 		}
 
-		lastEntry := n.logStorage.LastEntry()
-		if !lastEntry.IsAtLeastUpToDateThanMe(request.LastLogTerm, request.LastLogIndex) {
+		if !n.logStorage.IsAtLeastUpToDateThanMe(request.LastLogTerm, request.LastLogIndex) {
 			return &protos.RequestVoteResponse{
 				Term:        meta.CurrentTerm,
 				VoteGranted: false,
@@ -368,8 +451,25 @@ func (n *Node) HandleRequestVote(ctx context.Context, fromNodeId string, request
 func (n *Node) HandleAppendEntries(ctx context.Context, fromNodeId string, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	if _, ok := n.peers[fromNodeId]; !ok {
+	peer, ok := n.peers[fromNodeId];
+	if !ok {
 		return nil, fmt.Errorf("unknown peer node: %s", fromNodeId)
+	}
+
+	meta := n.meta.GetMeta()
+	if request.Term < meta.CurrentTerm {
+		return &protos.AppendEntriesResponse{
+			Term:        int64(meta.CurrentTerm),
+			Success: false,
+		}, nil
+	}
+
+	if request.Term > meta.CurrentTerm {
+		meta = Meta{CurrentTerm: request.Term, VoteFor: fromNodeId}
+		if err := n.meta.SaveMeta(meta); err != nil {
+			return nil, err
+		}
+		n.transferToFollowerWithLeader(peer)
 	}
 
 	return n.state.HandleAppendEntries(ctx, request)
@@ -411,7 +511,7 @@ func (n *Node) transferToLeader() {
 	n.transferState(&Leader{node: n})
 }
 
-func (n *Node) transferToFollowerWithLeader(leader PeerNode) {
+func (n *Node) transferToFollowerWithLeader(leader *PeerNode) {
 	n.logger.Printf("choose %s as leader", leader.Id)
 	n.transferState(&Follower{
 		node:     n,
@@ -432,10 +532,10 @@ func (n *Node) transferToCandidate() {
 
 func (n *Node) transferState(newState State) {
 	if oldState := n.state; oldState != nil {
-		n.logger.Printf("%s transfer state from %s to %s", n.id, n.state.StateType(), newState.StateType())
+		n.logger.Printf("%s transfer state from %s to %s", n.Id, n.state.StateType(), newState.StateType())
 		oldState.Stop()
 	} else {
-		n.logger.Printf("%s transfer state to %s", n.id, newState.StateType())
+		n.logger.Printf("%s transfer state to %s", n.Id, newState.StateType())
 	}
 	n.state = newState
 	n.state.Start()

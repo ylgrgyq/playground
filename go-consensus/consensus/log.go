@@ -1,30 +1,39 @@
 package consensus
 
-type LogEntry struct {
-	Index int64
-	Term  int64
-	data  []byte
+import "ylgrgyq.com/go-consensus/consensus/protos"
+
+type LogStorage interface {
+	IsAtLeastUpToDateThanMe(term int64, index int64) bool
+	LastEntry() *protos.LogEntry
+	GetEntry(index int64) *protos.LogEntry
+	GetEntries(fromIndex int64) []*protos.LogEntry
 }
 
-func (l *LogEntry) IsAtLeastUpToDateThanMe(term int64, index int64) bool {
-	if term > l.Term  {
+type TestingLogStorage struct {
+}
+
+func (l *TestingLogStorage) IsAtLeastUpToDateThanMe(term int64, index int64) bool {
+	lastEntry := l.LastEntry();
+	if term > lastEntry.Term  {
 		return true
 	}
 
-	if l.Term == term && index >= l.Index {
+	if lastEntry.Term == term && index >= lastEntry.Index {
 		return true
 	}
 
 	return false
 }
 
-type LogStorage interface {
-	LastEntry() LogEntry
+
+func (l *TestingLogStorage) LastEntry() *protos.LogEntry {
+	return &protos.LogEntry{}
 }
 
-type TestingLogStorage struct {
+func (l *TestingLogStorage) GetEntry(index int64) *protos.LogEntry {
+	return &protos.LogEntry{}
 }
 
-func (l *TestingLogStorage) LastEntry() LogEntry {
-	return LogEntry{}
+func (l *TestingLogStorage) GetEntries(fromIndex int64) []*protos.LogEntry {
+	return make([]*protos.LogEntry, 4)
 }

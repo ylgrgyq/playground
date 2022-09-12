@@ -80,7 +80,7 @@ func Main() {
 	for {
 		select {
 		case <-node.Done:
-			logger.Printf("node %s done", node.id)
+			logger.Printf("node %s done", node.Id)
 		}
 	}
 }
