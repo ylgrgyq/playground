@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"context"
 	"fmt"
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
@@ -13,7 +14,7 @@ type LogStorage interface {
 	LastEntry() *protos.LogEntry
 	GetEntry(index int64) (*protos.LogEntry, error)
 	GetEntries(fromIndex int64) ([]*protos.LogEntry, error)
-	Stop()
+	Stop(ctx context.Context)
 }
 
 type TestingLogStorage struct {
@@ -44,7 +45,7 @@ func (l *TestingLogStorage) Start() error {
 	return nil
 }
 
-func (l *TestingLogStorage) Stop() {
+func (l *TestingLogStorage) Stop(ctx context.Context) {
 }
 
 func (l *TestingLogStorage) Append(entry *protos.LogEntry) error {

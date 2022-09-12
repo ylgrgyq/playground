@@ -1,4 +1,5 @@
 rpcType: "http"
+metaStorageDirectory: ""
 
 selfEndpoint:
   nodeId: node1

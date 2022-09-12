@@ -4,6 +4,11 @@ package consensus.protos;
 
 option go_package = "./consensus/protos";
 
+message Meta {
+    int64 currentTerm = 1;
+    string voteFor = 2;
+}
+
 message Endpoint {
     string nodeId = 1;
     string ip = 2;

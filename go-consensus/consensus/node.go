@@ -319,7 +319,7 @@ func (c *Candidate) electAsLeader() {
 			n.transferToLeader()
 			return
 		} else {
-			c.node.logger.Printf("%s elect as leader failed due to ballot not fufil", n.Id)
+			c.node.logger.Printf("%s elect as leader failed due to ballot not fulfil", n.Id)
 		}
 	} else {
 		c.node.logger.Printf("%s elect as leader failed due to error: %s", n.Id, err)
@@ -335,7 +335,7 @@ func (c *Candidate) buildRequestVoteRequest() (*protos.RequestVoteRequest, error
 	meta := n.meta.GetMeta()
 	meta.VoteFor = c.node.Id
 	meta.CurrentTerm += 1
-	if err := n.meta.SaveMeta(meta); err != nil {
+	if err := n.meta.SaveMeta(meta.CurrentTerm, meta.VoteFor); err != nil {
 		return nil, err
 	}
 
@@ -436,7 +436,7 @@ func NewNode(configs *Configurations, rpcService RpcService, logger *log.Logger)
 		peers:        NewPeerNodes(configs.PeerEndpoints),
 		commitIndex:  -1,
 		lastApplied:  -1,
-		meta:         NewTestingMeta(configs.SelfEndpoint.NodeId, logger),
+		meta:         NewMeta(configs, logger),
 		scheduler:    NewScheduler(),
 		raftConfigs:  configs.RaftConfigurations,
 		rpcClient:    rpcClient,
@@ -482,7 +482,7 @@ func (n *Node) Start() error {
 	return nil
 }
 
-func (n *Node) Stop() {
+func (n *Node) Stop(ctx context.Context) {
 	if n.status == Stopped {
 		return
 	}
@@ -498,7 +498,8 @@ func (n *Node) Stop() {
 	n.rpcServiceUnregister()
 	n.state.Stop()
 	n.state = nil
-	n.logStorage.Stop()
+	n.logStorage.Stop(ctx)
+	n.meta.Stop(ctx)
 
 	close(n.Done)
 }
@@ -542,13 +543,12 @@ func (n *Node) HandleRequestVote(ctx context.Context, fromNodeId string, request
 	}
 
 	peer := n.peers[request.CandidateId]
-	meta = Meta{CurrentTerm: reqTerm, VoteFor: request.CandidateId}
-	if err := n.meta.SaveMeta(meta); err != nil {
+	if err := n.meta.SaveMeta(reqTerm, request.CandidateId); err != nil {
 		return nil, err
 	}
 	n.transferToFollowerWithLeader(peer)
 	return &protos.RequestVoteResponse{
-		Term:        int64(meta.CurrentTerm),
+		Term:        int64(reqTerm),
 		VoteGranted: true,
 	}, nil
 }
@@ -570,8 +570,7 @@ func (n *Node) HandleAppendEntries(ctx context.Context, fromNodeId string, reque
 	}
 
 	if request.Term > meta.CurrentTerm {
-		meta = Meta{CurrentTerm: request.Term, VoteFor: fromNodeId}
-		if err := n.meta.SaveMeta(meta); err != nil {
+		if err := n.meta.SaveMeta(request.Term, fromNodeId); err != nil {
 			return nil, err
 		}
 		n.transferToFollowerWithLeader(peer)

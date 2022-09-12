@@ -9,6 +9,8 @@ import (
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
+const PROGRAM_NAME = "go-consensus"
+
 type RpcType string
 
 const (
@@ -36,10 +38,11 @@ type RaftConfigurations struct {
 }
 
 type Configurations struct {
-	RpcType            RpcType
-	SelfEndpoint       protos.Endpoint
-	PeerEndpoints      []protos.Endpoint
-	RaftConfigurations RaftConfigurations
+	RpcType              RpcType
+	MetaStorageDirectory string
+	SelfEndpoint         protos.Endpoint
+	PeerEndpoints        []protos.Endpoint
+	RaftConfigurations   RaftConfigurations
 }
 
 func (c *Configurations) String() string {
@@ -47,6 +50,8 @@ func (c *Configurations) String() string {
 	b.WriteString("\n")
 	b.WriteString("********************************* Configurations *********************************\n\n")
 	b.WriteString(fmt.Sprintf("NodeId: %s\n", c.SelfEndpoint.NodeId))
+	b.WriteString("\n")
+	b.WriteString(fmt.Sprintf("MetaStorageDir: %s\n", c.MetaStorageDirectory))
 	b.WriteString("\n")
 	b.WriteString(fmt.Sprintf("RpcType: %s\n", c.RpcType))
 	b.WriteString(fmt.Sprintf("IP: %s\n", c.SelfEndpoint.Ip))
@@ -86,7 +91,7 @@ func (yc *yamlRaftConfigurations) toRaftConfigurations() (*RaftConfigurations, e
 		return nil, fmt.Errorf("invalid ElectionTimeoutMs: %d", yc.ElectionTimeoutMs)
 	}
 
-	if yc.ElectionTimeoutMs < 2 * yc.PingTimeoutMs {
+	if yc.ElectionTimeoutMs < 2*yc.PingTimeoutMs {
 		return nil, fmt.Errorf("invalid ElectionTimeoutMs: %d. ElectionTimeoutMs is at least twice as large as PingTimeoutMs", yc.ElectionTimeoutMs)
 	}
 
@@ -97,10 +102,11 @@ func (yc *yamlRaftConfigurations) toRaftConfigurations() (*RaftConfigurations, e
 }
 
 type yamlConfigurations struct {
-	RpcType            string                 `yaml:"rpcType"`
-	SelfEndpoint       yamlEndpoint           `yaml:"selfEndpoint"`
-	PeerEndpoints      []yamlEndpoint         `yaml:"peerEndpoints"`
-	RaftConfigurations yamlRaftConfigurations `yaml:"raftConfigurations"`
+	RpcType              string                 `yaml:"rpcType"`
+	MetaStorageDirectory string                 `yaml:"metaStorageDirectory"`
+	SelfEndpoint         yamlEndpoint           `yaml:"selfEndpoint"`
+	PeerEndpoints        []yamlEndpoint         `yaml:"peerEndpoints"`
+	RaftConfigurations   yamlRaftConfigurations `yaml:"raftConfigurations"`
 }
 
 func (ye *yamlEndpoint) toStdEndpoint() (*protos.Endpoint, error) {
@@ -119,14 +125,18 @@ func (ye *yamlEndpoint) toStdEndpoint() (*protos.Endpoint, error) {
 	}
 	return &protos.Endpoint{
 		NodeId: ye.NodeId,
-		Ip:   ye.IP,
-		Port: ye.Port,
+		Ip:     ye.IP,
+		Port:   ye.Port,
 	}, nil
 }
 
 func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 	if yc.RpcType == UnknownRpcType {
 		return nil, fmt.Errorf("unknown rpc type: %s", yc.RpcType)
+	}
+	metaStorageDirectory := "/tmp/" + PROGRAM_NAME
+	if len(yc.MetaStorageDirectory) != 0 {
+		metaStorageDirectory = yc.MetaStorageDirectory
 	}
 	selfEndpoint, err := yc.SelfEndpoint.toStdEndpoint()
 	if err != nil {
@@ -151,10 +161,11 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 	}
 
 	return &Configurations{
-		SelfEndpoint:       *selfEndpoint,
-		RpcType:            toValidRpcType(yc.RpcType),
-		PeerEndpoints:      peers,
-		RaftConfigurations: *config,
+		SelfEndpoint:         *selfEndpoint,
+		RpcType:              toValidRpcType(yc.RpcType),
+		PeerEndpoints:        peers,
+		RaftConfigurations:   *config,
+		MetaStorageDirectory: metaStorageDirectory,
 	}, nil
 }
 
