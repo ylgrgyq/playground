@@ -10,6 +10,14 @@ import (
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
+type NodeStatus string
+
+const (
+	Init    = "Init"
+	Started = "Started"
+	Stopped = "Stopped"
+)
+
 type StateType string
 
 const (
@@ -23,7 +31,7 @@ type Ballot struct {
 	vote  int
 }
 
-func (b *Ballot) CountVoteFrom(peerNodeId string) {
+func (b *Ballot) Count(peerNodeId string) {
 	if _, ok := b.peers[peerNodeId]; ok {
 		b.vote += 1
 	}
@@ -50,12 +58,20 @@ func (l *Leader) Start() {
 	for _, peer := range l.node.peers {
 		peer.initialize(l.node.logStorage)
 	}
+
+	meta := l.node.meta.GetMeta()
+	lastEntry := l.node.logStorage.LastEntry()
+	initEntry := protos.LogEntry{Term: meta.CurrentTerm, Index: lastEntry.Index + 1, Data: []byte{}}
+	if err := l.node.logStorage.Append(&initEntry); err != nil {
+		l.node.logger.Printf("append init entry as leader failed. error: %s", err)
+		l.node.transferToFollower()
+		return
+	}
+
 	l.cancelPingTimeoutFunc = l.node.schedulePeriod(
 		0,
 		l.node.raftConfigs.PingTimeoutMs,
 		func() {
-			l.node.lock.Lock()
-			defer l.node.lock.Unlock()
 			heartbeats := make(map[string]*protos.AppendEntriesRequest)
 			for _, peer := range l.node.peers {
 				heartbeats[peer.Id] = l.buildAppendEntries(peer)
@@ -65,14 +81,32 @@ func (l *Leader) Start() {
 				return
 			}
 			meta := l.node.meta.GetMeta()
+			ballots := make(map[int64]*Ballot)
 			for peerId, resp := range resps {
 				peer := l.node.peers[peerId]
 				req := heartbeats[peerId]
+				if req == nil {
+					continue
+				}
 				if resp.Term > meta.CurrentTerm {
 					l.node.transferToFollower()
 					return
 				}
 				l.handleAppendEntriesResponse(peer, req, resp)
+				if resp.Success {
+					ballot, ok := ballots[peer.matchIndex]
+					if !ok {
+						ballot = &Ballot{peers: l.node.peers}
+						ballots[peer.matchIndex] = ballot
+					}
+					ballot.Count(peerId)
+				}
+			}
+			for index, ballot := range ballots {
+				if ballot.Pass() {
+					l.node.updateCommitIndex(index)
+					return
+				}
 			}
 		})
 }
@@ -105,7 +139,10 @@ func (l *Leader) broadcastAppendEntries(requests map[string]*protos.AppendEntrie
 	group := sync.WaitGroup{}
 	group.Add(len(l.node.peers))
 	responseChan := make(chan BroadcastResponse, len(l.node.peers))
-	for peerId, req := range requests{
+	for peerId, req := range requests {
+		if req == nil {
+			continue
+		}
 		go func(peerId string, req *protos.AppendEntriesRequest) {
 			defer group.Done()
 			peer := l.node.peers[peerId]
@@ -134,8 +171,16 @@ func (l *Leader) buildAppendEntries(peer *PeerNode) *protos.AppendEntriesRequest
 	meta := l.node.meta.GetMeta()
 
 	nextIndex := peer.nextIndex
-	prevLog := l.node.logStorage.GetEntry(nextIndex - 1)
-	entries := l.node.logStorage.GetEntries(nextIndex)
+	prevLog, err := l.node.logStorage.GetEntry(nextIndex - 1)
+	if err != nil {
+		l.node.logger.Printf("get prev log with index: %d for peer: %s failed. error: %s", nextIndex-1, peer.Id, err)
+		return nil
+	}
+	entries, err := l.node.logStorage.GetEntries(nextIndex)
+	if err != nil {
+		l.node.logger.Printf("get log entries log with index: %d for peer: %s failed. error: %s", nextIndex, peer.Id, err)
+		return nil
+	}
 
 	return &protos.AppendEntriesRequest{
 		Term:         int64(meta.CurrentTerm),
@@ -147,14 +192,14 @@ func (l *Leader) buildAppendEntries(peer *PeerNode) *protos.AppendEntriesRequest
 	}
 }
 
-func (l *Leader) handleAppendEntriesResponse(peer *PeerNode, req *protos.AppendEntriesRequest, resp *protos.AppendEntriesResponse)  {
-    if resp.Success {
-    	if len(req.Entries) > 0 {
-			lastEntry := req.Entries[len(req.Entries) - 1]
+func (l *Leader) handleAppendEntriesResponse(peer *PeerNode, req *protos.AppendEntriesRequest, resp *protos.AppendEntriesResponse) {
+	if resp.Success {
+		if len(req.Entries) > 0 {
+			lastEntry := req.Entries[len(req.Entries)-1]
 			peer.matchIndex = lastEntry.Index
 			peer.nextIndex = lastEntry.Index + 1
 		}
-    	return
+		return
 	}
 
 	if len(req.Entries) == 0 {
@@ -162,7 +207,7 @@ func (l *Leader) handleAppendEntriesResponse(peer *PeerNode, req *protos.AppendE
 		return
 	}
 
-    peer.nextIndex = peer.nextIndex - 1
+	peer.nextIndex = peer.nextIndex - 1
 }
 
 type Follower struct {
@@ -189,15 +234,32 @@ func (f *Follower) StateType() StateType {
 
 func (f *Follower) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	meta := f.node.meta.GetMeta()
+	if meta.VoteFor != request.LeaderId {
+		return nil, fmt.Errorf("receive append entries from leader: %s which I'm not voted for", request.LeaderId)
+	}
 	f.cancelElectionTimeoutFunc()
 	f.scheduleElectionTimeout(f.node.raftConfigs.ElectionTimeoutMs)
+
+	if len(request.Entries) == 0 {
+		f.node.updateCommitIndex(request.LeaderCommit)
+		return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
+	}
+
+	ok, err := f.node.logStorage.AppendEntries(request.PrevLogTerm, request.PrevLogIndex, request.Entries)
+	if err != nil {
+		return nil, fmt.Errorf("append entries failed. error: %s", err)
+	}
+	if !ok {
+		f.node.logger.Printf("append entries failed due to prev log not match. prevTermInRequest: %d, prevIndexInRequest: %d",
+			request.PrevLogTerm, request.PrevLogIndex)
+		return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: false}, nil
+	}
+	f.node.updateCommitIndex(request.LeaderCommit)
 	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: true}, nil
 }
 
 func (f *Follower) scheduleElectionTimeout(timeout int64) {
 	f.cancelElectionTimeoutFunc = f.node.scheduleOnce(timeout, func() {
-		f.node.lock.Lock()
-		defer f.node.lock.Unlock()
 		// todo 收到 append entries 后不要 cancel election timeout
 		// 而是等 election timeout 后检查最后一次收到心跳的时间有没有超时
 		// 从而避免所有 node 最后 election timeout 的时间都一样，leader 已断开大家都在相同的时间开始 election
@@ -233,9 +295,6 @@ func (c *Candidate) HandleAppendEntries(ctx context.Context, request *protos.App
 }
 
 func (c *Candidate) electAsLeader() {
-	c.node.lock.Lock()
-	defer c.node.lock.Unlock()
-
 	n := c.node
 	c.node.logger.Printf("%s start election", n.Id)
 
@@ -253,16 +312,19 @@ func (c *Candidate) electAsLeader() {
 			}
 
 			if res.VoteGranted {
-				ballot.CountVoteFrom(peerId)
+				ballot.Count(peerId)
 			}
 		}
 		if ballot.Pass() {
 			n.transferToLeader()
 			return
+		} else {
+			c.node.logger.Printf("%s elect as leader failed due to ballot not fufil", n.Id)
 		}
+	} else {
+		c.node.logger.Printf("%s elect as leader failed due to error: %s", n.Id, err)
 	}
 
-	c.node.logger.Printf("%s elect as leader failed, try elect leader later. error :%s", n.Id, err)
 	timeout := calculateElectionTimeout(n.raftConfigs)
 	c.cancelElectionTimeoutFunc = n.scheduleOnce(timeout, c.electAsLeader)
 }
@@ -333,7 +395,7 @@ func NewPeerNodes(es []protos.Endpoint) map[string]*PeerNode {
 	peers := make(map[string]*PeerNode)
 	for _, e := range es {
 		id := e.NodeId
-		peer := PeerNode{Id: id, Endpoint: e, nextIndex: 1, matchIndex: 0}
+		peer := PeerNode{Id: id, Endpoint: e}
 		peers[id] = &peer
 	}
 	return peers
@@ -341,25 +403,27 @@ func NewPeerNodes(es []protos.Endpoint) map[string]*PeerNode {
 
 func (p *PeerNode) initialize(storage LogStorage) {
 	lastEntry := storage.LastEntry()
-	p.nextIndex = lastEntry.Index
+	p.nextIndex = lastEntry.Index + 1
 	p.matchIndex = 0
 }
 
 type Node struct {
-	Id           string
-	selfEndpoint protos.Endpoint
-	peers        map[string]*PeerNode
-	state        State
-	meta         MetaStorage
-	logStorage   LogStorage
-	commitIndex  int64
-	lastApplied  int64
-	scheduler    Scheduler
-	raftConfigs  RaftConfigurations
-	rpcClient    RpcClient
-	Done         chan struct{}
-	lock         sync.Mutex
-	logger       *log.Logger
+	Id                   string
+	Done                 chan struct{}
+	status               NodeStatus
+	selfEndpoint         protos.Endpoint
+	peers                map[string]*PeerNode
+	state                State
+	meta                 MetaStorage
+	logStorage           LogStorage
+	commitIndex          int64
+	lastApplied          int64
+	scheduler            Scheduler
+	raftConfigs          RaftConfigurations
+	rpcClient            RpcClient
+	lock                 sync.Mutex
+	logger               *log.Logger
+	rpcServiceUnregister RpcServiceHandlerUnregister
 }
 
 func NewNode(configs *Configurations, rpcService RpcService, logger *log.Logger) *Node {
@@ -367,6 +431,7 @@ func NewNode(configs *Configurations, rpcService RpcService, logger *log.Logger)
 	rpcClient := rpcService.GetRpcClient()
 	node := Node{
 		Id:           configs.SelfEndpoint.NodeId,
+		status:       Init,
 		selfEndpoint: configs.SelfEndpoint,
 		peers:        NewPeerNodes(configs.PeerEndpoints),
 		commitIndex:  -1,
@@ -375,33 +440,73 @@ func NewNode(configs *Configurations, rpcService RpcService, logger *log.Logger)
 		scheduler:    NewScheduler(),
 		raftConfigs:  configs.RaftConfigurations,
 		rpcClient:    rpcClient,
-		logStorage:   &TestingLogStorage{},
+		logStorage:   NewLogStorage(),
 		Done:         make(chan struct{}),
 		lock:         sync.Mutex{},
 		logger:       nodeLogger,
 	}
-	if err := rpcService.RegisterRpcHandler(node.Id, &node); err != nil {
+	unregister, err := rpcService.RegisterRpcHandler(node.Id, &node)
+	if err != nil {
 		logger.Fatalf("register node: %s to rpc service failed: %s", node.Id, err)
 	}
-
+	node.rpcServiceUnregister = unregister
 	return &node
 }
 
 func (n *Node) Start() error {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	if n.status != Init {
+		return fmt.Errorf("can not start Node in %s status", n.status)
+	}
+
 	err := n.meta.LoadMeta()
 	if err != nil {
 		return fmt.Errorf("load meta failed. %s", err)
 	}
 
-	n.lock.Lock()
-	defer n.lock.Unlock()
+	err = n.logStorage.Start()
+	if err != nil {
+		return fmt.Errorf("start log storage failed. %s", err)
+	}
 
 	if len(n.peers) > 0 {
 		n.transferToFollower()
+		n.status = Started
 		return nil
 	}
 
 	n.transferToLeader()
+	n.status = Started
+	return nil
+}
+
+func (n *Node) Stop() {
+	if n.status == Stopped {
+		return
+	}
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	if n.status == Stopped {
+		return
+	}
+
+	n.status = Stopped
+
+	n.rpcServiceUnregister()
+	n.state.Stop()
+	n.state = nil
+	n.logStorage.Stop()
+
+	close(n.Done)
+}
+
+func (n *Node) Append(bytes []byte) error {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
 	return nil
 }
 
@@ -459,7 +564,7 @@ func (n *Node) HandleAppendEntries(ctx context.Context, fromNodeId string, reque
 	meta := n.meta.GetMeta()
 	if request.Term < meta.CurrentTerm {
 		return &protos.AppendEntriesResponse{
-			Term:        int64(meta.CurrentTerm),
+			Term:    int64(meta.CurrentTerm),
 			Success: false,
 		}, nil
 	}
@@ -539,6 +644,15 @@ func (n *Node) transferState(newState State) {
 	}
 	n.state = newState
 	n.state.Start()
+}
+
+func (n *Node) updateCommitIndex(commitIndex int64) {
+	if commitIndex > n.commitIndex {
+		n.logger.Printf("update commit index to: %d", commitIndex)
+		n.commitIndex = commitIndex
+	} else {
+		n.logger.Printf("skip update commit index to: %d, currentCommitIndex: %d", commitIndex, n.commitIndex)
+	}
 }
 
 func calculateElectionTimeout(config RaftConfigurations) int64 {

@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
@@ -24,10 +25,12 @@ type RpcContextKeyType string
 
 const RawRequestKey RpcContextKeyType = "RawRequest"
 
+type RpcServiceHandlerUnregister func()
+
 type RpcService interface {
 	Start() error
 	Shutdown(context context.Context) error
-	RegisterRpcHandler(nodeId string, handler RpcHandler) error
+	RegisterRpcHandler(nodeId string, handler RpcHandler) (RpcServiceHandlerUnregister, error)
 	GetRpcClient() RpcClient
 }
 
@@ -65,23 +68,38 @@ type HttpRpcService struct {
 	selfEndpoint   protos.Endpoint
 	selfEndpointId string
 	logger         log.Logger
+	rpcHandlerLock sync.Mutex
 }
 
 func (h *HttpRpcService) GetRpcClient() RpcClient {
 	return h
 }
 
-func (h *HttpRpcService) RegisterRpcHandler(nodeId string, handler RpcHandler) error {
+func (h *HttpRpcService) RegisterRpcHandler(nodeId string, handler RpcHandler) (RpcServiceHandlerUnregister, error) {
+	h.rpcHandlerLock.Lock()
+	defer h.rpcHandlerLock.Unlock()
+
 	if h.rpcHandlers == nil {
 		h.rpcHandlers = make(map[string]RpcHandler)
 	}
 
 	if _, ok := h.rpcHandlers[nodeId]; ok {
-		return fmt.Errorf("node: %s has registered rpc handler", nodeId)
+		return nil, fmt.Errorf("node: %s has registered rpc handler", nodeId)
 	}
 
 	h.rpcHandlers[nodeId] = handler
-	return nil
+	return func() {
+		h.rpcHandlerLock.Lock()
+		defer h.rpcHandlerLock.Unlock()
+		delete(h.rpcHandlers, nodeId)
+	}, nil
+}
+
+func (h *HttpRpcService) getRpcHandler(nodeId string) (RpcHandler, bool) {
+	h.rpcHandlerLock.Lock()
+	defer h.rpcHandlerLock.Unlock()
+	handler, ok := h.rpcHandlers[nodeId]
+	return handler, ok
 }
 
 func (h *HttpRpcService) Start() error {
@@ -178,7 +196,7 @@ func NewHttpRpc(selfEndpoint protos.Endpoint, logger *log.Logger) *HttpRpcServic
 	httpClient := http.Client{
 		Timeout: 10 * time.Second,
 	}
-	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, logger: *httpRpcServiceLogger, client: &httpClient}
+	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, logger: *httpRpcServiceLogger, client: &httpClient, rpcHandlerLock: sync.Mutex{}}
 
 	serverMux := http.NewServeMux()
 	serverMux.HandleFunc(RequestVoteUri, httpRpcService.wrapRequestHandler(
@@ -301,7 +319,7 @@ func (h *HttpRpcService) wrapRequestHandler(f requestHandler) func(writer http.R
 		}
 
 		to := rawReq.To
-		handler, ok := h.rpcHandlers[to]
+		handler, ok := h.getRpcHandler(to)
 		if !ok {
 			http.Error(writer, fmt.Sprintf("no handler with nodeId: %s", to), http.StatusServiceUnavailable)
 		}
