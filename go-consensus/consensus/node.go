@@ -44,7 +44,9 @@ func (b *Ballot) Pass() bool {
 type State interface {
 	Start()
 	StateType() StateType
+	Append(bytes []byte) (*AppendResponse, error)
 	HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
+	UpdateAppliedLogIndex(index int64)
 	Stop()
 }
 
@@ -52,6 +54,7 @@ type Leader struct {
 	node                  *Node
 	cancelPingTimeoutFunc context.CancelFunc
 	scheduler             Scheduler
+	pendingAppend         []*AppendResponse
 }
 
 func (l *Leader) Start() {
@@ -116,16 +119,65 @@ func (l *Leader) Stop() {
 		l.cancelPingTimeoutFunc()
 		l.cancelPingTimeoutFunc = nil
 	}
+	for _, resp := range l.pendingAppend {
+		err := fmt.Errorf("leader step down")
+		resp.Done <- err
+	}
 }
 
 func (_ *Leader) StateType() StateType {
 	return LeaderState
 }
 
+func (l *Leader) Append(bytes []byte) (*AppendResponse, error) {
+	lastEntry := l.node.logStorage.LastEntry()
+	meta := l.node.meta.GetMeta()
+	entry := protos.LogEntry{Term: meta.CurrentTerm, Index: lastEntry.Index + 1, Data: bytes}
+	if err := l.node.logStorage.Append(&entry); err != nil {
+		return nil, fmt.Errorf("append log failed. error: %s", err)
+	}
+
+	resp := AppendResponse{Index: entry.Index, Done: make(chan error)}
+	l.pendingAppend = append(l.pendingAppend, &resp)
+
+	requests := make(map[string]*protos.AppendEntriesRequest)
+	for _, peer := range l.node.peers {
+		requests[peer.Id] = l.buildAppendEntries(peer)
+	}
+	l.broadcastAppendEntries(requests)
+	return nil, nil
+}
+
 func (l *Leader) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	meta := l.node.meta.GetMeta()
 	l.node.logger.Printf("leader: %s receive append entries request from: %s with term %d.", l.node.Id, request.LeaderId, request.Term)
 	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: false}, nil
+}
+
+func (l *Leader) UpdateAppliedLogIndex(index int64) {
+	for _, resp := range l.pendingAppend {
+		if index >= resp.Index {
+			close(resp.Done)
+		}
+	}
+}
+
+func (l *Leader) ballotAndUpdateCommitIndex() {
+	ballots := make(map[int64]*Ballot)
+	for peerId, peer := range l.node.peers {
+		ballot, ok := ballots[peer.matchIndex]
+		if !ok {
+			ballot = &Ballot{peers: l.node.peers}
+			ballots[peer.matchIndex] = ballot
+		}
+		ballot.Count(peerId)
+	}
+	for index, ballot := range ballots {
+		if ballot.Pass() {
+			l.node.updateCommitIndex(index)
+			return
+		}
+	}
 }
 
 func (l *Leader) broadcastAppendEntries(requests map[string]*protos.AppendEntriesRequest) map[string]*protos.AppendEntriesResponse {
@@ -232,6 +284,14 @@ func (f *Follower) StateType() StateType {
 	return FollowerState
 }
 
+func (f *Follower) Append(bytes []byte) (*AppendResponse, error) {
+	return nil, fmt.Errorf("node is not leader")
+}
+
+func (f *Follower) UpdateAppliedLogIndex(index int64) {
+
+}
+
 func (f *Follower) HandleAppendEntries(ctx context.Context, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	meta := f.node.meta.GetMeta()
 	if meta.VoteFor != request.LeaderId {
@@ -284,6 +344,10 @@ func (c *Candidate) Stop() {
 	}
 }
 
+func (c *Candidate) Append(bytes []byte) (*AppendResponse, error) {
+	return nil, fmt.Errorf("node is not leader")
+}
+
 func (_ *Candidate) StateType() StateType {
 	return CandidateState
 }
@@ -292,6 +356,10 @@ func (c *Candidate) HandleAppendEntries(ctx context.Context, request *protos.App
 	meta := c.node.meta.GetMeta()
 	c.node.logger.Printf("candidate: %s receive append entries request from: %s with term %d.", c.node.Id, request.LeaderId, request.Term)
 	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: false}, nil
+}
+
+func (_ *Candidate) UpdateAppliedLogIndex(index int64) {
+
 }
 
 func (c *Candidate) electAsLeader() {
@@ -407,9 +475,15 @@ func (p *PeerNode) initialize(storage LogStorage) {
 	p.matchIndex = 0
 }
 
+type AppendResponse struct {
+	Index int64
+	Done  chan error
+}
+
 type Node struct {
 	Id                   string
 	Done                 chan struct{}
+	ApplyLogChan         chan []*protos.LogEntry
 	status               NodeStatus
 	selfEndpoint         protos.Endpoint
 	peers                map[string]*PeerNode
@@ -426,16 +500,17 @@ type Node struct {
 	rpcServiceUnregister RpcServiceHandlerUnregister
 }
 
-func NewNode(configs *Configurations, rpcService RpcService, logger *log.Logger) *Node {
+func NewNode(configs *Configurations, rpcService RpcService, applyLogChan chan []*protos.LogEntry, logger *log.Logger) *Node {
 	nodeLogger := log.New(logger.Writer(), fmt.Sprintf("[Node-%s]", configs.SelfEndpoint.NodeId), logger.Flags())
 	rpcClient := rpcService.GetRpcClient()
 	node := Node{
 		Id:           configs.SelfEndpoint.NodeId,
+		ApplyLogChan: applyLogChan,
 		status:       Init,
 		selfEndpoint: configs.SelfEndpoint,
 		peers:        NewPeerNodes(configs.PeerEndpoints),
-		commitIndex:  -1,
-		lastApplied:  -1,
+		commitIndex:  0,
+		lastApplied:  0,
 		meta:         NewMeta(configs, logger),
 		scheduler:    NewScheduler(),
 		raftConfigs:  configs.RaftConfigurations,
@@ -504,11 +579,20 @@ func (n *Node) Stop(ctx context.Context) {
 	close(n.Done)
 }
 
-func (n *Node) Append(bytes []byte) error {
+func (n *Node) Append(bytes []byte) (*AppendResponse, error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
-	return nil
+	if n.status != Started {
+		return nil, fmt.Errorf("node in invalid status: %s", n.status)
+	}
+
+	resp, err := n.state.Append(bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 func (n *Node) HandleRequestVote(ctx context.Context, fromNodeId string, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
@@ -556,7 +640,7 @@ func (n *Node) HandleRequestVote(ctx context.Context, fromNodeId string, request
 func (n *Node) HandleAppendEntries(ctx context.Context, fromNodeId string, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	peer, ok := n.peers[fromNodeId];
+	peer, ok := n.peers[fromNodeId]
 	if !ok {
 		return nil, fmt.Errorf("unknown peer node: %s", fromNodeId)
 	}
@@ -577,6 +661,15 @@ func (n *Node) HandleAppendEntries(ctx context.Context, fromNodeId string, reque
 	}
 
 	return n.state.HandleAppendEntries(ctx, request)
+}
+
+func (n *Node) UpdateAppliedLogIndex(index int64) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	if index > n.lastApplied {
+		n.lastApplied = index
+	}
 }
 
 func (n *Node) scheduleOnce(timeoutMs int64, run func()) context.CancelFunc {
@@ -649,6 +742,7 @@ func (n *Node) updateCommitIndex(commitIndex int64) {
 	if commitIndex > n.commitIndex {
 		n.logger.Printf("update commit index to: %d", commitIndex)
 		n.commitIndex = commitIndex
+
 	} else {
 		n.logger.Printf("skip update commit index to: %d, currentCommitIndex: %d", commitIndex, n.commitIndex)
 	}

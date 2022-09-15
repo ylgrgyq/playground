@@ -67,7 +67,7 @@ func (l *TestingLogStorage) AppendEntries(prevLogTerm int64, prevLogIndex int64,
 			return false, nil
 		}
 
-		l.entries = append(l.entries[:index + 1], entries...)
+		l.entries = append(l.entries[:index+1], entries...)
 		return true, nil
 	}
 	return false, nil
