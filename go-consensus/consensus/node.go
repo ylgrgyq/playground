@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
@@ -26,18 +27,19 @@ const (
 	CandidateState = "Candidate"
 )
 
-type Ballot struct {
-	peers map[string]*PeerNode
-	vote  int
+type Ballot[T any] struct {
+	peers   map[string]*PeerNode
+	vote    int
+	voteVal T
 }
 
-func (b *Ballot) Count(peerNodeId string) {
+func (b *Ballot[T]) Count(peerNodeId string) {
 	if _, ok := b.peers[peerNodeId]; ok {
 		b.vote += 1
 	}
 }
 
-func (b *Ballot) Pass() bool {
+func (b *Ballot[T]) Pass() bool {
 	return b.vote >= (len(b.peers)+1)/2
 }
 
@@ -55,6 +57,7 @@ type Leader struct {
 	cancelPingTimeoutFunc context.CancelFunc
 	scheduler             Scheduler
 	pendingAppend         []*AppendResponse
+	ballots               []*Ballot[int64]
 }
 
 func (l *Leader) Start() {
@@ -84,7 +87,7 @@ func (l *Leader) Start() {
 				return
 			}
 			meta := l.node.meta.GetMeta()
-			ballots := make(map[int64]*Ballot)
+			ballots := make(map[int64]*Ballot[int64])
 			for peerId, resp := range resps {
 				peer := l.node.peers[peerId]
 				req := heartbeats[peerId]
@@ -99,7 +102,7 @@ func (l *Leader) Start() {
 				if resp.Success {
 					ballot, ok := ballots[peer.matchIndex]
 					if !ok {
-						ballot = &Ballot{peers: l.node.peers}
+						ballot = &Ballot[int64]{peers: l.node.peers}
 						ballots[peer.matchIndex] = ballot
 					}
 					ballot.Count(peerId)
@@ -163,11 +166,11 @@ func (l *Leader) UpdateAppliedLogIndex(index int64) {
 }
 
 func (l *Leader) ballotAndUpdateCommitIndex() {
-	ballots := make(map[int64]*Ballot)
+	ballots := make(map[int64]*Ballot[int64])
 	for peerId, peer := range l.node.peers {
 		ballot, ok := ballots[peer.matchIndex]
 		if !ok {
-			ballot = &Ballot{peers: l.node.peers}
+			ballot = &Ballot[int64]{peers: l.node.peers}
 			ballots[peer.matchIndex] = ballot
 		}
 		ballot.Count(peerId)
@@ -330,7 +333,6 @@ func (f *Follower) scheduleElectionTimeout(timeout int64) {
 type Candidate struct {
 	node                      *Node
 	cancelElectionTimeoutFunc context.CancelFunc
-	startElectionTimeout      int64
 }
 
 func (c *Candidate) Start() {
@@ -348,7 +350,7 @@ func (c *Candidate) Append(bytes []byte) (*AppendResponse, error) {
 	return nil, fmt.Errorf("node is not leader")
 }
 
-func (_ *Candidate) StateType() StateType {
+func (*Candidate) StateType() StateType {
 	return CandidateState
 }
 
@@ -358,7 +360,7 @@ func (c *Candidate) HandleAppendEntries(ctx context.Context, request *protos.App
 	return &protos.AppendEntriesResponse{Term: meta.CurrentTerm, Success: false}, nil
 }
 
-func (_ *Candidate) UpdateAppliedLogIndex(index int64) {
+func (*Candidate) UpdateAppliedLogIndex(index int64) {
 
 }
 
@@ -372,7 +374,7 @@ func (c *Candidate) electAsLeader() {
 		if c.node.state != c {
 			return
 		}
-		ballot := Ballot{peers: c.node.peers}
+		ballot := Ballot[int64]{peers: c.node.peers}
 		for peerId, res := range reps {
 			if res.Term > n.meta.GetMeta().CurrentTerm {
 				n.transferToFollower()
@@ -454,12 +456,12 @@ func (c *Candidate) broadcastRequestVote(req *protos.RequestVoteRequest) map[str
 
 type PeerNode struct {
 	Id         string
-	Endpoint   protos.Endpoint
+	Endpoint   *protos.Endpoint
 	nextIndex  int64
 	matchIndex int64
 }
 
-func NewPeerNodes(es []protos.Endpoint) map[string]*PeerNode {
+func NewPeerNodes(es []*protos.Endpoint) map[string]*PeerNode {
 	peers := make(map[string]*PeerNode)
 	for _, e := range es {
 		id := e.NodeId
@@ -485,7 +487,7 @@ type Node struct {
 	Done                 chan struct{}
 	ApplyLogChan         chan []*protos.LogEntry
 	status               NodeStatus
-	selfEndpoint         protos.Endpoint
+	selfEndpoint         *protos.Endpoint
 	peers                map[string]*PeerNode
 	state                State
 	meta                 MetaStorage

@@ -5,6 +5,7 @@ import (
 	"github.com/jessevdk/go-flags"
 	"log"
 	"os"
+	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
 type ApplicationOptions struct {
@@ -71,7 +72,7 @@ func Main() {
 		}
 	}()
 
-	node := NewNode(config, rpcService, logger)
+	node := NewNode(config, rpcService, make(chan []*protos.LogEntry), logger)
 
 	if err = node.Start(); err != nil {
 		logger.Fatalf("start node failed: %s", err)

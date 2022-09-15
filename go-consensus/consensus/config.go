@@ -40,8 +40,8 @@ type RaftConfigurations struct {
 type Configurations struct {
 	RpcType              RpcType
 	MetaStorageDirectory string
-	SelfEndpoint         protos.Endpoint
-	PeerEndpoints        []protos.Endpoint
+	SelfEndpoint         *protos.Endpoint
+	PeerEndpoints        []*protos.Endpoint
 	RaftConfigurations   RaftConfigurations
 }
 
@@ -142,7 +142,7 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 	if err != nil {
 		return nil, fmt.Errorf("SelfEndpoint, %s", err.Error())
 	}
-	peers := make([]protos.Endpoint, 0)
+	peers := make([]*protos.Endpoint, 0)
 	for _, peer := range yc.PeerEndpoints {
 		peerEndpoint, err := peer.toStdEndpoint()
 		if err != nil {
@@ -153,7 +153,7 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 			return nil, fmt.Errorf("SelfEndpoint can't in peer endpoints")
 		}
 
-		peers = append(peers, *peerEndpoint)
+		peers = append(peers, peerEndpoint)
 	}
 	config, err := yc.RaftConfigurations.toRaftConfigurations()
 	if err != nil {
@@ -161,7 +161,7 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 	}
 
 	return &Configurations{
-		SelfEndpoint:         *selfEndpoint,
+		SelfEndpoint:         selfEndpoint,
 		RpcType:              toValidRpcType(yc.RpcType),
 		PeerEndpoints:        peers,
 		RaftConfigurations:   *config,

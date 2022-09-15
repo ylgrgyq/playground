@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"google.golang.org/protobuf/proto"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
+
+	"google.golang.org/protobuf/proto"
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
@@ -35,8 +36,8 @@ type RpcService interface {
 }
 
 type RpcClient interface {
-	RequestVote(fromNodeId string, toNodeEndpoint protos.Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
-	AppendEntries(fromNodeId string, toNodeEndpoint protos.Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
+	RequestVote(fromNodeId string, toNodeEndpoint *protos.Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
+	AppendEntries(fromNodeId string, toNodeEndpoint *protos.Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
 
 type RpcHandler interface {
@@ -44,7 +45,7 @@ type RpcHandler interface {
 	HandleAppendEntries(ctx context.Context, from string, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
 
-func NewRpcService(logger *log.Logger, rpcType RpcType, endpoint protos.Endpoint) (RpcService, error) {
+func NewRpcService(logger *log.Logger, rpcType RpcType, endpoint *protos.Endpoint) (RpcService, error) {
 	switch rpcType {
 	case HttpRpcType:
 		return NewHttpRpc(endpoint, logger), nil
@@ -65,7 +66,7 @@ type HttpRpcService struct {
 	client         *http.Client
 	apiToUriMap    map[RpcAPI]RequestApiUri
 	rpcHandlers    map[string]RpcHandler
-	selfEndpoint   protos.Endpoint
+	selfEndpoint   *protos.Endpoint
 	selfEndpointId string
 	logger         log.Logger
 	rpcHandlerLock sync.Mutex
@@ -110,7 +111,7 @@ func (h *HttpRpcService) Shutdown(context context.Context) error {
 	return h.server.Shutdown(context)
 }
 
-func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint protos.Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
 	h.logger.Printf("send RequestVote from %s to %s. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d",
 		fromNodeId,
 		nodeEndpoint.NodeId,
@@ -131,7 +132,7 @@ func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint protos.Endp
 	return &res, nil
 }
 
-func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint protos.Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	h.logger.Printf("send AppendEntries from %s to %s. Term: %d, LeaderId: \"%s\", LeaderCommit: %d",
 		fromNodeId,
 		nodeEndpoint.NodeId,
@@ -151,7 +152,7 @@ func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint protos.En
 	return &res, nil
 }
 
-func (h *HttpRpcService) sendRequest(api RpcAPI, fromNodeId string, toNodeEndpoint protos.Endpoint, requestBody proto.Message, responseBody proto.Message) error {
+func (h *HttpRpcService) sendRequest(api RpcAPI, fromNodeId string, toNodeEndpoint *protos.Endpoint, requestBody proto.Message, responseBody proto.Message) error {
 	uri, ok := h.apiToUriMap[api]
 	if !ok {
 		return fmt.Errorf("unknown rpc API with code: %d", api)
@@ -191,7 +192,7 @@ func (h *HttpRpcService) sendRequest(api RpcAPI, fromNodeId string, toNodeEndpoi
 	return nil
 }
 
-func NewHttpRpc(selfEndpoint protos.Endpoint, logger *log.Logger) *HttpRpcService {
+func NewHttpRpc(selfEndpoint *protos.Endpoint, logger *log.Logger) *HttpRpcService {
 	httpRpcServiceLogger := log.New(logger.Writer(), "[HttpRpc]", logger.Flags())
 	httpClient := http.Client{
 		Timeout: 10 * time.Second,
@@ -286,7 +287,7 @@ func buildApiToUriMap() map[RpcAPI]RequestApiUri {
 	return apiToUriMap
 }
 
-func (h *HttpRpcService) encodeRequest(fromNodeId string, toNodeEndpoint protos.Endpoint, requestBody proto.Message) ([]byte, error) {
+func (h *HttpRpcService) encodeRequest(fromNodeId string, toNodeEndpoint *protos.Endpoint, requestBody proto.Message) ([]byte, error) {
 	bs, err := proto.Marshal(requestBody)
 	if err != nil {
 		return nil, err
@@ -381,6 +382,6 @@ func writeResponse(writer http.ResponseWriter, url *url.URL, mid string, respons
 	return nil
 }
 
-func buildRequestUrl(endpoint protos.Endpoint, api RequestApiUri) string {
+func buildRequestUrl(endpoint *protos.Endpoint, api RequestApiUri) string {
 	return fmt.Sprintf("http://%s:%d%s", endpoint.Ip, endpoint.Port, api)
 }
