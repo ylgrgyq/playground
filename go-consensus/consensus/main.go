@@ -55,7 +55,7 @@ func Main() {
 
 	logger.Printf("%s", config)
 
-	rpcService, err := NewRpcService(logger, config.RpcType, config.SelfEndpoint)
+	rpcService, err := NewRpcService(logger, config)
 	if err != nil {
 		logger.Fatalf("create rpc service failed: %s", err)
 	}

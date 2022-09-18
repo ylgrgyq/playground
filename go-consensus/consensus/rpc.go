@@ -45,12 +45,12 @@ type RpcHandler interface {
 	HandleAppendEntries(ctx context.Context, from string, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
 }
 
-func NewRpcService(logger *log.Logger, rpcType RpcType, endpoint *protos.Endpoint) (RpcService, error) {
-	switch rpcType {
+func NewRpcService(logger *log.Logger, config *Configurations) (RpcService, error) {
+	switch config.RpcType {
 	case HttpRpcType:
-		return NewHttpRpc(endpoint, logger), nil
+		return NewHttpRpc(logger, config), nil
 	default:
-		return nil, fmt.Errorf("unsupport rpc type: %s", rpcType)
+		return nil, fmt.Errorf("unsupport rpc type: %s", config.RpcType)
 	}
 }
 
@@ -67,7 +67,6 @@ type HttpRpcService struct {
 	apiToUriMap    map[RpcAPI]RequestApiUri
 	rpcHandlers    map[string]RpcHandler
 	selfEndpoint   *protos.Endpoint
-	selfEndpointId string
 	logger         log.Logger
 	rpcHandlerLock sync.Mutex
 }
@@ -192,10 +191,11 @@ func (h *HttpRpcService) sendRequest(api RpcAPI, fromNodeId string, toNodeEndpoi
 	return nil
 }
 
-func NewHttpRpc(selfEndpoint *protos.Endpoint, logger *log.Logger) *HttpRpcService {
+func NewHttpRpc(logger *log.Logger, config *Configurations) *HttpRpcService {
+	selfEndpoint := config.SelfEndpoint
 	httpRpcServiceLogger := log.New(logger.Writer(), "[HttpRpc]", logger.Flags())
 	httpClient := http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: time.Duration(config.RaftConfigurations.RpcTimeoutMs) * time.Millisecond,
 	}
 	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, logger: *httpRpcServiceLogger, client: &httpClient, rpcHandlerLock: sync.Mutex{}}
 

@@ -35,6 +35,7 @@ func toValidRpcType(rpcTypeStr string) RpcType {
 type RaftConfigurations struct {
 	PingTimeoutMs     int64
 	ElectionTimeoutMs int64
+	RpcTimeoutMs      int64
 }
 
 type Configurations struct {
@@ -79,6 +80,7 @@ type yamlEndpoint struct {
 }
 
 type yamlRaftConfigurations struct {
+	RpcTimeoutMs      int64 `yaml:"rpcTimeoutMs:`
 	ElectionTimeoutMs int64 `yaml:"electionTimeoutMs"`
 	PingTimeoutMs     int64 `yaml:"pingTimeoutMs"`
 }
@@ -95,9 +97,14 @@ func (yc *yamlRaftConfigurations) toRaftConfigurations() (*RaftConfigurations, e
 		return nil, fmt.Errorf("invalid ElectionTimeoutMs: %d. ElectionTimeoutMs is at least twice as large as PingTimeoutMs", yc.ElectionTimeoutMs)
 	}
 
+	if yc.RpcTimeoutMs <= 0 {
+		return nil, fmt.Errorf("invalid RpcTimeoutMs: %d", yc.RpcTimeoutMs)
+	}
+
 	return &RaftConfigurations{
 		ElectionTimeoutMs: yc.ElectionTimeoutMs,
 		PingTimeoutMs:     yc.PingTimeoutMs,
+		RpcTimeoutMs:      yc.RpcTimeoutMs,
 	}, nil
 }
 

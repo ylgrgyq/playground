@@ -1,4 +1,6 @@
 rpcType: "http"
+metaStorageDirectory: ""
+rpcTimeoutMs: 1000
 
 selfEndpoint:
   nodeId: node2
@@ -12,7 +14,6 @@ peerEndpoints:
   - nodeId: node1
     ip: "127.0.0.1"
     port: 8081
-
 
 raftConfigurations:
   pingTimeoutMs: 2000
