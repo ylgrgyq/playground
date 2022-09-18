@@ -28,19 +28,28 @@ const (
 )
 
 type Ballot[T any] struct {
-	peers   map[string]*PeerNode
-	vote    int
-	voteVal T
+	knownEndpointIds map[string]bool
+	vote             int
+	valueToVote      T
+}
+
+func NewBallot[T any](selfId string, peers map[string]*PeerNode, valToVote T) *Ballot[T] {
+	knownPeerIds := make(map[string]bool)
+	knownPeerIds[selfId] = true
+	for peerId := range peers {
+		knownPeerIds[peerId] = true
+	}
+	return &Ballot[T]{knownPeerIds, 0, valToVote}
 }
 
 func (b *Ballot[T]) Count(peerNodeId string) {
-	if _, ok := b.peers[peerNodeId]; ok {
+	if _, ok := b.knownEndpointIds[peerNodeId]; ok {
 		b.vote += 1
 	}
 }
 
 func (b *Ballot[T]) Pass() bool {
-	return b.vote >= (len(b.peers)+1)/2
+	return b.vote >= (len(b.knownEndpointIds)+1)/2
 }
 
 type State interface {
@@ -92,6 +101,9 @@ func (l *Leader) Stop() {
 		err := fmt.Errorf("leader step down")
 		resp.Done <- err
 	}
+	for _, peer := range l.node.peers {
+		peer.numOfPendingAppend = 0
+	}
 }
 
 func (*Leader) StateType() StateType {
@@ -108,7 +120,7 @@ func (l *Leader) Append(bytes []byte) (*AppendResponse, error) {
 
 	resp := AppendResponse{Index: entry.Index, Done: make(chan error)}
 	l.pendingAppend = append(l.pendingAppend, &resp)
-	l.ballots = append(l.ballots, &Ballot[int64]{peers: l.node.peers, voteVal: entry.Index})
+	l.ballots = append(l.ballots, NewBallot(l.node.Id, l.node.peers, entry.Index))
 
 	for _, peer := range l.node.peers {
 		l.sendAppend(peer)
@@ -135,7 +147,7 @@ func (l *Leader) ballotAndUpdateCommitIndex() {
 	for peerId, peer := range l.node.peers {
 		ballot, ok := ballots[peer.matchIndex]
 		if !ok {
-			ballot = &Ballot[int64]{peers: l.node.peers}
+			ballot := NewBallot[int64](l.node.Id, l.node.peers, 0)
 			ballots[peer.matchIndex] = ballot
 		}
 		ballot.Count(peerId)
@@ -149,80 +161,94 @@ func (l *Leader) ballotAndUpdateCommitIndex() {
 }
 
 func (l *Leader) sendHeartbeat(peer *PeerNode) {
-	if peer.pendingAppend != 0 {
+	if peer.numOfPendingAppend != 0 {
 		return
 	}
 
 	heartbeat := l.buildHeartbeat(peer)
-	peer.pendingAppend += 1
-	res, err := l.node.rpcClient.AppendEntries(l.node.Id, peer.Endpoint, heartbeat)
-	peer.pendingAppend -= 1
-	if err != nil {
-		l.node.logger.Printf("heartbeat for peer: %s failed. %s", peer.Id, err)
-		return
-	}
+	peer.numOfPendingAppend += 1
+	resChan := l.node.rpcClient.AppendEntries(l.node.Id, peer.Endpoint, heartbeat)
+	go func() {
+		res := <-resChan
+		l.node.lock.Lock()
+		defer l.node.lock.Unlock()
+		if l.node.state != l {
+			return
+		}
+		peer.numOfPendingAppend -= 1
+		if res.err != nil {
+			l.node.logger.Printf("heartbeat for peer: %s failed. %s", peer.Id, res.err)
+			return
+		}
 
-	if !res.Success {
-		peer.nextIndex = heartbeat.PrevLogIndex
-		l.sendProbe(peer)
-		return
-	}
-	l.sendAppend(peer)
+		if !res.response.Success {
+			meta := l.node.meta.GetMeta()
+			if res.response.Term > meta.CurrentTerm {
+				l.node.transferToFollower()
+				return
+			}
+			peer.nextIndex = heartbeat.PrevLogIndex
+			l.sendProbe(peer)
+			return
+		}
+
+		l.sendAppend(peer)
+	}()
 }
 
 func (l *Leader) sendAppend(peer *PeerNode) {
-	if peer.pendingAppend != 0 {
+	if peer.numOfPendingAppend != 0 {
 		return
 	}
 
-	append := l.buildAppendEntries(peer)
-	if append == nil {
-		return
-	}
+	// append := l.buildAppendEntries(peer)
+	// if append == nil {
+	// 	return
+	// }
 
-	peer.pendingAppend += 1
-	res, err := l.node.rpcClient.AppendEntries(l.node.Id, peer.Endpoint, append)
-	peer.pendingAppend -= 1
-	if err != nil {
-		l.node.logger.Printf("heartbeat for peer: %s failed. %s", peer.Id, err)
-		return
-	}
+	// peer.numOfPendingAppend += 1
+	// res, err := l.node.rpcClient.AppendEntries(l.node.Id, peer.Endpoint, append)
+	// peer.numOfPendingAppend -= 1
+	// if err != nil {
+	// 	l.node.logger.Printf("heartbeat for peer: %s failed. %s", peer.Id, err)
+	// 	return
+	// }
 
-	if !res.Success {
-		peer.nextIndex = append.PrevLogIndex
-		l.sendProbe(peer)
-		return
-	}
+	// if !res.Success {
+	// 	peer.nextIndex = append.PrevLogIndex
+	// 	l.sendProbe(peer)
+	// 	return
+	// }
 
-	lastIndex := append.Entries[len(append.Entries)-1].Index
-	if lastIndex > peer.matchIndex {
-		peer.matchIndex = lastIndex
-		peer.nextIndex = lastIndex + 1
-	}
+	// lastIndex := append.Entries[len(append.Entries)-1].Index
+	// if lastIndex > peer.matchIndex {
+	// 	peer.matchIndex = lastIndex
+	// 	peer.nextIndex = lastIndex + 1
+	// }
 
-	l.sendAppend(peer)
+	// l.sendAppend(peer)
 }
 
 func (l *Leader) sendProbe(peer *PeerNode) {
-	if peer.pendingAppend != 0 {
+	if peer.numOfPendingAppend != 0 {
 		return
 	}
 
-	heartbeat := l.buildHeartbeat(peer)
-	peer.pendingAppend += 1
-	res, err := l.node.rpcClient.AppendEntries(l.node.Id, peer.Endpoint, heartbeat)
-	peer.pendingAppend -= 1
-	if err != nil {
-		l.node.logger.Printf("heartbeat for peer: %s failed. %s", peer.Id, err)
-		return
-	}
+	// heartbeat := l.buildHeartbeat(peer)
+	// peer.numOfPendingAppend += 1
+	// res, err := l.node.rpcClient.AppendEntries(l.node.Id, peer.Endpoint, heartbeat)
+	// peer.numOfPendingAppend -= 1
+	// if err != nil {
+	// 	l.node.logger.Printf("heartbeat for peer: %s failed. %s", peer.Id, err)
+	// 	return
+	// }
 
-	if !res.Success {
-		peer.nextIndex = heartbeat.PrevLogIndex
-		l.sendProbe(peer)
-		return
-	}
-	l.sendAppend(peer)
+	// if !res.Success {
+	// 	peer.nextIndex = heartbeat.PrevLogIndex
+	// 	l.sendProbe(peer)
+	// 	return
+	// }
+	// l.sendAppend(peer)
 }
 
 func (l *Leader) buildAppendEntries(peer *PeerNode) *protos.AppendEntriesRequest {
@@ -375,20 +401,39 @@ func (c *Candidate) HandleAppendEntries(ctx context.Context, request *protos.App
 }
 
 func (*Candidate) UpdateAppliedLogIndex(index int64) {
-
+	// ignore
 }
 
 func (c *Candidate) electAsLeader() {
 	n := c.node
 	c.node.logger.Printf("%s start election", n.Id)
 
-	req, err := c.buildRequestVoteRequest()
-	if err == nil {
-		reps := c.broadcastRequestVote(req)
-		if c.node.state != c {
+	meta := n.meta.GetMeta()
+	meta.VoteFor = c.node.Id
+	meta.CurrentTerm += 1
+	if err := n.meta.SaveMeta(meta.CurrentTerm, meta.VoteFor); err != nil {
+		c.node.logger.Printf("%s elect as leader failed due to error: %s", n.Id, err)
+		timeout := calculateElectionTimeout(n.raftConfigs)
+		c.cancelElectionTimeoutFunc = n.scheduleOnce(timeout, c.electAsLeader)
+		return
+	}
+
+	req := c.buildRequestVoteRequest()
+	resultCh := c.broadcastRequestVote(req)
+	go func() {
+		reps := <-resultCh
+		n.lock.Lock()
+		defer n.lock.Unlock()
+		if n.state != c {
 			return
 		}
-		ballot := Ballot[string]{peers: c.node.peers, voteVal: n.Id}
+		meta := n.meta.GetMeta()
+		if meta.CurrentTerm != req.Term {
+			return
+		}
+
+		ballot := NewBallot(n.Id, n.peers, n.Id)
+		ballot.Count(n.Id)
 		for peerId, res := range reps {
 			if res.Term > n.meta.GetMeta().CurrentTerm {
 				n.transferToFollower()
@@ -404,76 +449,61 @@ func (c *Candidate) electAsLeader() {
 			return
 		} else {
 			c.node.logger.Printf("%s elect as leader failed due to ballot not fulfil", n.Id)
+			timeout := calculateElectionTimeout(n.raftConfigs)
+			c.cancelElectionTimeoutFunc = n.scheduleOnce(timeout, c.electAsLeader)
 		}
-	} else {
-		c.node.logger.Printf("%s elect as leader failed due to error: %s", n.Id, err)
-	}
-
-	timeout := calculateElectionTimeout(n.raftConfigs)
-	c.cancelElectionTimeoutFunc = n.scheduleOnce(timeout, c.electAsLeader)
+	}()
 }
 
-func (c *Candidate) buildRequestVoteRequest() (*protos.RequestVoteRequest, error) {
+func (c *Candidate) buildRequestVoteRequest() *protos.RequestVoteRequest {
 	n := c.node
 
 	meta := n.meta.GetMeta()
-	meta.VoteFor = c.node.Id
-	meta.CurrentTerm += 1
-	if err := n.meta.SaveMeta(meta.CurrentTerm, meta.VoteFor); err != nil {
-		return nil, err
-	}
-
 	lastLog := n.logStorage.LastEntry()
 	return &protos.RequestVoteRequest{
 		Term:         int64(meta.CurrentTerm),
 		CandidateId:  n.Id,
 		LastLogIndex: lastLog.Index,
 		LastLogTerm:  lastLog.Term,
-	}, nil
+	}
 }
 
-func (c *Candidate) broadcastRequestVote(req *protos.RequestVoteRequest) map[string]*protos.RequestVoteResponse {
-	c.node.lock.Unlock()
-	defer c.node.lock.Lock()
-	type BroadcastResponse struct {
-		peerId   string
-		response *protos.RequestVoteResponse
-		err      error
-	}
-	group := sync.WaitGroup{}
-	group.Add(len(c.node.peers))
-	responseChan := make(chan BroadcastResponse, len(c.node.peers))
-	for peerId, peer := range c.node.peers {
-		go func(peerId string, peer *PeerNode) {
-			defer group.Done()
-			res, err := c.node.rpcClient.RequestVote(c.node.Id, peer.Endpoint, req)
-			responseChan <- BroadcastResponse{peerId: peerId, response: res, err: err}
-		}(peerId, peer)
-	}
-
+func (c *Candidate) broadcastRequestVote(req *protos.RequestVoteRequest) chan map[string]*protos.RequestVoteResponse {
+	responseCh := make(chan map[string]*protos.RequestVoteResponse)
 	go func() {
-		group.Wait()
-		close(responseChan)
+		defer close(responseCh)
+		type PeerAndResponse struct {
+			peer    *PeerNode
+			channel chan *RpcResponse[*protos.RequestVoteResponse]
+		}
+
+		peerResponses := []*PeerAndResponse{}
+		for _, peer := range c.node.peers {
+			ch := c.node.rpcClient.RequestVote(c.node.Id, peer.Endpoint, req)
+			peerResponses = append(peerResponses, &PeerAndResponse{peer, ch})
+		}
+
+		responses := make(map[string]*protos.RequestVoteResponse)
+		for _, pr := range peerResponses {
+			r := <-pr.channel
+			if r.err != nil {
+				c.node.logger.Printf("request vote for peer: %s failed. %s", pr.peer.Id, r.err)
+				continue
+			}
+			responses[pr.peer.Id] = r.response
+		}
+		responseCh <- responses
 	}()
 
-	responses := make(map[string]*protos.RequestVoteResponse)
-	for res := range responseChan {
-		if res.err != nil {
-			c.node.logger.Printf("request vote for peer: %s failed. %s", res.peerId, res.err)
-			continue
-		}
-		responses[res.peerId] = res.response
-	}
-
-	return responses
+	return responseCh
 }
 
 type PeerNode struct {
-	Id            string
-	Endpoint      *protos.Endpoint
-	nextIndex     int64
-	matchIndex    int64
-	pendingAppend int32
+	Id                 string
+	Endpoint           *protos.Endpoint
+	nextIndex          int64
+	matchIndex         int64
+	numOfPendingAppend int32
 }
 
 func NewPeerNodes(es []*protos.Endpoint) map[string]*PeerNode {

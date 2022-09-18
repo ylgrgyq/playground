@@ -2,10 +2,11 @@ package consensus
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
@@ -35,11 +36,11 @@ func toValidRpcType(rpcTypeStr string) RpcType {
 type RaftConfigurations struct {
 	PingTimeoutMs     int64
 	ElectionTimeoutMs int64
-	RpcTimeoutMs      int64
 }
 
 type Configurations struct {
 	RpcType              RpcType
+	RpcTimeoutMs         int64
 	MetaStorageDirectory string
 	SelfEndpoint         *protos.Endpoint
 	PeerEndpoints        []*protos.Endpoint
@@ -97,20 +98,16 @@ func (yc *yamlRaftConfigurations) toRaftConfigurations() (*RaftConfigurations, e
 		return nil, fmt.Errorf("invalid ElectionTimeoutMs: %d. ElectionTimeoutMs is at least twice as large as PingTimeoutMs", yc.ElectionTimeoutMs)
 	}
 
-	if yc.RpcTimeoutMs <= 0 {
-		return nil, fmt.Errorf("invalid RpcTimeoutMs: %d", yc.RpcTimeoutMs)
-	}
-
 	return &RaftConfigurations{
 		ElectionTimeoutMs: yc.ElectionTimeoutMs,
 		PingTimeoutMs:     yc.PingTimeoutMs,
-		RpcTimeoutMs:      yc.RpcTimeoutMs,
 	}, nil
 }
 
 type yamlConfigurations struct {
 	RpcType              string                 `yaml:"rpcType"`
 	MetaStorageDirectory string                 `yaml:"metaStorageDirectory"`
+	RpcTimeoutMs         int64                  `yaml:"rpcTimeoutMs"`
 	SelfEndpoint         yamlEndpoint           `yaml:"selfEndpoint"`
 	PeerEndpoints        []yamlEndpoint         `yaml:"peerEndpoints"`
 	RaftConfigurations   yamlRaftConfigurations `yaml:"raftConfigurations"`
@@ -141,6 +138,9 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 	if yc.RpcType == UnknownRpcType {
 		return nil, fmt.Errorf("unknown rpc type: %s", yc.RpcType)
 	}
+	if yc.RpcTimeoutMs <= 0 {
+		return nil, fmt.Errorf("invalid RpcTimeoutMs: %d", yc.RpcTimeoutMs)
+	}
 	metaStorageDirectory := "/tmp/" + PROGRAM_NAME
 	if len(yc.MetaStorageDirectory) != 0 {
 		metaStorageDirectory = yc.MetaStorageDirectory
@@ -170,6 +170,7 @@ func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
 	return &Configurations{
 		SelfEndpoint:         selfEndpoint,
 		RpcType:              toValidRpcType(yc.RpcType),
+		RpcTimeoutMs:         yc.RpcTimeoutMs,
 		PeerEndpoints:        peers,
 		RaftConfigurations:   *config,
 		MetaStorageDirectory: metaStorageDirectory,

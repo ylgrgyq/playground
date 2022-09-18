@@ -35,9 +35,14 @@ type RpcService interface {
 	GetRpcClient() RpcClient
 }
 
+type RpcResponse[T proto.Message] struct {
+	response T
+	err      error
+}
+
 type RpcClient interface {
-	RequestVote(fromNodeId string, toNodeEndpoint *protos.Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error)
-	AppendEntries(fromNodeId string, toNodeEndpoint *protos.Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error)
+	RequestVote(fromNodeId string, toNodeEndpoint *protos.Endpoint, request *protos.RequestVoteRequest) chan *RpcResponse[*protos.RequestVoteResponse]
+	AppendEntries(fromNodeId string, toNodeEndpoint *protos.Endpoint, request *protos.AppendEntriesRequest) chan *RpcResponse[*protos.AppendEntriesResponse]
 }
 
 type RpcHandler interface {
@@ -110,7 +115,7 @@ func (h *HttpRpcService) Shutdown(context context.Context) error {
 	return h.server.Shutdown(context)
 }
 
-func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.RequestVoteRequest) chan *RpcResponse[*protos.RequestVoteResponse] {
 	h.logger.Printf("send RequestVote from %s to %s. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d",
 		fromNodeId,
 		nodeEndpoint.NodeId,
@@ -119,19 +124,28 @@ func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint *protos.End
 		request.LastLogTerm,
 		request.LastLogIndex)
 	var res protos.RequestVoteResponse
-	err := h.sendRequest(RequestVote, fromNodeId, nodeEndpoint, request, &res)
-	if err != nil {
-		return nil, err
-	}
-	h.logger.Printf("receive RequestVote response from %s to %s. Term: %d, VoteGranted: %t",
-		nodeEndpoint.NodeId,
-		fromNodeId,
-		res.Term,
-		res.VoteGranted)
-	return &res, nil
+	sendRetCh := h.sendRequest(RequestVote, fromNodeId, nodeEndpoint, request, &res)
+	respCh := make(chan *RpcResponse[*protos.RequestVoteResponse])
+
+	go func() {
+		defer close(respCh)
+		err := <-sendRetCh
+		if err != nil {
+			respCh <- &RpcResponse[*protos.RequestVoteResponse]{nil, err}
+			return
+		}
+		h.logger.Printf("receive RequestVote response from %s to %s. Term: %d, VoteGranted: %t",
+			nodeEndpoint.NodeId,
+			fromNodeId,
+			res.Term,
+			res.VoteGranted)
+		respCh <- &RpcResponse[*protos.RequestVoteResponse]{&res, nil}
+	}()
+
+	return respCh
 }
 
-func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.AppendEntriesRequest) chan *RpcResponse[*protos.AppendEntriesResponse] {
 	h.logger.Printf("send AppendEntries from %s to %s. Term: %d, LeaderId: \"%s\", LeaderCommit: %d",
 		fromNodeId,
 		nodeEndpoint.NodeId,
@@ -139,63 +153,92 @@ func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint *protos.E
 		request.LeaderId,
 		request.LeaderCommit)
 	var res protos.AppendEntriesResponse
-	err := h.sendRequest(AppendEntries, fromNodeId, nodeEndpoint, request, &res)
-	if err != nil {
-		return nil, err
-	}
-	h.logger.Printf("receive AppendEntries response from %s to %s. Term: %d, Success: %t",
-		nodeEndpoint.NodeId,
-		fromNodeId,
-		res.Term,
-		res.Success)
-	return &res, nil
+	sendRetCh := h.sendRequest(AppendEntries, fromNodeId, nodeEndpoint, request, &res)
+	respCh := make(chan *RpcResponse[*protos.AppendEntriesResponse])
+	go func() {
+		defer close(respCh)
+		err := <-sendRetCh
+		if err != nil {
+			respCh <- &RpcResponse[*protos.AppendEntriesResponse]{nil, err}
+			return
+		}
+		h.logger.Printf("receive AppendEntries response from %s to %s. Term: %d, Success: %t",
+			nodeEndpoint.NodeId,
+			fromNodeId,
+			res.Term,
+			res.Success)
+		respCh <- &RpcResponse[*protos.AppendEntriesResponse]{&res, nil}
+	}()
+
+	return respCh
 }
 
-func (h *HttpRpcService) sendRequest(api RpcAPI, fromNodeId string, toNodeEndpoint *protos.Endpoint, requestBody proto.Message, responseBody proto.Message) error {
-	uri, ok := h.apiToUriMap[api]
-	if !ok {
-		return fmt.Errorf("unknown rpc API with code: %d", api)
-	}
+func (h *HttpRpcService) sendRequest(
+	api RpcAPI,
+	fromNodeId string,
+	toNodeEndpoint *protos.Endpoint,
+	requestBody proto.Message,
+	responseBody proto.Message,
+) chan error {
+	respChan := make(chan error)
+	go func() {
+		defer close(respChan)
+		uri, ok := h.apiToUriMap[api]
+		if !ok {
+			h.logger.Printf("unknown rpc API with code: %d", api)
+			respChan <- fmt.Errorf("unknown rpc API with code: %d", api)
+			return
+		}
 
-	reqInBytes, err := h.encodeRequest(fromNodeId, toNodeEndpoint, requestBody)
-	if err != nil {
-		h.logger.Printf("encode request body failed: %+v failed. error: %s", requestBody, err)
-		return err
-	}
+		reqInBytes, err := h.encodeRequest(fromNodeId, toNodeEndpoint, requestBody)
+		if err != nil {
+			h.logger.Printf("encode request body failed: %+v failed. error: %s", requestBody, err)
+			respChan <- err
+			return
+		}
 
-	reqUrl := buildRequestUrl(toNodeEndpoint, uri)
-	postResp, err := h.client.Post(reqUrl, "application/octet-stream", bytes.NewBuffer(reqInBytes))
-	if err != nil {
-		return err
-	}
+		reqUrl := buildRequestUrl(toNodeEndpoint, uri)
+		reqBody := bytes.NewBuffer(reqInBytes)
+		postResp, err := h.client.Post(reqUrl, "application/octet-stream", reqBody)
+		if err != nil {
+			h.logger.Printf("post failed. error: %s", err)
+			respChan <- err
+			return
+		}
 
-	respBs, err := ioutil.ReadAll(postResp.Body)
-	if err != nil {
-		h.logger.Printf("read response body for request: %+v failed. error: %s", requestBody, err)
-		return err
-	}
+		respBs, err := ioutil.ReadAll(postResp.Body)
+		if err != nil {
+			h.logger.Printf("read response body for request: %+v failed. error: %s", requestBody, err)
+			respChan <- err
+			return
+		}
 
-	var rawResp protos.Response
-	err = proto.Unmarshal(respBs, &rawResp)
-	if err != nil {
-		h.logger.Printf("decode response for request: %+v failed. error: %s", requestBody, err)
-		return err
-	}
+		var rawResp protos.Response
+		err = proto.Unmarshal(respBs, &rawResp)
+		if err != nil {
+			h.logger.Printf("decode response for request: %+v failed. error: %s", requestBody, err)
+			respChan <- err
+			return
+		}
 
-	err = proto.Unmarshal(rawResp.Body, responseBody)
-	if err != nil {
-		h.logger.Printf("decode response body for request: %+v failed. error: %s", requestBody, err)
-		return err
-	}
+		err = proto.Unmarshal(rawResp.Body, responseBody)
+		if err != nil {
+			h.logger.Printf("decode response body for request: %+v failed. error: %s", requestBody, err)
+			respChan <- err
+			return
+		}
 
-	return nil
+		respChan <- nil
+	}()
+
+	return respChan
 }
 
 func NewHttpRpc(logger *log.Logger, config *Configurations) *HttpRpcService {
 	selfEndpoint := config.SelfEndpoint
 	httpRpcServiceLogger := log.New(logger.Writer(), "[HttpRpc]", logger.Flags())
 	httpClient := http.Client{
-		Timeout: time.Duration(config.RaftConfigurations.RpcTimeoutMs) * time.Millisecond,
+		Timeout: time.Duration(config.RpcTimeoutMs) * time.Millisecond,
 	}
 	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, logger: *httpRpcServiceLogger, client: &httpClient, rpcHandlerLock: sync.Mutex{}}
 
