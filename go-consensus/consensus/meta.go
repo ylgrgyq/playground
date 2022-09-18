@@ -3,10 +3,11 @@ package consensus
 import (
 	"context"
 	"fmt"
-	"google.golang.org/protobuf/proto"
 	"log"
 	"os"
 	"path/filepath"
+
+	"google.golang.org/protobuf/proto"
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
@@ -59,7 +60,7 @@ func (t *FileMetaStorage) LoadMeta() error {
 	return nil
 }
 
-func (t *FileMetaStorage) Stop(ctx context.Context){
+func (t *FileMetaStorage) Stop(ctx context.Context) {
 }
 
 func (t *FileMetaStorage) SaveMeta(currentTerm int64, voteFor string) error {

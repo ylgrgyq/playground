@@ -35,14 +35,14 @@ type RpcService interface {
 	GetRpcClient() RpcClient
 }
 
-type RpcResponse[T proto.Message] struct {
+type RpcResponse[T any] struct {
 	response T
 	err      error
 }
 
 type RpcClient interface {
-	RequestVote(fromNodeId string, toNodeEndpoint *protos.Endpoint, request *protos.RequestVoteRequest) chan *RpcResponse[*protos.RequestVoteResponse]
-	AppendEntries(fromNodeId string, toNodeEndpoint *protos.Endpoint, request *protos.AppendEntriesRequest) chan *RpcResponse[*protos.AppendEntriesResponse]
+	RequestVote(fromNodeId string, toNodeEndpoint *protos.Endpoint, request *protos.RequestVoteRequest) (string, chan *RpcResponse[*protos.RequestVoteResponse])
+	AppendEntries(fromNodeId string, toNodeEndpoint *protos.Endpoint, request *protos.AppendEntriesRequest) (string, chan *RpcResponse[*protos.AppendEntriesResponse])
 }
 
 type RpcHandler interface {
@@ -115,7 +115,7 @@ func (h *HttpRpcService) Shutdown(context context.Context) error {
 	return h.server.Shutdown(context)
 }
 
-func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.RequestVoteRequest) chan *RpcResponse[*protos.RequestVoteResponse] {
+func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.RequestVoteRequest) (string, chan *RpcResponse[*protos.RequestVoteResponse]) {
 	h.logger.Printf("send RequestVote from %s to %s. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d",
 		fromNodeId,
 		nodeEndpoint.NodeId,
@@ -124,7 +124,8 @@ func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint *protos.End
 		request.LastLogTerm,
 		request.LastLogIndex)
 	var res protos.RequestVoteResponse
-	sendRetCh := h.sendRequest(RequestVote, fromNodeId, nodeEndpoint, request, &res)
+	mid := RandString(8)
+	sendRetCh := h.sendRequest(mid, RequestVote, fromNodeId, nodeEndpoint, request, &res)
 	respCh := make(chan *RpcResponse[*protos.RequestVoteResponse])
 
 	go func() {
@@ -142,10 +143,10 @@ func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint *protos.End
 		respCh <- &RpcResponse[*protos.RequestVoteResponse]{&res, nil}
 	}()
 
-	return respCh
+	return mid, respCh
 }
 
-func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.AppendEntriesRequest) chan *RpcResponse[*protos.AppendEntriesResponse] {
+func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.AppendEntriesRequest) (string, chan *RpcResponse[*protos.AppendEntriesResponse]) {
 	h.logger.Printf("send AppendEntries from %s to %s. Term: %d, LeaderId: \"%s\", LeaderCommit: %d",
 		fromNodeId,
 		nodeEndpoint.NodeId,
@@ -153,7 +154,8 @@ func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint *protos.E
 		request.LeaderId,
 		request.LeaderCommit)
 	var res protos.AppendEntriesResponse
-	sendRetCh := h.sendRequest(AppendEntries, fromNodeId, nodeEndpoint, request, &res)
+	mid := RandString(8)
+	sendRetCh := h.sendRequest(mid, AppendEntries, fromNodeId, nodeEndpoint, request, &res)
 	respCh := make(chan *RpcResponse[*protos.AppendEntriesResponse])
 	go func() {
 		defer close(respCh)
@@ -170,10 +172,11 @@ func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint *protos.E
 		respCh <- &RpcResponse[*protos.AppendEntriesResponse]{&res, nil}
 	}()
 
-	return respCh
+	return mid, respCh
 }
 
 func (h *HttpRpcService) sendRequest(
+	mid string,
 	api RpcAPI,
 	fromNodeId string,
 	toNodeEndpoint *protos.Endpoint,
@@ -190,7 +193,7 @@ func (h *HttpRpcService) sendRequest(
 			return
 		}
 
-		reqInBytes, err := h.encodeRequest(fromNodeId, toNodeEndpoint, requestBody)
+		reqInBytes, err := h.encodeRequest(mid, fromNodeId, toNodeEndpoint, requestBody)
 		if err != nil {
 			h.logger.Printf("encode request body failed: %+v failed. error: %s", requestBody, err)
 			respChan <- err
@@ -330,13 +333,13 @@ func buildApiToUriMap() map[RpcAPI]RequestApiUri {
 	return apiToUriMap
 }
 
-func (h *HttpRpcService) encodeRequest(fromNodeId string, toNodeEndpoint *protos.Endpoint, requestBody proto.Message) ([]byte, error) {
+func (h *HttpRpcService) encodeRequest(mid string, fromNodeId string, toNodeEndpoint *protos.Endpoint, requestBody proto.Message) ([]byte, error) {
 	bs, err := proto.Marshal(requestBody)
 	if err != nil {
 		return nil, err
 	}
 
-	req := protos.Request{Body: bs, From: fromNodeId, To: toNodeEndpoint.NodeId, Mid: RandString(8)}
+	req := protos.Request{Body: bs, From: fromNodeId, To: toNodeEndpoint.NodeId, Mid: mid}
 	bs, err = proto.Marshal(&req)
 	if err != nil {
 		return nil, err

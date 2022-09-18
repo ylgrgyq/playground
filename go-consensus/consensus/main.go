@@ -2,10 +2,10 @@ package consensus
 
 import (
 	"context"
-	"github.com/jessevdk/go-flags"
 	"log"
 	"os"
-	"ylgrgyq.com/go-consensus/consensus/protos"
+
+	"github.com/jessevdk/go-flags"
 )
 
 type ApplicationOptions struct {
@@ -44,6 +44,23 @@ func parseCommandLineArguments() CommandLineOptions {
 	return CommandLineOptions{appOpts}
 }
 
+type TestingStateMachine struct {
+	logger *log.Logger
+}
+
+func (t *TestingStateMachine) ApplyOperation(index int64, op []byte) error {
+	t.logger.Printf("apply operation index: %d, op len: %d", index, len(op))
+	return nil
+}
+
+func (t *TestingStateMachine) GetCheckpoint() (int64, []byte, error) {
+	return 0, nil, nil
+}
+
+func (t *TestingStateMachine) LoadCheckpoint() {
+
+}
+
 func Main() {
 	logger := log.New(log.Writer(), "[Main]", log.LstdFlags|log.Lshortfile|log.Lmsgprefix|log.Lmicroseconds)
 	cliOpts := parseCommandLineArguments()
@@ -72,16 +89,17 @@ func Main() {
 		}
 	}()
 
-	node := NewNode(config, rpcService, make(chan []*protos.LogEntry), logger)
+	stateMachine := TestingStateMachine{logger}
+	consensus := NewConsensus(&stateMachine, config, rpcService, logger)
 
-	if err = node.Start(); err != nil {
+	if err = consensus.Start(); err != nil {
 		logger.Fatalf("start node failed: %s", err)
 	}
 
 	for {
 		select {
-		case <-node.Done:
-			logger.Printf("node %s done", node.Id)
+		case <-consensus.Done:
+
 		}
 	}
 }
