@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/proto"
 	"ylgrgyq.com/go-consensus/consensus/protos"
 )
 
@@ -645,7 +646,29 @@ func (n *Node) Append(bytes []byte) (*AppendResponse, error) {
 	return resp, nil
 }
 
-func (n *Node) HandleRequestVote(ctx context.Context, fromNodeId string, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
+func (n *Node) Handle(ctx context.Context, fromNodeId string, request proto.Message) (proto.Message, error) {
+	switch request.(type) {
+	case *protos.AppendEntriesRequest:
+		return n.handleAppendEntries(ctx, fromNodeId, request.(*protos.AppendEntriesRequest))
+	case *protos.RequestVoteRequest:
+		return n.handleRequestVote(ctx, fromNodeId, request.(*protos.RequestVoteRequest))
+	default:
+		return nil, fmt.Errorf("unknown request type from node: %s", fromNodeId)
+	}
+}
+
+func (n *Node) UpdateAppliedLogIndex(index int64) {
+	n.lock.Lock()
+	defer n.lock.Unlock()
+
+	if index > n.lastApplied {
+		n.lastApplied = index
+		n.logger.Printf("update applied index to: %d", index)
+	}
+	n.applyLogEntriesToStateMachine()
+}
+
+func (n *Node) handleRequestVote(ctx context.Context, fromNodeId string, request *protos.RequestVoteRequest) (*protos.RequestVoteResponse, error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	if _, ok := n.peers[fromNodeId]; !ok {
@@ -687,7 +710,7 @@ func (n *Node) HandleRequestVote(ctx context.Context, fromNodeId string, request
 	}, nil
 }
 
-func (n *Node) HandleAppendEntries(ctx context.Context, fromNodeId string, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
+func (n *Node) handleAppendEntries(ctx context.Context, fromNodeId string, request *protos.AppendEntriesRequest) (*protos.AppendEntriesResponse, error) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 	peer, ok := n.peers[fromNodeId]
@@ -711,17 +734,6 @@ func (n *Node) HandleAppendEntries(ctx context.Context, fromNodeId string, reque
 	}
 
 	return n.state.HandleAppendEntries(ctx, request)
-}
-
-func (n *Node) UpdateAppliedLogIndex(index int64) {
-	n.lock.Lock()
-	defer n.lock.Unlock()
-
-	if index > n.lastApplied {
-		n.lastApplied = index
-		n.logger.Printf("update applied index to: %d", index)
-	}
-	n.applyLogEntriesToStateMachine()
 }
 
 func (n *Node) scheduleOnce(timeoutMs int64, run func()) context.CancelFunc {
