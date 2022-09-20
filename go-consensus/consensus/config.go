@@ -3,6 +3,7 @@ package consensus
 import (
 	"fmt"
 	"io/ioutil"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -58,11 +59,18 @@ type HttpRpcConfigurations struct {
 	RpcTimeoutMs int64
 }
 
+type SelfEndpointConfigurations struct {
+	SelfEndpoint *protos.Endpoint
+}
+
+type PeerEndpointConfigurations struct {
+	PeerEndpoints []*protos.Endpoint
+}
+
 type Configurations struct {
+	SelfEndpointConfigurations
+	PeerEndpointConfigurations
 	RpcType               RpcType
-	RpcTimeoutMs          int64
-	SelfEndpoint          *protos.Endpoint
-	PeerEndpoints         []*protos.Endpoint
 	RaftConfigurations    RaftConfigurations
 	HttpRpcConfigurations HttpRpcConfigurations
 }
@@ -92,49 +100,59 @@ func (r *RaftConfigurations) Validate() error {
 	return nil
 }
 
-// func (ye *yamlEndpoint) toStdEndpoint() (*protos.Endpoint, error) {
-// 	if len(ye.NodeId) == 0 {
-// 		return nil, fmt.Errorf("invalid empty NodeId")
-// 	}
-// 	if !regexp.MustCompile(`^[a-zA-Z0-9]*$`).MatchString(ye.NodeId) {
-// 		return nil, fmt.Errorf("nodeId must be an alphanumeric string")
-// 	}
+func (h *HttpRpcConfigurations) Validate() error {
+	if h.RpcTimeoutMs <= 0 {
+		return fmt.Errorf("invalid RpcTimeoutMs: %d", h.RpcTimeoutMs)
+	}
+	return nil
+}
 
-// 	if len(ye.IP) == 0 {
-// 		return nil, fmt.Errorf("invalid empty IP")
-// 	}
-// 	if ye.Port <= 0 {
-// 		return nil, fmt.Errorf("invalid port: %d", ye.Port)
-// 	}
-// 	return &protos.Endpoint{
-// 		NodeId: ye.NodeId,
-// 		Ip:     ye.IP,
-// 		Port:   ye.Port,
-// 	}, nil
-// }
+func validateEndpoint(e *protos.Endpoint) error {
+	if len(e.NodeId) == 0 {
+		return fmt.Errorf("invalid empty NodeId")
+	}
+	if !regexp.MustCompile(`^[a-zA-Z0-9]*$`).MatchString(e.NodeId) {
+		return fmt.Errorf("nodeId must be an alphanumeric string")
+	}
+
+	if len(e.Ip) == 0 {
+		return fmt.Errorf("invalid empty IP")
+	}
+	if e.Port <= 0 {
+		return fmt.Errorf("invalid port: %d", e.Port)
+	}
+	return nil
+}
+
+func (s *SelfEndpointConfigurations) Validate() error {
+	return validateEndpoint(s.SelfEndpoint)
+}
+
+func (p *PeerEndpointConfigurations) Validate() error {
+	for _, peer := range p.PeerEndpoints {
+		if err := validateEndpoint(peer); err != nil {
+			return fmt.Errorf("PeerEndpoint, %s", err)
+		}
+	}
+	return nil
+}
 
 func (c *Configurations) Validate() error {
 	if err := c.RpcType.Validate(); err != nil {
 		return err
 	}
 
-	// selfEndpoint, err := yc.SelfEndpoint.toStdEndpoint()
-	// if err != nil {
-	// 	return nil, fmt.Errorf("SelfEndpoint, %s", err.Error())
-	// }
-	// peers := make([]*protos.Endpoint, 0)
-	// for _, peer := range yc.PeerEndpoints {
-	// 	peerEndpoint, err := peer.toStdEndpoint()
-	// 	if err != nil {
-	// 		return nil, fmt.Errorf("PeerEndpoint, %s", err.Error())
-	// 	}
+	if err := c.SelfEndpointConfigurations.Validate(); err != nil {
+		return err
+	}
 
-	// 	if selfEndpoint.NodeId == peerEndpoint.NodeId {
-	// 		return nil, fmt.Errorf("SelfEndpoint can't in peer endpoints")
-	// 	}
+	if err := c.PeerEndpointConfigurations.Validate(); err != nil {
+		return err
+	}
 
-	// 	peers = append(peers, peerEndpoint)
-	// }
+	if err := c.RaftConfigurations.Validate(); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -234,11 +252,11 @@ func (yc *yamlConfigurations) toConfigurations() (*Configurations, error) {
 	}
 
 	return &Configurations{
-		SelfEndpoint:          selfEndpoint,
-		RpcType:               toValidRpcType(yc.RpcType),
-		PeerEndpoints:         peers,
-		RaftConfigurations:    *yc.RaftConfigurations.toRaftConfigurations(),
-		HttpRpcConfigurations: *yc.HttpRpcConfigurations.toHttpConfigurations(),
+		SelfEndpointConfigurations: SelfEndpointConfigurations{selfEndpoint},
+		RpcType:                    toValidRpcType(yc.RpcType),
+		PeerEndpointConfigurations: PeerEndpointConfigurations{peers},
+		RaftConfigurations:         *yc.RaftConfigurations.toRaftConfigurations(),
+		HttpRpcConfigurations:      *yc.HttpRpcConfigurations.toHttpConfigurations(),
 	}, nil
 }
 
