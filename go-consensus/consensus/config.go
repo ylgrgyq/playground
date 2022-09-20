@@ -3,7 +3,6 @@ package consensus
 import (
 	"fmt"
 	"io/ioutil"
-	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -33,18 +32,111 @@ func toValidRpcType(rpcTypeStr string) RpcType {
 	return UnknownRpcType
 }
 
+func (r *RpcType) Validate() error {
+	if *r == UnknownRpcType {
+		return fmt.Errorf("unknown rpc type")
+	}
+	return nil
+}
+
+type Config interface {
+	Print()
+	Validate() error
+}
+
+type ConfigurationsParser interface {
+	Parse(bs []byte) Configurations
+}
+
 type RaftConfigurations struct {
-	PingTimeoutMs     int64
-	ElectionTimeoutMs int64
+	MetaStorageDirectory string
+	PingTimeoutMs        int64
+	ElectionTimeoutMs    int64
+}
+
+type HttpRpcConfigurations struct {
+	RpcTimeoutMs int64
 }
 
 type Configurations struct {
-	RpcType              RpcType
-	RpcTimeoutMs         int64
-	MetaStorageDirectory string
-	SelfEndpoint         *protos.Endpoint
-	PeerEndpoints        []*protos.Endpoint
-	RaftConfigurations   RaftConfigurations
+	RpcType               RpcType
+	RpcTimeoutMs          int64
+	SelfEndpoint          *protos.Endpoint
+	PeerEndpoints         []*protos.Endpoint
+	RaftConfigurations    RaftConfigurations
+	HttpRpcConfigurations HttpRpcConfigurations
+}
+
+func NewRaftConfigurations() *RaftConfigurations {
+	return &RaftConfigurations{
+		MetaStorageDirectory: "/tmp/" + PROGRAM_NAME,
+	}
+}
+
+func (r *RaftConfigurations) Validate() error {
+	if r.PingTimeoutMs <= 0 {
+		return fmt.Errorf("invalid PingTimeoutMs: %d", r.PingTimeoutMs)
+	}
+	if r.ElectionTimeoutMs <= 0 {
+		return fmt.Errorf("invalid ElectionTimeoutMs: %d", r.ElectionTimeoutMs)
+	}
+
+	if r.ElectionTimeoutMs < 2*r.PingTimeoutMs {
+		return fmt.Errorf("invalid ElectionTimeoutMs: %d. ElectionTimeoutMs is at least twice as large as PingTimeoutMs", r.ElectionTimeoutMs)
+	}
+
+	if len(r.MetaStorageDirectory) <= 0 {
+		return fmt.Errorf("empty MetaStorageDirectory")
+	}
+
+	return nil
+}
+
+// func (ye *yamlEndpoint) toStdEndpoint() (*protos.Endpoint, error) {
+// 	if len(ye.NodeId) == 0 {
+// 		return nil, fmt.Errorf("invalid empty NodeId")
+// 	}
+// 	if !regexp.MustCompile(`^[a-zA-Z0-9]*$`).MatchString(ye.NodeId) {
+// 		return nil, fmt.Errorf("nodeId must be an alphanumeric string")
+// 	}
+
+// 	if len(ye.IP) == 0 {
+// 		return nil, fmt.Errorf("invalid empty IP")
+// 	}
+// 	if ye.Port <= 0 {
+// 		return nil, fmt.Errorf("invalid port: %d", ye.Port)
+// 	}
+// 	return &protos.Endpoint{
+// 		NodeId: ye.NodeId,
+// 		Ip:     ye.IP,
+// 		Port:   ye.Port,
+// 	}, nil
+// }
+
+func (c *Configurations) Validate() error {
+	if err := c.RpcType.Validate(); err != nil {
+		return err
+	}
+
+	// selfEndpoint, err := yc.SelfEndpoint.toStdEndpoint()
+	// if err != nil {
+	// 	return nil, fmt.Errorf("SelfEndpoint, %s", err.Error())
+	// }
+	// peers := make([]*protos.Endpoint, 0)
+	// for _, peer := range yc.PeerEndpoints {
+	// 	peerEndpoint, err := peer.toStdEndpoint()
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("PeerEndpoint, %s", err.Error())
+	// 	}
+
+	// 	if selfEndpoint.NodeId == peerEndpoint.NodeId {
+	// 		return nil, fmt.Errorf("SelfEndpoint can't in peer endpoints")
+	// 	}
+
+	// 	peers = append(peers, peerEndpoint)
+	// }
+
+	return nil
 }
 
 func (c *Configurations) String() string {
@@ -53,7 +145,7 @@ func (c *Configurations) String() string {
 	b.WriteString("********************************* Configurations *********************************\n\n")
 	b.WriteString(fmt.Sprintf("NodeId: %s\n", c.SelfEndpoint.NodeId))
 	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("MetaStorageDir: %s\n", c.MetaStorageDirectory))
+	// b.WriteString(fmt.Sprintf("MetaStorageDir: %s\n", c.MetaStorageDirectory))
 	b.WriteString("\n")
 	b.WriteString(fmt.Sprintf("RpcType: %s\n", c.RpcType))
 	b.WriteString(fmt.Sprintf("IP: %s\n", c.SelfEndpoint.Ip))
@@ -81,99 +173,72 @@ type yamlEndpoint struct {
 }
 
 type yamlRaftConfigurations struct {
-	RpcTimeoutMs      int64 `yaml:"rpcTimeoutMs:`
-	ElectionTimeoutMs int64 `yaml:"electionTimeoutMs"`
-	PingTimeoutMs     int64 `yaml:"pingTimeoutMs"`
+	MetaStorageDirectory string `yaml:"metaStorageDirectory"`
+	ElectionTimeoutMs    int64  `yaml:"electionTimeoutMs"`
+	PingTimeoutMs        int64  `yaml:"pingTimeoutMs"`
 }
 
-func (yc *yamlRaftConfigurations) toRaftConfigurations() (*RaftConfigurations, error) {
-	if yc.PingTimeoutMs <= 0 {
-		return nil, fmt.Errorf("invalid PingTimeoutMs: %d", yc.PingTimeoutMs)
-	}
-	if yc.ElectionTimeoutMs <= 0 {
-		return nil, fmt.Errorf("invalid ElectionTimeoutMs: %d", yc.ElectionTimeoutMs)
-	}
-
-	if yc.ElectionTimeoutMs < 2*yc.PingTimeoutMs {
-		return nil, fmt.Errorf("invalid ElectionTimeoutMs: %d. ElectionTimeoutMs is at least twice as large as PingTimeoutMs", yc.ElectionTimeoutMs)
-	}
-
-	return &RaftConfigurations{
-		ElectionTimeoutMs: yc.ElectionTimeoutMs,
-		PingTimeoutMs:     yc.PingTimeoutMs,
-	}, nil
+type yamlHttpRpcConfigurations struct {
+	RpcTimeoutMs int64 `yaml:"rpcTimeoutMs"`
 }
 
 type yamlConfigurations struct {
-	RpcType              string                 `yaml:"rpcType"`
-	MetaStorageDirectory string                 `yaml:"metaStorageDirectory"`
-	RpcTimeoutMs         int64                  `yaml:"rpcTimeoutMs"`
-	SelfEndpoint         yamlEndpoint           `yaml:"selfEndpoint"`
-	PeerEndpoints        []yamlEndpoint         `yaml:"peerEndpoints"`
-	RaftConfigurations   yamlRaftConfigurations `yaml:"raftConfigurations"`
+	RpcType               string                    `yaml:"rpcType"`
+	SelfEndpoint          yamlEndpoint              `yaml:"selfEndpoint"`
+	PeerEndpoints         []yamlEndpoint            `yaml:"peerEndpoints"`
+	RaftConfigurations    yamlRaftConfigurations    `yaml:"raftConfigurations"`
+	HttpRpcConfigurations yamlHttpRpcConfigurations `yaml:"httpRpcConfigurations"`
 }
 
-func (ye *yamlEndpoint) toStdEndpoint() (*protos.Endpoint, error) {
-	if len(ye.NodeId) == 0 {
-		return nil, fmt.Errorf("invalid empty NodeId")
+func (yc yamlConfigurations) ParseConfig(bs []byte) (*Configurations, error) {
+	err := yaml.Unmarshal(bs, yc)
+	if err != nil {
+		return nil, fmt.Errorf("parse configurations in yaml failed. cause by: %s", err)
 	}
-	if !regexp.MustCompile(`^[a-zA-Z0-9]*$`).MatchString(ye.NodeId) {
-		return nil, fmt.Errorf("nodeId must be an alphanumeric string")
+	config, err := yc.toConfigurations()
+	if err != nil {
+		return nil, err
 	}
 
-	if len(ye.IP) == 0 {
-		return nil, fmt.Errorf("invalid empty IP")
-	}
-	if ye.Port <= 0 {
-		return nil, fmt.Errorf("invalid port: %d", ye.Port)
-	}
+	return config, nil
+}
+
+func (yc *yamlRaftConfigurations) toRaftConfigurations() *RaftConfigurations {
+	c := NewRaftConfigurations()
+	c.PingTimeoutMs = yc.PingTimeoutMs
+	c.ElectionTimeoutMs = yc.ElectionTimeoutMs
+	c.MetaStorageDirectory = yc.MetaStorageDirectory
+	return c
+}
+
+func (ye *yamlEndpoint) toStdEndpoint() *protos.Endpoint {
 	return &protos.Endpoint{
 		NodeId: ye.NodeId,
 		Ip:     ye.IP,
 		Port:   ye.Port,
-	}, nil
+	}
 }
 
-func (yc *yamlConfigurations) toStdConfigurations() (*Configurations, error) {
-	if yc.RpcType == UnknownRpcType {
-		return nil, fmt.Errorf("unknown rpc type: %s", yc.RpcType)
+func (y *yamlHttpRpcConfigurations) toHttpConfigurations() *HttpRpcConfigurations {
+	return &HttpRpcConfigurations{
+		RpcTimeoutMs: y.RpcTimeoutMs,
 	}
-	if yc.RpcTimeoutMs <= 0 {
-		return nil, fmt.Errorf("invalid RpcTimeoutMs: %d", yc.RpcTimeoutMs)
-	}
-	metaStorageDirectory := "/tmp/" + PROGRAM_NAME
-	if len(yc.MetaStorageDirectory) != 0 {
-		metaStorageDirectory = yc.MetaStorageDirectory
-	}
-	selfEndpoint, err := yc.SelfEndpoint.toStdEndpoint()
-	if err != nil {
-		return nil, fmt.Errorf("SelfEndpoint, %s", err.Error())
-	}
+}
+
+func (yc *yamlConfigurations) toConfigurations() (*Configurations, error) {
+	selfEndpoint := yc.SelfEndpoint.toStdEndpoint()
 	peers := make([]*protos.Endpoint, 0)
 	for _, peer := range yc.PeerEndpoints {
-		peerEndpoint, err := peer.toStdEndpoint()
-		if err != nil {
-			return nil, fmt.Errorf("PeerEndpoint, %s", err.Error())
-		}
-
-		if selfEndpoint.NodeId == peerEndpoint.NodeId {
-			return nil, fmt.Errorf("SelfEndpoint can't in peer endpoints")
-		}
-
+		peerEndpoint := peer.toStdEndpoint()
 		peers = append(peers, peerEndpoint)
-	}
-	config, err := yc.RaftConfigurations.toRaftConfigurations()
-	if err != nil {
-		return nil, fmt.Errorf("invalid raft configuration, %s", err.Error())
 	}
 
 	return &Configurations{
-		SelfEndpoint:         selfEndpoint,
-		RpcType:              toValidRpcType(yc.RpcType),
-		RpcTimeoutMs:         yc.RpcTimeoutMs,
-		PeerEndpoints:        peers,
-		RaftConfigurations:   *config,
-		MetaStorageDirectory: metaStorageDirectory,
+		SelfEndpoint:          selfEndpoint,
+		RpcType:               toValidRpcType(yc.RpcType),
+		PeerEndpoints:         peers,
+		RaftConfigurations:    *yc.RaftConfigurations.toRaftConfigurations(),
+		HttpRpcConfigurations: *yc.HttpRpcConfigurations.toHttpConfigurations(),
 	}, nil
 }
 
@@ -183,10 +248,13 @@ func ParseConfig(configFilePath string) (*Configurations, error) {
 		return nil, fmt.Errorf("read configurations from file %s failed. caused by: %s", configFilePath, err)
 	}
 
-	var yConfig yamlConfigurations
-	err = yaml.Unmarshal(bs, &yConfig)
+	c, err := yamlConfigurations{}.ParseConfig(bs)
 	if err != nil {
-		return nil, fmt.Errorf("parse configurations in yaml failed. cause by: %s", err)
+		return nil, err
 	}
-	return yConfig.toStdConfigurations()
+
+	if err = c.Validate(); err != nil {
+		return nil, err
+	}
+	return c, nil
 }

@@ -23,7 +23,7 @@ type MetaStorage interface {
 func NewMeta(configs *Configurations, logger *log.Logger) MetaStorage {
 	meta := Meta{CurrentTerm: 1, VoteFor: ""}
 	metaLogger := log.New(logger.Writer(), fmt.Sprintf("[Meta-%s]", configs.SelfEndpoint.NodeId), logger.Flags())
-	return &FileMetaStorage{meta: &meta, logger: metaLogger, metaDir: configs.MetaStorageDirectory, nodeId: configs.SelfEndpoint.NodeId}
+	return &FileMetaStorage{meta: &meta, logger: metaLogger, metaDir: configs.RaftConfigurations.MetaStorageDirectory, nodeId: configs.SelfEndpoint.NodeId}
 }
 
 type FileMetaStorage struct {
