@@ -120,73 +120,41 @@ func (h *HttpRpcService) Shutdown(context context.Context) error {
 }
 
 func (h *HttpRpcService) RequestVote(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.RequestVoteRequest) (string, chan *RpcResponse[*protos.RequestVoteResponse]) {
-	h.logger.Printf("send RequestVote from %s to %s. Term: %d, CandidateId: \"%s\", LastLogTerm: %d, LastLogIndex: %d",
-		fromNodeId,
-		nodeEndpoint.NodeId,
-		request.Term,
-		request.CandidateId,
-		request.LastLogTerm,
-		request.LastLogIndex)
 	var res protos.RequestVoteResponse
-	mid := RandString(8)
-	sendRetCh := h.sendRequest(mid, RequestVote, fromNodeId, nodeEndpoint, request, &res)
-	respCh := make(chan *RpcResponse[*protos.RequestVoteResponse])
-
-	go func() {
-		defer close(respCh)
-		err := <-sendRetCh
-		if err != nil {
-			respCh <- &RpcResponse[*protos.RequestVoteResponse]{nil, err}
-			return
-		}
-		h.logger.Printf("receive RequestVote response from %s to %s. Term: %d, VoteGranted: %t",
-			nodeEndpoint.NodeId,
-			fromNodeId,
-			res.Term,
-			res.VoteGranted)
-		respCh <- &RpcResponse[*protos.RequestVoteResponse]{&res, nil}
-	}()
-
+	mid, sendRetCh := h.sendRequest(RequestVote, fromNodeId, nodeEndpoint, request, &res)
+	respCh := pipelineResponse(&res, sendRetCh)
 	return mid, respCh
 }
 
 func (h *HttpRpcService) AppendEntries(fromNodeId string, nodeEndpoint *protos.Endpoint, request *protos.AppendEntriesRequest) (string, chan *RpcResponse[*protos.AppendEntriesResponse]) {
-	h.logger.Printf("send AppendEntries from %s to %s. Term: %d, LeaderId: \"%s\", LeaderCommit: %d",
-		fromNodeId,
-		nodeEndpoint.NodeId,
-		request.Term,
-		request.LeaderId,
-		request.LeaderCommit)
 	var res protos.AppendEntriesResponse
-	mid := RandString(8)
-	sendRetCh := h.sendRequest(mid, AppendEntries, fromNodeId, nodeEndpoint, request, &res)
-	respCh := make(chan *RpcResponse[*protos.AppendEntriesResponse])
+	mid, sendRetCh := h.sendRequest(AppendEntries, fromNodeId, nodeEndpoint, request, &res)
+	respCh := pipelineResponse(&res, sendRetCh)
+	return mid, respCh
+}
+
+func pipelineResponse[T any, Pt *T](res Pt, sendRetCh chan error) chan *RpcResponse[Pt] {
+	respCh := make(chan *RpcResponse[Pt])
 	go func() {
 		defer close(respCh)
 		err := <-sendRetCh
 		if err != nil {
-			respCh <- &RpcResponse[*protos.AppendEntriesResponse]{nil, err}
+			respCh <- &RpcResponse[Pt]{nil, err}
 			return
 		}
-		h.logger.Printf("receive AppendEntries response from %s to %s. Term: %d, Success: %t",
-			nodeEndpoint.NodeId,
-			fromNodeId,
-			res.Term,
-			res.Success)
-		respCh <- &RpcResponse[*protos.AppendEntriesResponse]{&res, nil}
+		respCh <- &RpcResponse[Pt]{res, nil}
 	}()
-
-	return mid, respCh
+	return respCh
 }
 
 func (h *HttpRpcService) sendRequest(
-	mid string,
 	api RpcAPI,
 	fromNodeId string,
 	toNodeEndpoint *protos.Endpoint,
 	requestBody proto.Message,
 	responseBody proto.Message,
-) chan error {
+) (string, chan error) {
+	mid := RandString(8)
 	respChan := make(chan error)
 	go func() {
 		defer close(respChan)
@@ -238,7 +206,7 @@ func (h *HttpRpcService) sendRequest(
 		respChan <- nil
 	}()
 
-	return respChan
+	return mid, respChan
 }
 
 func NewHttpRpc(logger *log.Logger, config *Configurations) *HttpRpcService {
@@ -305,8 +273,6 @@ func decodeRequestBody(body []byte, requestDecoded proto.Message) error {
 	}
 	return nil
 }
-
-type protoGenerator func() proto.Message
 
 func (h *HttpRpcService) genRaftRequestHandler(prototype proto.Message) func(writer http.ResponseWriter, request *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
