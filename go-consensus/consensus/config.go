@@ -178,17 +178,11 @@ func (c *Configurations) String() string {
 	b := strings.Builder{}
 	b.WriteString("\n")
 	b.WriteString("********************************* Configurations *********************************\n\n")
-	configVal := reflect.ValueOf(c).Elem()
-	for i := 0; i < configVal.NumField(); i++ {
-		f := configVal.Field(i)
-		switch fPtr := f.Addr().Interface().(type) {
-		case Config:
-			fPtr.Print(&b)
-			b.WriteString("\n")
-		default:
-			log.Fatalf("field: %s in %s does not implement interface Config",
-				f.Type().Name(), configVal.Type().String())
-		}
+	for next, hasNext := c.fieldWalker(); hasNext; {
+		v, h := next()
+		v.Print(&b)
+		b.WriteString("\n")
+		hasNext = h
 	}
 	b.WriteString("**********************************************************************************\n")
 
@@ -196,50 +190,34 @@ func (c *Configurations) String() string {
 }
 
 func (c *Configurations) Validate() error {
-	configVal := reflect.ValueOf(c).Elem()
-	for i := 0; i < configVal.NumField(); i++ {
-		f := configVal.Field(i)
-		switch fPtr := f.Addr().Interface().(type) {
-		case Config:
-			if err := fPtr.Validate(); err != nil {
-				return err
-			}
-		default:
-			log.Fatalf("field: %s in %s does not implement interface Config",
-				f.Type().Name(), configVal.Type().String())
+	for next, hasNext := c.fieldWalker(); hasNext; {
+		v, h := next()
+		if err := v.Validate(); err != nil {
+			return err
 		}
+		hasNext = h
 	}
 
 	return nil
 }
 
-// func (c *Configurations) String() string {
-// 	b := strings.Builder{}
-// 	b.WriteString("\n")
-// 	b.WriteString("********************************* Configurations *********************************\n\n")
-// 	b.WriteString(fmt.Sprintf("NodeId: %s\n", c.SelfEndpoint.NodeId))
-// 	b.WriteString("\n")
-// 	// b.WriteString(fmt.Sprintf("MetaStorageDir: %s\n", c.MetaStorageDirectory))
-// 	b.WriteString("\n")
-// 	b.WriteString(fmt.Sprintf("RpcType: %s\n", c.RpcType))
-// 	b.WriteString(fmt.Sprintf("IP: %s\n", c.SelfEndpoint.Ip))
-// 	b.WriteString(fmt.Sprintf("Port: %d\n", c.SelfEndpoint.Port))
-// 	b.WriteString("\n")
-// 	b.WriteString("PeerEndpoints:\n")
-// 	for _, peer := range c.PeerEndpoints {
-// 		b.WriteString(fmt.Sprintf("  NodeId: %s\n", peer.NodeId))
-// 		b.WriteString(fmt.Sprintf("  IP: %s\n", peer.Ip))
-// 		b.WriteString(fmt.Sprintf("  Port: %d\n", peer.Port))
-// 		b.WriteString("\n")
-// 	}
-
-// 	b.WriteString("RaftConfigurations:\n")
-// 	b.WriteString(fmt.Sprintf("  PingTimeoutMs: %dms\n", c.RaftConfigurations.PingTimeoutMs))
-// 	b.WriteString(fmt.Sprintf("  ElectionTimeout: %dms\n", c.RaftConfigurations.ElectionTimeoutMs))
-// 	b.WriteString("\n")
-// 	b.WriteString("**********************************************************************************\n")
-// 	return b.String()
-// }
+func (c *Configurations) fieldWalker() (func() (Config, bool), bool) {
+	configVal := reflect.ValueOf(c).Elem()
+	i := 0
+	next := func() (Config, bool) {
+		f := configVal.Field(i)
+		switch fPtr := f.Addr().Interface().(type) {
+		case Config:
+			i++
+			return fPtr, i < configVal.NumField()
+		default:
+			log.Fatalf("field: %s in %s does not implement interface Config",
+				f.Type().Name(), configVal.Type().String())
+			return nil, false
+		}
+	}
+	return next, i < configVal.NumField()
+}
 
 type yamlEndpoint struct {
 	NodeId string `yaml:"nodeId"`
