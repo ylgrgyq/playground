@@ -61,7 +61,10 @@ type RaftConfigurations struct {
 }
 
 type HttpRpcConfigurations struct {
-	RpcTimeoutMs int64
+	ClientRequestTimeoutMs int64
+	ServerReadTimeoutMs    int64
+	ServerWriteTimeoutMs   int64
+	ServerIdleTimeoutMs    int64
 }
 
 type SelfEndpointConfigurations struct {
@@ -114,13 +117,36 @@ func (r *RaftConfigurations) Validate() error {
 
 func (h *HttpRpcConfigurations) Print(b *strings.Builder) {
 	b.WriteString("HttpRpcConfigurations:\n")
-	b.WriteString(fmt.Sprintf("  RpcTimeoutMs: %dms\n", h.RpcTimeoutMs))
+	b.WriteString(fmt.Sprintf("  ClientRequestTimeoutMs: %dms\n", h.ClientRequestTimeoutMs))
+	b.WriteString(fmt.Sprintf("  ServerReadTimeoutMs: %dms\n", h.ServerReadTimeoutMs))
+	b.WriteString(fmt.Sprintf("  ServerWriteTimeoutMs: %dms\n", h.ServerWriteTimeoutMs))
+	b.WriteString(fmt.Sprintf("  ServerIdleTimeoutMs: %dms\n", h.ServerIdleTimeoutMs))
 }
 
 func (h *HttpRpcConfigurations) Validate() error {
-	log.Print("http config")
-	if h.RpcTimeoutMs <= 0 {
-		return fmt.Errorf("invalid RpcTimeoutMs: %d", h.RpcTimeoutMs)
+	if h.ClientRequestTimeoutMs < 0 {
+		return fmt.Errorf("invalid ClientRequestTimeoutMs: %d", h.ClientRequestTimeoutMs)
+	}
+	if h.ClientRequestTimeoutMs == 0 {
+		h.ClientRequestTimeoutMs = 1000
+	}
+	if h.ServerIdleTimeoutMs < 0 {
+		return fmt.Errorf("invalid ServerIdleTimeoutMs: %d", h.ServerIdleTimeoutMs)
+	}
+	if h.ServerIdleTimeoutMs == 0 {
+		h.ServerIdleTimeoutMs = 1000
+	}
+	if h.ServerReadTimeoutMs < 0 {
+		return fmt.Errorf("invalid ServerReadTimeoutMs: %d", h.ServerReadTimeoutMs)
+	}
+	if h.ServerReadTimeoutMs == 0 {
+		h.ServerReadTimeoutMs = 10_000
+	}
+	if h.ServerWriteTimeoutMs < 0 {
+		return fmt.Errorf("invalid ServerWriteTimeoutMs: %d", h.ServerWriteTimeoutMs)
+	}
+	if h.ServerWriteTimeoutMs == 0 {
+		h.ServerWriteTimeoutMs = 10_000
 	}
 	return nil
 }
@@ -232,7 +258,10 @@ type yamlRaftConfigurations struct {
 }
 
 type yamlHttpRpcConfigurations struct {
-	RpcTimeoutMs int64 `yaml:"rpcTimeoutMs"`
+	ClientRequestTimeoutMs int64 `yaml:"clientRequestTimeoutMs"`
+	ServerReadTimeoutMs    int64 `yaml:"ServerReadTimeoutMs"`
+	ServerWriteTimeoutMs   int64 `yaml:"ServerWriteTimeoutMs"`
+	ServerIdleTimeoutMs    int64 `yaml:"ServerIdleTimeoutMs"`
 }
 
 type yamlConfigurations struct {
@@ -276,7 +305,10 @@ func (ye *yamlEndpoint) toStdEndpoint() *protos.Endpoint {
 
 func (y *yamlHttpRpcConfigurations) toHttpConfigurations() *HttpRpcConfigurations {
 	return &HttpRpcConfigurations{
-		RpcTimeoutMs: y.RpcTimeoutMs,
+		ClientRequestTimeoutMs: y.ClientRequestTimeoutMs,
+		ServerReadTimeoutMs:    y.ServerReadTimeoutMs,
+		ServerWriteTimeoutMs:   y.ServerWriteTimeoutMs,
+		ServerIdleTimeoutMs:    y.ServerIdleTimeoutMs,
 	}
 }
 

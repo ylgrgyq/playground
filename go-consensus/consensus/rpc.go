@@ -213,7 +213,7 @@ func NewHttpRpc(logger *log.Logger, config *Configurations) *HttpRpcService {
 	selfEndpoint := config.SelfEndpoint
 	httpRpcServiceLogger := log.New(logger.Writer(), "[HttpRpc]", logger.Flags())
 	httpClient := http.Client{
-		Timeout: time.Duration(config.HttpRpcConfigurations.RpcTimeoutMs) * time.Millisecond,
+		Timeout: time.Duration(config.HttpRpcConfigurations.ClientRequestTimeoutMs) * time.Millisecond,
 	}
 	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, logger: *httpRpcServiceLogger, client: &httpClient, rpcHandlerLock: sync.Mutex{}}
 
@@ -227,8 +227,9 @@ func NewHttpRpc(logger *log.Logger, config *Configurations) *HttpRpcService {
 	httpRpcService.server = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", selfEndpoint.Ip, selfEndpoint.Port),
 		Handler:        serverMux,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
+		ReadTimeout:    time.Duration(config.HttpRpcConfigurations.ServerReadTimeoutMs) * time.Millisecond,
+		WriteTimeout:   time.Duration(config.HttpRpcConfigurations.ServerWriteTimeoutMs) * time.Millisecond,
+		IdleTimeout:    time.Duration(config.HttpRpcConfigurations.ServerIdleTimeoutMs) * time.Microsecond,
 		MaxHeaderBytes: 1 << 20,
 	}
 	httpRpcService.apiToUriMap = buildApiToUriMap()
