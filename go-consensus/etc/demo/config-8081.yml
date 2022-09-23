@@ -1,6 +1,7 @@
 rpcType: "http"
-metaStorageDirectory: ""
-rpcTimeoutMs: 1000
+
+httpRpcConfigurations:
+  rpcTimeoutMs: 1000
 
 selfEndpoint:
   nodeId: node1
@@ -16,5 +17,6 @@ peerEndpoints:
     port: 8083
 
 raftConfigurations:
+  metaStorageDirectory: ""
   pingTimeoutMs: 2000
   electionTimeoutMs: 5000

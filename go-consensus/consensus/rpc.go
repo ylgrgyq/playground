@@ -213,7 +213,7 @@ func NewHttpRpc(logger *log.Logger, config *Configurations) *HttpRpcService {
 	selfEndpoint := config.SelfEndpoint
 	httpRpcServiceLogger := log.New(logger.Writer(), "[HttpRpc]", logger.Flags())
 	httpClient := http.Client{
-		Timeout: time.Duration(config.RpcTimeoutMs) * time.Millisecond,
+		Timeout: time.Duration(config.HttpRpcConfigurations.RpcTimeoutMs) * time.Millisecond,
 	}
 	httpRpcService := HttpRpcService{selfEndpoint: selfEndpoint, logger: *httpRpcServiceLogger, client: &httpClient, rpcHandlerLock: sync.Mutex{}}
 

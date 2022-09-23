@@ -3,6 +3,8 @@ package consensus
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -32,6 +34,9 @@ func toValidRpcType(rpcTypeStr string) RpcType {
 	}
 	return UnknownRpcType
 }
+func (r *RpcType) Print(b *strings.Builder) {
+	b.WriteString(fmt.Sprintf("RpcType: %s\n", *r))
+}
 
 func (r *RpcType) Validate() error {
 	if *r == UnknownRpcType {
@@ -41,7 +46,7 @@ func (r *RpcType) Validate() error {
 }
 
 type Config interface {
-	Print()
+	Print(b *strings.Builder)
 	Validate() error
 }
 
@@ -68,17 +73,24 @@ type PeerEndpointConfigurations struct {
 }
 
 type Configurations struct {
+	RpcType               RpcType
+	HttpRpcConfigurations HttpRpcConfigurations
+	RaftConfigurations    RaftConfigurations
 	SelfEndpointConfigurations
 	PeerEndpointConfigurations
-	RpcType               RpcType
-	RaftConfigurations    RaftConfigurations
-	HttpRpcConfigurations HttpRpcConfigurations
 }
 
 func NewRaftConfigurations() *RaftConfigurations {
 	return &RaftConfigurations{
 		MetaStorageDirectory: "/tmp/" + PROGRAM_NAME,
 	}
+}
+
+func (r *RaftConfigurations) Print(b *strings.Builder) {
+	b.WriteString("RaftConfigurations:\n")
+	b.WriteString(fmt.Sprintf("  PingTimeoutMs: %dms\n", r.PingTimeoutMs))
+	b.WriteString(fmt.Sprintf("  ElectionTimeout: %dms\n", r.ElectionTimeoutMs))
+	b.WriteString(fmt.Sprintf("  MetaStorageDirectory: %s\n", r.MetaStorageDirectory))
 }
 
 func (r *RaftConfigurations) Validate() error {
@@ -100,7 +112,13 @@ func (r *RaftConfigurations) Validate() error {
 	return nil
 }
 
+func (h *HttpRpcConfigurations) Print(b *strings.Builder) {
+	b.WriteString("HttpRpcConfigurations:\n")
+	b.WriteString(fmt.Sprintf("  RpcTimeoutMs: %dms\n", h.RpcTimeoutMs))
+}
+
 func (h *HttpRpcConfigurations) Validate() error {
+	log.Print("http config")
 	if h.RpcTimeoutMs <= 0 {
 		return fmt.Errorf("invalid RpcTimeoutMs: %d", h.RpcTimeoutMs)
 	}
@@ -124,8 +142,27 @@ func validateEndpoint(e *protos.Endpoint) error {
 	return nil
 }
 
+func printEndpoint(b *strings.Builder, end *protos.Endpoint, padding int) {
+	b.WriteString(fmt.Sprintf("%sNodeId: %s\n", strings.Repeat(" ", padding), end.NodeId))
+	b.WriteString(fmt.Sprintf("%sIP: %s\n", strings.Repeat(" ", padding), end.Ip))
+	b.WriteString(fmt.Sprintf("%sPort: %d\n", strings.Repeat(" ", padding), end.Port))
+}
+
+func (s *SelfEndpointConfigurations) Print(b *strings.Builder) {
+	b.WriteString("SelfEndpoints:\n")
+	printEndpoint(b, s.SelfEndpoint, 2)
+}
+
 func (s *SelfEndpointConfigurations) Validate() error {
 	return validateEndpoint(s.SelfEndpoint)
+}
+
+func (c *PeerEndpointConfigurations) Print(b *strings.Builder) {
+	b.WriteString("PeerEndpoints:\n")
+	for _, peer := range c.PeerEndpoints {
+		printEndpoint(b, peer, 2)
+		b.WriteString("\n")
+	}
 }
 
 func (p *PeerEndpointConfigurations) Validate() error {
@@ -137,52 +174,72 @@ func (p *PeerEndpointConfigurations) Validate() error {
 	return nil
 }
 
+func (c *Configurations) String() string {
+	b := strings.Builder{}
+	b.WriteString("\n")
+	b.WriteString("********************************* Configurations *********************************\n\n")
+	configVal := reflect.ValueOf(c).Elem()
+	for i := 0; i < configVal.NumField(); i++ {
+		f := configVal.Field(i)
+		switch fPtr := f.Addr().Interface().(type) {
+		case Config:
+			fPtr.Print(&b)
+			b.WriteString("\n")
+		default:
+			log.Fatalf("field: %s in %s does not implement interface Config",
+				f.Type().Name(), configVal.Type().String())
+		}
+	}
+	b.WriteString("**********************************************************************************\n")
+
+	return b.String()
+}
+
 func (c *Configurations) Validate() error {
-	if err := c.RpcType.Validate(); err != nil {
-		return err
-	}
-
-	if err := c.SelfEndpointConfigurations.Validate(); err != nil {
-		return err
-	}
-
-	if err := c.PeerEndpointConfigurations.Validate(); err != nil {
-		return err
-	}
-
-	if err := c.RaftConfigurations.Validate(); err != nil {
-		return err
+	configVal := reflect.ValueOf(c).Elem()
+	for i := 0; i < configVal.NumField(); i++ {
+		f := configVal.Field(i)
+		switch fPtr := f.Addr().Interface().(type) {
+		case Config:
+			if err := fPtr.Validate(); err != nil {
+				return err
+			}
+		default:
+			log.Fatalf("field: %s in %s does not implement interface Config",
+				f.Type().Name(), configVal.Type().String())
+		}
 	}
 
 	return nil
 }
 
-func (c *Configurations) String() string {
-	b := strings.Builder{}
-	b.WriteString("\n")
-	b.WriteString("********************************* Configurations *********************************\n\n")
-	b.WriteString(fmt.Sprintf("NodeId: %s\n", c.SelfEndpoint.NodeId))
-	b.WriteString("\n")
-	// b.WriteString(fmt.Sprintf("MetaStorageDir: %s\n", c.MetaStorageDirectory))
-	b.WriteString("\n")
-	b.WriteString(fmt.Sprintf("RpcType: %s\n", c.RpcType))
-	b.WriteString(fmt.Sprintf("IP: %s\n", c.SelfEndpoint.Ip))
-	b.WriteString(fmt.Sprintf("Port: %d\n", c.SelfEndpoint.Port))
-	b.WriteString("\n")
-	b.WriteString("PeerEndpoints:\n")
-	for _, peer := range c.PeerEndpoints {
-		b.WriteString(fmt.Sprintf("  NodeId: %s\n", peer.NodeId))
-		b.WriteString(fmt.Sprintf("  IP: %s\n", peer.Ip))
-		b.WriteString(fmt.Sprintf("  Port: %d\n", peer.Port))
-		b.WriteString("\n")
-	}
-	b.WriteString("RaftConfigurations:\n")
-	b.WriteString(fmt.Sprintf("  PingTimeoutMs: %dms\n", c.RaftConfigurations.PingTimeoutMs))
-	b.WriteString(fmt.Sprintf("  ElectionTimeout: %dms\n", c.RaftConfigurations.ElectionTimeoutMs))
-	b.WriteString("\n")
-	b.WriteString("**********************************************************************************\n")
-	return b.String()
-}
+// func (c *Configurations) String() string {
+// 	b := strings.Builder{}
+// 	b.WriteString("\n")
+// 	b.WriteString("********************************* Configurations *********************************\n\n")
+// 	b.WriteString(fmt.Sprintf("NodeId: %s\n", c.SelfEndpoint.NodeId))
+// 	b.WriteString("\n")
+// 	// b.WriteString(fmt.Sprintf("MetaStorageDir: %s\n", c.MetaStorageDirectory))
+// 	b.WriteString("\n")
+// 	b.WriteString(fmt.Sprintf("RpcType: %s\n", c.RpcType))
+// 	b.WriteString(fmt.Sprintf("IP: %s\n", c.SelfEndpoint.Ip))
+// 	b.WriteString(fmt.Sprintf("Port: %d\n", c.SelfEndpoint.Port))
+// 	b.WriteString("\n")
+// 	b.WriteString("PeerEndpoints:\n")
+// 	for _, peer := range c.PeerEndpoints {
+// 		b.WriteString(fmt.Sprintf("  NodeId: %s\n", peer.NodeId))
+// 		b.WriteString(fmt.Sprintf("  IP: %s\n", peer.Ip))
+// 		b.WriteString(fmt.Sprintf("  Port: %d\n", peer.Port))
+// 		b.WriteString("\n")
+// 	}
+
+// 	b.WriteString("RaftConfigurations:\n")
+// 	b.WriteString(fmt.Sprintf("  PingTimeoutMs: %dms\n", c.RaftConfigurations.PingTimeoutMs))
+// 	b.WriteString(fmt.Sprintf("  ElectionTimeout: %dms\n", c.RaftConfigurations.ElectionTimeoutMs))
+// 	b.WriteString("\n")
+// 	b.WriteString("**********************************************************************************\n")
+// 	return b.String()
+// }
 
 type yamlEndpoint struct {
 	NodeId string `yaml:"nodeId"`
@@ -209,7 +266,7 @@ type yamlConfigurations struct {
 }
 
 func (yc yamlConfigurations) ParseConfig(bs []byte) (*Configurations, error) {
-	err := yaml.Unmarshal(bs, yc)
+	err := yaml.Unmarshal(bs, &yc)
 	if err != nil {
 		return nil, fmt.Errorf("parse configurations in yaml failed. cause by: %s", err)
 	}
@@ -225,7 +282,9 @@ func (yc *yamlRaftConfigurations) toRaftConfigurations() *RaftConfigurations {
 	c := NewRaftConfigurations()
 	c.PingTimeoutMs = yc.PingTimeoutMs
 	c.ElectionTimeoutMs = yc.ElectionTimeoutMs
-	c.MetaStorageDirectory = yc.MetaStorageDirectory
+	if len(yc.MetaStorageDirectory) > 0 {
+		c.MetaStorageDirectory = yc.MetaStorageDirectory
+	}
 	return c
 }
 
