@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 struct Index {
     file_id: String,
-    value_size: usize,
-    value_pos: usize,
+    value_size: u64,
+    value_pos: u64,
     tstamp: u64,
 }
 
